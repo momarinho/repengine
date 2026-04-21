@@ -7,6 +7,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/momarinho/rep_engine/internal/db"
 	"github.com/momarinho/rep_engine/internal/handlers"
+	"github.com/momarinho/rep_engine/internal/middleware"
 )
 
 func main() {
@@ -23,6 +24,10 @@ func main() {
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
+	})
+	app.Get("/dashboard", middleware.RequireAuth, func(c *fiber.Ctx) error {
+		userID := c.Locals("user_id").(int)
+		return c.JSON(fiber.Map{"message": "welcome to dashboard", "user_id": userID})
 	})
 
 	auth := app.Group("/auth")
