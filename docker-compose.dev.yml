@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: rep
+      POSTGRES_PASSWORD: rep
+      POSTGRES_DB: repengine
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  api:
+    build: ./api
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://rep:rep@db:5432/repengine
+    depends_on:
+      - db
+
+  web:
+    build: ./web
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

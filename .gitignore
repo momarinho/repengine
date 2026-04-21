@@ -1,0 +1,18 @@
+cat > .gitignore << 'EOF'
+# Go
+api/vendor/
+api/server
+
+# Node
+web/node_modules/
+web/.svelte-kit/
+web/build/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Docker
+*.log
+EOF
