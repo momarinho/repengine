@@ -3,8 +3,8 @@ package db
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
@@ -15,30 +15,31 @@ var Pool *pgxpool.Pool
 func Connect() error {
 	err := godotenv.Load()
 	if err != nil {
-		log.Println("No .env.example file found, using sys env vars")
+		return fmt.Errorf("godotenv: %w", err)
 	}
 
 	databaseURL := os.Getenv("DATABASE_URL")
-	if databaseURL == "" {
-		return fmt.Errorf("DATABASE_URL not set in .env.example")
-	}
-
 	config, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
-		return fmt.Errorf("unable to parse DATABASE_URL: %w", err)
+		return fmt.Errorf("parse config: %w", err)
 	}
 
-	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	config.MaxConns = 20
+	config.MinConns = 2
+	config.MaxConnLifetime = 1 * time.Hour
+	config.MaxConnIdleTime = 30 * time.Minute
+
+	pool, err := pgxpool.NewWithConfig(context.Background(),
+		config)
 	if err != nil {
-		return fmt.Errorf("unable to create connection pool: %w", err)
+		return fmt.Errorf("new pool %w", err)
 	}
 
 	if err := pool.Ping(context.Background()); err != nil {
-		return fmt.Errorf("unable to ping database: %w", err)
+		return fmt.Errorf("ping: %w", err)
 	}
 
 	Pool = pool
-	log.Println("✅ Database connected")
 	return nil
 }
 

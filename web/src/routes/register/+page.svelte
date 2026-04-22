@@ -42,7 +42,7 @@
 		</div>
 
 		<!-- Form -->
-		<form method="POST" action="/register" class="space-y-6" use:enhance>
+		<form method="POST" action="?/register" class="space-y-6" use:enhance>
 			<!-- Email Input -->
 			<div>
 				<label class="block text-xs font-label text-on-surface-variant uppercase tracking-widest mb-2" for="email">Email Address</label>

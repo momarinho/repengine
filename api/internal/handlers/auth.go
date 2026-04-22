@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"os"
 	"time"
 
@@ -29,7 +28,7 @@ func Register(c *fiber.Ctx) error {
 	}
 
 	// Insert user
-	_, err = db.Pool.Exec(context.Background(),
+	_, err = db.Pool.Exec(c.Context(),
 		"INSERT INTO users (email, password_hash) VALUES ($1, $2)",
 		input.Email, string(hash),
 	)
@@ -54,7 +53,7 @@ func Login(c *fiber.Ctx) error {
 	// Find user
 	var id int
 	var passwordHash string
-	err := db.Pool.QueryRow(context.Background(),
+	err := db.Pool.QueryRow(c.Context(),
 		"SELECT id, password_hash FROM users WHERE email = $1", input.Email,
 	).Scan(&id, &passwordHash)
 	if err != nil {
