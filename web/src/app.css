@@ -1,0 +1,69 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+
+@theme {
+  --color-background: #14121e;
+  --color-on-background: #e5e0f3;
+  --color-surface: #14121e;
+  --color-on-surface: #e5e0f3;
+  --color-surface-container-high: #2b2836;
+  --color-surface-container-highest: #353341;
+  --color-on-surface-variant: #dbc0c4;
+  --color-primary: #ffb1c3;
+  --color-primary-container: #eb6f92;
+  --color-on-primary: #65012c;
+  --color-on-primary-fixed: #3f0019;
+  --color-on-primary-container: #64012c;
+  --color-secondary: #d8bafb;
+  --color-secondary-container: #543b73;
+  --color-on-secondary: #3c245b;
+  --color-secondary-fixed: #eedcff;
+  --color-secondary-fixed-dim: #d8bafb;
+  --color-on-secondary-fixed: #260d44;
+  --color-on-secondary-fixed-variant: #543b73;
+  --color-on-secondary-container: #c6a9e9;
+  --color-tertiary: #9ccfd8;
+  --color-tertiary-container: #6ea0a8;
+  --color-on-tertiary: #00363d;
+  --color-tertiary-fixed: #b8ebf5;
+  --color-tertiary-fixed-dim: #9ccfd8;
+  --color-on-tertiary-fixed: #001f24;
+  --color-on-tertiary-fixed-variant: #174e55;
+  --color-on-tertiary-container: #00363c;
+  --color-surface-bright: #3a3746;
+  --color-surface-container: #201e2b;
+  --color-surface-container-low: #1c1a27;
+  --color-surface-container-lowest: #0e0d19;
+  --color-surface-dim: #14121e;
+  --color-surface-variant: #353341;
+  --color-surface-tint: #ffb1c3;
+  --color-inverse-surface: #e5e0f3;
+  --color-inverse-on-surface: #312f3d;
+  --color-inverse-primary: #a3375a;
+  --color-error: #ffb4ab;
+  --color-error-container: #93000a;
+  --color-on-error: #690005;
+  --color-on-error-container: #ffdad6;
+  --color-outline: #a38b8f;
+  --color-outline-variant: #554246;
+
+  --font-family-headline: 'Space Grotesk', sans-serif;
+  --font-family-body: 'Manrope', sans-serif;
+  --font-family-label: 'Manrope', sans-serif;
+
+  --radius-default: 0.25rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-full: 9999px;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+.material-symbols-outlined.filled {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+body {
+  font-family: var(--font-family-body);
+}
