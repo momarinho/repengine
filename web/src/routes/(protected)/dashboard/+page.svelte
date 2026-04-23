@@ -1,24 +1,38 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import NodeTypeCard from '$lib/blocks/NodeTypeCard.svelte';
+	import type { PageData } from './$types';
+
+	let { data }: { data: PageData } = $props();
 </script>
 
 <svelte:head>
 	<title>RepEngine V2 - Dashboard</title>
 </svelte:head>
 
-<div class="min-h-screen bg-background flex items-center justify-center">
-	<div class="text-center">
+<div class="min-h-screen bg-background px-6 py-10">
+	<div class="mx-auto max-w-6xl">
 		<h1 class="font-headline text-4xl font-bold text-on-surface">
-			Welcome to <span class="text-primary-container">RepEngine</span>
+			Node Types
 		</h1>
-		<p class="text-on-surface-variant mt-4">Dashboard coming soon...</p>
-		<form method="POST" action="/auth/logout">
-			<button
-				class="mt-8 bg-primary-container text-on-primary-fixed font-headline font-semibold py-3 px-8 rounded-full hover:bg-primary transition-colors"
-				type="submit"
-			>
-				Logout
-			</button>
-		</form>
+
+		<div class="node-types-grid">
+			{#each data.nodeTypes as nodeType}
+				<NodeTypeCard
+					slug={nodeType.slug}
+					name={nodeType.name}
+					icon={nodeType.icon}
+					description={nodeType.description}
+				/>
+			{/each}
+		</div>
 	</div>
 </div>
+
+<style>
+	.node-types-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+		gap: 16px;
+		margin-top: 24px;
+	}
+</style>

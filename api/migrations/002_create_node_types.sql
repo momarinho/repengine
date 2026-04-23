@@ -1,0 +1,13 @@
+CREATE TABLE IF NOT EXISTS node_types
+(
+    id SERIAL PRIMARY KEY
+    slug VARCHAR(50) NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    icon VARCHAR(50) NOT NULL,
+    schema JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Down
+DROP TABLE IF EXISTS node_types;
