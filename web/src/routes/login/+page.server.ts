@@ -4,7 +4,7 @@ import type { Actions } from './$types';
 const API_URL = process.env.API_URL || 'http://localhost:8080';
 
 export const actions = {
-	login: async ({ request }) => {
+	login: async ({ request, cookies }) => {
 		const data = await request.formData();
 		const email = data.get('email') as string;
 		const password = data.get('password') as string;
@@ -20,7 +20,18 @@ export const actions = {
 			return fail(401, { message: body.error || 'invalid credentials' });
 		}
 
-		// Backend sets cookie directly, no need to read token from body
+		const body = await res.json();
+
+		// Set cookie manually since server-side fetch doesn't propagate Set-Cookie
+		if (body.token) {
+			cookies.set('token', body.token, {
+				path: '/',
+				httpOnly: true,
+				sameSite: 'lax',
+				secure: false,
+				maxAge: 86400
+			});
+		}
 
 		throw redirect(303, '/dashboard');
 	},

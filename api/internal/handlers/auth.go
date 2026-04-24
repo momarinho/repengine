@@ -86,7 +86,7 @@ func Login(c *fiber.Ctx) error {
 		MaxAge:   86400,
 	})
 
-	return c.JSON(fiber.Map{"message": "logged in", "user_id": id})
+	return c.JSON(fiber.Map{"message": "logged in", "user_id": id, "token": tokenString})
 }
 
 func Logout(c *fiber.Ctx) error {

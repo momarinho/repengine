@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -14,11 +15,15 @@ var Pool *pgxpool.Pool
 
 func Connect() error {
 	err := godotenv.Load()
-	if err != nil {
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("godotenv: %w", err)
 	}
 
 	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		return fmt.Errorf("DATABASE_URL is not set")
+	}
+
 	config, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
 		return fmt.Errorf("parse config: %w", err)
@@ -51,7 +56,12 @@ func Close() {
 
 func RunMigrations(ctx context.Context) error {
 	queries := []string{
-		`CREATE TABLE IF NOT EXISTS users (...);`, // keep existing
+		`CREATE TABLE IF NOT EXISTS users (
+              id SERIAL PRIMARY KEY,
+              email VARCHAR(255) NOT NULL UNIQUE,
+              password_hash VARCHAR(255) NOT NULL,
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );`,
 		`CREATE TABLE IF NOT EXISTS node_types (
               id SERIAL PRIMARY KEY,
               slug VARCHAR(50) NOT NULL UNIQUE,
@@ -61,12 +71,55 @@ func RunMigrations(ctx context.Context) error {
               schema JSONB NOT NULL DEFAULT '{}',
               created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
           );`,
+		`CREATE TABLE IF NOT EXISTS workflows (
+              id SERIAL PRIMARY KEY,
+              user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              name VARCHAR(255) NOT NULL,
+              description TEXT,
+              is_public BOOLEAN NOT NULL DEFAULT FALSE,
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+              updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );`,
+		`CREATE TABLE IF NOT EXISTS workflow_blocks (
+              id SERIAL PRIMARY KEY,
+              workflow_id INTEGER NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+              node_type_slug VARCHAR(50) NOT NULL REFERENCES node_types(slug),
+              position INTEGER NOT NULL,
+              data JSONB NOT NULL DEFAULT '{}',
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );`,
+		`CREATE TABLE IF NOT EXISTS workflow_versions (
+              id SERIAL PRIMARY KEY,
+              workflow_id INTEGER NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+              version_number INTEGER NOT NULL,
+              snapshot JSONB NOT NULL,
+              commit_message VARCHAR(255),
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+              UNIQUE(workflow_id, version_number)
+          );`,
 	}
 	for _, q := range queries {
 		if _, err := Pool.Exec(ctx, q); err != nil {
 			return err
 		}
 	}
+
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE workflow_blocks ADD COLUMN IF NOT EXISTS id SERIAL`); err != nil {
+		return err
+	}
+
+	indexQueries := []string{
+		`CREATE INDEX IF NOT EXISTS idx_workflows_user_id ON workflows(user_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_workflow_blocks_workflow_id ON workflow_blocks(workflow_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_workflow_versions_workflow_id ON workflow_versions(workflow_id);`,
+	}
+	for _, q := range indexQueries {
+		if _, err := Pool.Exec(ctx, q); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

@@ -33,6 +33,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := db.SeedNodeTypes(context.Background()); err != nil {
+		slog.Error("failed to seed node types", "err", err)
+		os.Exit(1)
+	}
+
+	if err := handlers.LoadNodeTypesCache(context.Background()); err != nil {
+		slog.Error("failed to load node types cache", "err", err)
+		os.Exit(1)
+	}
+
 	app := fiber.New()
 
 	app.Use(middleware.RequestID())
@@ -76,6 +86,15 @@ func main() {
 	auth.Post("/logout", handlers.Logout)
 	app.Get("/node-types", handlers.GetNodeTypes)
 	app.Get("/node-types/:slug", handlers.GetNodeTypeBySlug)
+
+	workflows := app.Group("/workflows", middleware.RequireAuth)
+	workflows.Get("/", handlers.ListWorkflows)
+	workflows.Post("/", handlers.CreateWorkflow)
+	workflows.Get("/:id", handlers.GetWorkflow)
+	workflows.Put("/:id", handlers.UpdateWorkflow)
+	workflows.Delete("/:id", handlers.DeleteWorkflow)
+	workflows.Post("/:id/versions", handlers.CreateVersion)
+	workflows.Get("/:id/versions", handlers.ListVersions)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
