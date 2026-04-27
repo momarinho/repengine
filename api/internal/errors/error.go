@@ -62,42 +62,42 @@ func (e *AppError) WithExtra(key string, value any) *AppError {
 
 // ErrWorkflowNotFound returns a 404 Not Found AppError for missing workflows.
 func ErrWorkflowNotFound() *AppError {
-	return New(http.StatusNotFound, "workflow_not_found", "workflow not found")
+	return New(http.StatusNotFound, "WORKFLOW_NOT_FOUND", "Workflow not found")
 }
 
 // ErrBlockInvalid returns 422 Unprocessable Entity for invalid workflow block.
 // The provided message should describe the validation failure.
 func ErrBlockInvalid(msg string) *AppError {
-	return New(http.StatusUnprocessableEntity, "block_invalid", msg)
+	return New(http.StatusUnprocessableEntity, "BLOCK_INVALID", msg)
 }
 
 // ErrConflict returns a 409 Conflict AppError used for optimistic concurrency
 // errors. It adds the server's current updated timestamp as "current_updated_at"
 // in RFC3339Nano (UTC) so clients can reconcile.
 func ErrConflict(currentUpdateAt time.Time) *AppError {
-	return New(http.StatusConflict, "conflict", "workflow was modified by another request").
+	return New(http.StatusConflict, "CONFLICT", "Workflow was modified by another request").
 		WithExtra("current_updated_at", currentUpdateAt.UTC().Format(time.RFC3339Nano))
 }
 
 // ErrUnauthorized returns a 401 Unauthorized AppError.
 func ErrUnauthorized() *AppError {
-	return New(http.StatusUnauthorized, "unauthorized", "unauthorized")
+	return New(http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
 }
 
 // ErrForbidden returns a 403 Forbidden AppError.
 func ErrForbidden() *AppError {
-	return New(http.StatusForbidden, "forbidden", "forbidden")
+	return New(http.StatusForbidden, "FORBIDDEN", "Forbidden")
 }
 
 // ErrBadRequest returns a 400 Bad Request AppError with a custom message.
 func ErrBadRequest(msg string) *AppError {
-	return New(http.StatusBadRequest, "bad_request", msg)
+	return New(http.StatusBadRequest, "BAD_REQUEST", msg)
 }
 
 // ErrInternal returns a generic 500 Internal Server Error AppError. Use it as
 // a safe fallback when an error cannot be mapped to a more specific AppError.
 func ErrInternal() *AppError {
-	return New(http.StatusInternalServerError, "internal", "internal server error")
+	return New(http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error")
 }
 
 // WriteAppError writes the provided error to the HTTP response using Fiber.

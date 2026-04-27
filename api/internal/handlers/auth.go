@@ -7,6 +7,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/momarinho/rep_engine/internal/db"
+	apperrors "github.com/momarinho/rep_engine/internal/errors"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -18,13 +19,13 @@ func Register(c *fiber.Ctx) error {
 
 	var input Input
 	if err := c.BodyParser(&input); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid request"})
+		return apperrors.WriteAppError(c, apperrors.ErrBadRequest("invalid request"))
 	}
 
 	// Hash password
 	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to hash password"})
+		return apperrors.WriteAppError(c, apperrors.ErrInternal())
 	}
 
 	// Insert user
@@ -33,7 +34,7 @@ func Register(c *fiber.Ctx) error {
 		input.Email, string(hash),
 	)
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "email already exists"})
+		return apperrors.WriteAppError(c, apperrors.ErrBadRequest("email already exists"))
 	}
 
 	return c.JSON(fiber.Map{"message": "user created"})
@@ -47,7 +48,7 @@ func Login(c *fiber.Ctx) error {
 
 	var input Input
 	if err := c.BodyParser(&input); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid request"})
+		return apperrors.WriteAppError(c, apperrors.ErrBadRequest("invalid request"))
 	}
 
 	// Find user
@@ -57,14 +58,14 @@ func Login(c *fiber.Ctx) error {
 		"SELECT id, password_hash FROM users WHERE email = $1", input.Email,
 	).Scan(&id, &passwordHash)
 	if err != nil {
-		return c.Status(401).JSON(fiber.Map{"error": "invalid credentials"})
+		return apperrors.WriteAppError(c, apperrors.ErrUnauthorized())
 	}
 
 	// Verify password
 	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash),
 		[]byte(input.Password),
 	); err != nil {
-		return c.Status(401).JSON(fiber.Map{"error": "invalid credentials"})
+		return apperrors.WriteAppError(c, apperrors.ErrUnauthorized())
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -74,7 +75,7 @@ func Login(c *fiber.Ctx) error {
 
 	tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to generate token"})
+		return apperrors.WriteAppError(c, apperrors.ErrInternal())
 	}
 
 	c.Cookie(&fiber.Cookie{

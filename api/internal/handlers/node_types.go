@@ -6,6 +6,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/momarinho/rep_engine/internal/db"
+	apperrors "github.com/momarinho/rep_engine/internal/errors"
 )
 
 type NodeType struct {
@@ -53,7 +54,7 @@ func GetNodeTypeBySlug(c *fiber.Ctx) error {
 	slug := c.Params("slug")
 	nt, ok := nodeTypesCache[slug]
 	if !ok {
-		return c.Status(404).JSON(fiber.Map{"error": "node type not found"})
+		return apperrors.WriteAppError(c, apperrors.New(fiber.StatusNotFound, "NOT_FOUND", "Node type not found"))
 	}
 	return c.JSON(nt)
 }

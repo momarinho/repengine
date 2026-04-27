@@ -14,6 +14,7 @@ import (
 	"github.com/momarinho/rep_engine/internal/handlers"
 	"github.com/momarinho/rep_engine/internal/logger"
 	"github.com/momarinho/rep_engine/internal/middleware"
+	workflowsvc "github.com/momarinho/rep_engine/internal/workflows"
 )
 
 var serverStartTime = time.Now()
@@ -42,6 +43,10 @@ func main() {
 		slog.Error("failed to load node types cache", "err", err)
 		os.Exit(1)
 	}
+
+	workflowRepo := workflowsvc.NewRepository(db.Pool)
+	workflowService := workflowsvc.NewService(workflowRepo)
+	handlers.SetWorkflowService(workflowService)
 
 	app := fiber.New()
 
