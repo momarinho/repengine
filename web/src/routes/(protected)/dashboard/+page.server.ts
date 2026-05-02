@@ -28,7 +28,7 @@ function isWorkflow(value: unknown): value is Workflow {
 	);
 }
 
-export const load = (async ({ fetch, cookies }) => {
+export const load = (async ({ fetch, cookies, url }) => {
 	const token = cookies.get('token');
 
 	const res = await apiFetch(fetch, '/workflows', token, { method: 'GET' });
@@ -49,6 +49,7 @@ export const load = (async ({ fetch, cookies }) => {
 
 	return {
 		workflows: paginated.data.filter(isWorkflow),
-		error: null
+		error: null,
+		newRoutineFailed: url.searchParams.get('new') === 'failed'
 	};
 }) satisfies PageServerLoad;

@@ -51,6 +51,12 @@
 
 	<!-- Dashboard Content -->
 	<div class="p-8 max-w-7xl mx-auto">
+		{#if data.newRoutineFailed}
+			<div class="mb-6 rounded-md border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
+				Unable to create a new routine right now. Try again.
+			</div>
+		{/if}
+
 		<!-- Filters -->
 		<div class="flex gap-4 mb-8">
 			{#each filters as f}

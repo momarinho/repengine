@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"sort"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/momarinho/rep_engine/internal/db"
@@ -47,6 +48,11 @@ func GetNodeTypes(c *fiber.Ctx) error {
 	for _, nt := range nodeTypesCache {
 		types = append(types, nt)
 	}
+
+	sort.Slice(types, func(i, j int) bool {
+		return types[i].ID < types[j].ID
+	})
+
 	return c.JSON(types)
 }
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { untrack } from 'svelte';
 	import type { PageData } from './$types';
 	import AddBlockModal from '$lib/editor/AddBlockModal.svelte';
@@ -45,6 +46,8 @@
 	let dragClientId = $state<string | null>(null);
 	let dropClientId = $state<string | null>(null);
 	let ignoreAutosave = $state(true);
+	let saveInFlight = $state(false);
+	let queuedSave = $state<{ source: 'autosave' | 'manual'; createVersion: boolean } | null>(null);
 
 	const hasWorkflow = $derived(Boolean(workflow));
 	const selectedBlock = $derived(blocks.find((block) => block.client_id === selectedBlockId) ?? null);
@@ -154,18 +157,26 @@
 	async function reloadFromServer(message: string): Promise<void> {
 		if (!workflow) return;
 
-		const response = await fetch(`/api/workflows/${workflow.id}`);
-		const body = await response.json().catch(() => null);
+		const [workflowResponse, versionsResponse] = await Promise.all([
+			fetch(`/api/workflows/${workflow.id}`),
+			fetch(`/api/workflows/${workflow.id}/versions`)
+		]);
+		const workflowBody = await workflowResponse.json().catch(() => null);
+		const versionsBody = await versionsResponse.json().catch(() => null);
 
-		if (response.ok && body) {
-			initializeFromWorkflow(body as Workflow);
+		if (workflowResponse.ok && workflowBody) {
+			initializeFromWorkflow(workflowBody as Workflow);
+		}
+
+		if (versionsResponse.ok && versionsBody && Array.isArray(versionsBody.data)) {
+			versions = versionsBody.data as WorkflowVersion[];
 		}
 
 		saveState = 'conflict';
 		statusMessage = message;
 	}
 
-	async function persist(source: 'autosave' | 'manual', createVersion = false): Promise<void> {
+	async function runPersist(source: 'autosave' | 'manual', createVersion = false): Promise<void> {
 		if (!workflow) return;
 
 		saveState = 'saving';
@@ -224,6 +235,27 @@
 		}
 	}
 
+	async function persist(source: 'autosave' | 'manual', createVersion = false): Promise<void> {
+		if (saveInFlight) {
+			queuedSave = { source, createVersion: queuedSave?.createVersion || createVersion };
+			return;
+		}
+
+		saveInFlight = true;
+
+		try {
+			await runPersist(source, createVersion);
+		} finally {
+			saveInFlight = false;
+
+			if (queuedSave) {
+				const next = queuedSave;
+				queuedSave = null;
+				await persist(next.source, next.createVersion);
+			}
+		}
+	}
+
 	$effect(() => {
 		if (ignoreAutosave || !workflow) {
 			return;
@@ -250,6 +282,23 @@
 				clearTimeout(debounceHandle);
 				debounceHandle = null;
 			}
+		};
+	});
+
+	$effect(() => {
+		if (!browser || !hasUnsavedChanges) {
+			return;
+		}
+
+		const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+			event.preventDefault();
+			event.returnValue = '';
+		};
+
+		window.addEventListener('beforeunload', handleBeforeUnload);
+
+		return () => {
+			window.removeEventListener('beforeunload', handleBeforeUnload);
 		};
 	});
 
@@ -319,8 +368,9 @@
 					</div>
 					<button
 						type="button"
-						class="inline-flex h-11 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-on-primary-fixed transition-opacity hover:opacity-90"
+						class="inline-flex h-11 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-on-primary-fixed transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
 						onclick={() => persist('manual', true)}
+						disabled={saveInFlight}
 					>
 						<span class="material-symbols-outlined text-base">save</span>
 						Save Routine
@@ -360,9 +410,21 @@
 							? 'border-error/40 bg-error/10 text-error'
 							: saveState === 'conflict'
 								? 'border-secondary/30 bg-secondary/10 text-secondary'
-								: 'border-outline-variant/20 bg-surface-container-low text-on-surface-variant'
+							: 'border-outline-variant/20 bg-surface-container-low text-on-surface-variant'
 					}`}>
-						{statusMessage}
+						<div class="flex items-center justify-between gap-4">
+							<p>{statusMessage}</p>
+
+							{#if saveState === 'error' || saveState === 'conflict'}
+								<button
+									type="button"
+									class="rounded-md border border-current/25 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em]"
+									onclick={() => reloadFromServer('Latest saved state reloaded.')}
+								>
+									Reload
+								</button>
+							{/if}
+						</div>
 					</div>
 				{/if}
 
