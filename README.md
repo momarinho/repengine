@@ -48,6 +48,47 @@ curl http://localhost:8080/health
 - `POST /workflows/:id/versions`
 - `GET /workflows/:id/versions`
 
+## Backend Validation
+
+### Automated tests
+
+From `api/`:
+
+```bash
+go test ./...
+```
+
+Integration tests for transactional rollback require a reachable PostgreSQL database.
+If `DATABASE_URL` is not exported, the tests attempt to load `api/.env`.
+
+### Performance benchmark
+
+From `api/`:
+
+```bash
+export BENCH_TOKEN='YOUR_JWT_TOKEN'
+go run ./cmd/bench_put_workflow
+```
+
+Default benchmark settings:
+
+- `BENCH_RUNS=80`
+- `BENCH_WARMUP=5`
+
+These defaults are chosen to stay below the API rate limit during a local run.
+
+Latest local result on 2026-05-02:
+
+- runs: 80
+- warmup: 5
+- failures: 0
+- avg: 4.10ms
+- p50: 4.01ms
+- p95: 4.45ms
+- max: 6.10ms
+
+Status: PASS (`p95 < 200ms`)
+
 ## Current status
 
 Completed:

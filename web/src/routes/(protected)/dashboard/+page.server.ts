@@ -1,6 +1,5 @@
 import type { PageServerLoad } from './$types';
-
-const API_URL = process.env.API_URL || 'http://localhost:8080';
+import { apiFetch } from '$lib/server/api';
 
 type Workflow = {
 	id: number;
@@ -32,9 +31,7 @@ function isWorkflow(value: unknown): value is Workflow {
 export const load = (async ({ fetch, cookies }) => {
 	const token = cookies.get('token');
 
-	const res = await fetch(`${API_URL}/workflows`, {
-		headers: token ? { Authorization: `Bearer ${token}` } : {}
-	});
+	const res = await apiFetch(fetch, '/workflows', token, { method: 'GET' });
 
 	if (!res.ok) {
 		return { workflows: [], error: 'Failed to load workflows' };

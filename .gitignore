@@ -1,4 +1,3 @@
-cat > .gitignore << 'EOF'
 # Go
 api/vendor/
 api/server
@@ -13,6 +12,9 @@ web/build/
 .env.*
 !.env.example
 
-# Docker
+# Local auth/debug artifacts
+cookies.txt
+web/cookies.txt
+
+# Docker / logs
 *.log
-EOF

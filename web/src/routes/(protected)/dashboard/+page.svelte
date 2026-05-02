@@ -42,7 +42,7 @@
 			<button class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors">
 				<span class="material-symbols-outlined">search</span>
 			</button>
-			<a href="/dashboard/new" class="btn-primary-gradient text-on-primary-fixed font-body font-semibold px-6 py-2.5 rounded-full flex items-center gap-2 hover:opacity-90 transition-opacity">
+			<a href="/dashboard/new" class="btn-primary-gradient text-on-primary-fixed font-body font-semibold px-6 py-2.5 rounded-md flex items-center gap-2 hover:opacity-90 transition-opacity">
 				<span class="material-symbols-outlined text-sm">add</span>
 				New Routine
 			</a>
@@ -55,7 +55,7 @@
 		<div class="flex gap-4 mb-8">
 			{#each filters as f}
 				<button
-					class="px-4 py-1.5 rounded-full font-label text-sm tracking-wide transition-colors {filter === f.key ? 'bg-surface-container-high text-on-surface border border-outline-variant/20' : 'bg-transparent text-on-surface-variant hover:text-on-surface'}"
+					class="px-4 py-1.5 rounded-md font-label text-sm tracking-wide transition-colors {filter === f.key ? 'bg-surface-container-high text-on-surface border border-outline-variant/20' : 'bg-transparent text-on-surface-variant hover:text-on-surface'}"
 					onclick={() => filter = f.key}
 				>
 					{f.label}
@@ -68,7 +68,7 @@
 			<div class="text-center py-16">
 				<span class="material-symbols-outlined text-6xl text-on-surface-variant">folder_open</span>
 				<p class="mt-4 text-on-surface-variant font-body">No routines yet. Create your first one!</p>
-				<a href="/dashboard/new" class="btn-primary-gradient text-on-primary-fixed font-body font-semibold px-6 py-2.5 rounded-full inline-flex items-center gap-2 mt-6 hover:opacity-90 transition-opacity">
+				<a href="/dashboard/new" class="btn-primary-gradient text-on-primary-fixed font-body font-semibold px-6 py-2.5 rounded-md inline-flex items-center gap-2 mt-6 hover:opacity-90 transition-opacity">
 					<span class="material-symbols-outlined text-sm">add</span>
 					New Routine
 				</a>
@@ -77,18 +77,18 @@
 			<!-- Routines Grid -->
 			<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
 				{#each filteredWorkflows as workflow}
-					<article class="glass-panel rounded-xl p-6 border-l-4 border-tertiary relative group hover:bg-surface-container-highest transition-colors duration-300">
+					<article class="glass-panel rounded-lg p-6 border-l-4 border-tertiary relative group hover:bg-surface-container-highest transition-colors duration-300">
 						<div class="absolute top-4 right-4">
 							<button class="text-on-surface-variant hover:text-on-surface">
 								<span class="material-symbols-outlined">more_horiz</span>
 							</button>
 						</div>
-						<div class="mb-4">
+						<a class="mb-4 block" href={`/workflows/${workflow.id}/edit`}>
 							<h3 class="font-headline text-xl font-semibold text-on-surface mb-1">{workflow.name}</h3>
 							<p class="font-body text-sm text-on-surface-variant">{workflow.description || 'No description'}</p>
-						</div>
+						</a>
 						<div class="flex flex-wrap gap-2 mb-6">
-							<span class="px-2 py-1 rounded bg-[#26233a] text-[#c4a7e7] font-label text-xs tracking-wider uppercase">{workflow.blocks?.length || 0} Blocks</span>
+							<span class="px-2 py-1 rounded-md bg-[#26233a] text-[#c4a7e7] font-label text-xs tracking-wider uppercase">{workflow.blocks?.length || 0} Blocks</span>
 						</div>
 						<div class="flex justify-between items-end mt-auto pt-4 border-t border-outline-variant/10">
 							<span class="font-body text-xs text-outline">{workflow.is_public ? 'Public' : 'Private'}</span>

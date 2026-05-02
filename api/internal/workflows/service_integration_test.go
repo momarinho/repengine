@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 	"github.com/momarinho/rep_engine/internal/db"
 )
 
@@ -15,6 +17,15 @@ func newIntegrationService(t *testing.T) (*Service, *pgxpool.Pool) {
 	t.Helper()
 
 	oldPool := db.Pool
+
+	// go test can't set environment variables for the parent process, so we load .env here to get DATABASE_URL if it's not already set.
+	if os.Getenv("DATABASE_URL") == "" {
+		_ = godotenv.Load("../../.env")
+	}
+
+	if os.Getenv("DATABASE_URL") == "" {
+		t.Skip("skipping integration test: DATABASE_URL is not set")
+	}
 
 	if err := db.Connect(); err != nil {
 		t.Skipf("skipping integration test: database unavailable: %v", err)
