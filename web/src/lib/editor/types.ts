@@ -85,6 +85,7 @@ export function resolveNodeTypeIcon(icon: string): string {
 		dumbbell: 'fitness_center',
 		timer: 'timer',
 		activity: 'waterfall_chart',
+		trending_up: 'trending_up',
 		repeat: 'repeat',
 		pause: 'timer_pause',
 		folder: 'folder'

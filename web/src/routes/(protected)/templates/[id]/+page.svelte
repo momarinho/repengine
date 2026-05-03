@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import BlockRenderer from '$lib/blocks/BlockRenderer.svelte';
 	import type { DraftBlock, NodeType } from '$lib/editor/types';
+	import { groupBlocksBySection, type SectionBlockGroup } from '$lib/sections/group';
 	import type { CloneJob } from '$lib/templates/types';
 	import { normalizeCloneJob } from '$lib/templates/normalize';
 	import { onDestroy } from 'svelte';
@@ -22,10 +23,12 @@
 				data: structuredClone(block.data)
 			}))
 	);
+	const blockGroups = $derived(groupBlocksBySection(previewBlocks));
 
 	let cloneState = $state<'idle' | 'submitting' | 'polling' | 'error'>('idle');
 	let cloneMessage = $state('');
 	let cloneJobID = $state<number | null>(null);
+	let sectionCollapseState = $state<Record<string, boolean>>({});
 	let isDisposed = false;
 
 	onDestroy(() => {
@@ -40,6 +43,17 @@
 
 	function previewNodeType(block: DraftBlock): NodeType | undefined {
 		return nodeTypeMap.get(block.node_type_slug);
+	}
+
+	function isSectionCollapsed(group: SectionBlockGroup<DraftBlock>): boolean {
+		return sectionCollapseState[group.id] ?? group.collapsed;
+	}
+
+	function toggleSection(group: SectionBlockGroup<DraftBlock>): void {
+		sectionCollapseState = {
+			...sectionCollapseState,
+			[group.id]: !isSectionCollapsed(group)
+		};
 	}
 
 	function createIdempotencyKey(): string {
@@ -192,10 +206,40 @@
 						</div>
 					</div>
 
-					<div class="space-y-4">
-						{#each previewBlocks as block}
-							<div class="rounded-2xl border border-white/5 bg-surface-container p-5 shadow-lg">
-								<BlockRenderer block={block} nodeType={previewNodeType(block)} />
+					<div class="space-y-5">
+						{#each blockGroups as group (group.id)}
+							<div class="rounded-2xl border border-white/5 bg-surface-container-low p-4 shadow-lg">
+								<div class="flex items-center justify-between gap-4">
+									<div>
+										<div class="flex flex-wrap items-center gap-2">
+											<p class="text-lg font-bold text-on-surface">{group.title}</p>
+											<span class="rounded bg-surface-container-high px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-tertiary">{group.kind}</span>
+										</div>
+										<p class="mt-1 text-sm text-on-surface-variant">{group.subtitle || `${group.blocks.length} blocks`}</p>
+									</div>
+									<button
+										type="button"
+										class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+										aria-label={isSectionCollapsed(group) ? 'Expand section' : 'Collapse section'}
+										onclick={() => toggleSection(group)}
+									>
+										<span class="material-symbols-outlined">{isSectionCollapsed(group) ? 'unfold_more' : 'unfold_less'}</span>
+									</button>
+								</div>
+
+								{#if !isSectionCollapsed(group)}
+									<div class="mt-4 space-y-3 border-l border-outline-variant/30 pl-4">
+										{#each group.blocks as block (block.client_id)}
+											<div class="rounded-xl border border-white/5 bg-surface-container p-5">
+												<BlockRenderer block={block} nodeType={previewNodeType(block)} />
+											</div>
+										{/each}
+									</div>
+								{:else}
+									<div class="mt-4 rounded-md border border-dashed border-outline-variant/20 px-4 py-3 text-xs text-on-surface-variant">
+										{group.blocks.length} blocks hidden in this section.
+									</div>
+								{/if}
 							</div>
 						{/each}
 					</div>

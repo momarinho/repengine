@@ -9,7 +9,7 @@ type LoadResult = {
 	error: string | null;
 };
 
-export const load = (async ({ params, cookies, fetch }) => {
+export const load = (async ({ params, cookies, fetch, url }) => {
 	const token = cookies.get('token');
 	const workflowResponse = await apiFetch(fetch, `/workflows/${params.id}`, token, {
 		method: 'GET'
@@ -31,7 +31,7 @@ export const load = (async ({ params, cookies, fetch }) => {
 	}
 
 	const workflow = normalizeWorkflow(await safeJson<Workflow>(workflowResponse));
-	const routine = normalizePlayerRoutine(workflow);
+	const routine = normalizePlayerRoutine(workflow, url.searchParams.get('section'));
 
 	return {
 		routine,

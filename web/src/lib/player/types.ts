@@ -1,6 +1,7 @@
 export type PlayerBlockType =
 	| 'section'
 	| 'exercise'
+	| 'linear_progression'
 	| 'rest'
 	| 'wave'
 	| 'repeat'
@@ -38,11 +39,26 @@ export type PlayerBlock = {
 	reps?: string;
 	load?: number;
 	loadUnit?: string;
+	increment?: number;
+	progressionRule?: string;
 	rounds?: number;
 	restSeconds?: number;
 	waveSteps?: WaveWeek[];
 	activeWaveWeekIndex?: number;
+	sectionID?: string;
+	sectionTitle?: string;
+	sectionSubtitle?: string;
+	sectionKind?: string;
 	notePlaceholder?: string;
+};
+
+export type PlayerSection = {
+	id: string;
+	title: string;
+	subtitle: string;
+	kind: string;
+	startBlockIndex: number;
+	blockCount: number;
 };
 
 export type PlayerRoutine = {
@@ -56,5 +72,6 @@ export type PlayerRoutine = {
 	averageIntensity: string;
 	peakHeartRate: string;
 	initialBlockIndex: number;
+	sections: PlayerSection[];
 	blocks: PlayerBlock[];
 };

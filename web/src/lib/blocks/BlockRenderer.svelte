@@ -3,6 +3,7 @@
 	import { blockLabel, resolveNodeTypeIcon } from '$lib/editor/types';
 	import BlockExercise from './BlockExercise.svelte';
 	import BlockExerciseTimed from './BlockExerciseTimed.svelte';
+	import BlockLinearProgression from './BlockLinearProgression.svelte';
 	import BlockRepeat from './BlockRepeat.svelte';
 	import BlockRest from './BlockRest.svelte';
 	import BlockSection from './BlockSection.svelte';
@@ -22,6 +23,8 @@
 	<BlockExercise {block} />
 {:else if block.node_type_slug === 'exercise_timed'}
 	<BlockExerciseTimed {block} />
+{:else if block.node_type_slug === 'linear_progression'}
+	<BlockLinearProgression {block} />
 {:else if block.node_type_slug === 'wave'}
 	<BlockWave {block} />
 {:else if block.node_type_slug === 'repeat'}

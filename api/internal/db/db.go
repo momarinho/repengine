@@ -176,23 +176,45 @@ func SeedNodeTypes(ctx context.Context) error {
 				"exercise_name": "",
 				"active_week": 1,
 				"rest_seconds": 120,
-				"week_1_reps": "5/5/5+",
-				"week_1_intensity": "65/75/85",
-				"week_1_rpe": "8/8/9",
-				"week_2_reps": "3/3/3+",
-				"week_2_intensity": "70/80/90",
-				"week_2_rpe": "8/8/9",
-				"week_3_reps": "5/3/1+",
-				"week_3_intensity": "75/85/95",
-				"week_3_rpe": "8/9/9",
-				"week_4_reps": "5/5/5",
-				"week_4_intensity": "40/50/60",
-				"week_4_rpe": "6/6/6"
+				"week_1_reps": "",
+				"week_1_intensity": "",
+				"week_1_rpe": "",
+				"week_2_reps": "",
+				"week_2_intensity": "",
+				"week_2_rpe": "",
+				"week_3_reps": "",
+				"week_3_intensity": "",
+				"week_3_rpe": "",
+				"week_4_reps": "",
+				"week_4_intensity": "",
+				"week_4_rpe": ""
+			}`,
+		},
+		{
+			"linear_progression",
+			"Linear Progression",
+			"Session-to-session load progression",
+			"trending_up",
+			`{
+				"exercise_name": "",
+				"sets": 3,
+				"reps": "5",
+				"start_load": null,
+				"load_unit": "kg",
+				"increment": 2.5,
+				"progression_rule": "add_each_session",
+				"rest_seconds": 120
 			}`,
 		},
 		{"repeat", "Repeat", "Repeat block", "repeat", `{"times": 3}`},
 		{"rest", "Rest", "Rest period between sets", "pause", `{"duration": 30}`},
-		{"section", "Section", "Section header", "folder", "{}"},
+		{"section", "Section", "Logical section or training day divider", "folder",
+			`{
+				"title": "Day 1",
+				"subtitle": "",
+				"kind": "day",
+				"collapsed": false
+			}`},
 	}
 
 	for _, n := range seedData {
@@ -243,7 +265,10 @@ func SeedTemplates(ctx context.Context) error {
 				{
 					NodeTypeSlug: "section",
 					Data: map[string]any{
-						"title": "Day 1 - Squat",
+						"title":     "Day 1 - Squat",
+						"subtitle":  "Main lower-body strength day",
+						"kind":      "day",
+						"collapsed": false,
 					},
 				},
 				{
@@ -283,7 +308,10 @@ func SeedTemplates(ctx context.Context) error {
 				{
 					NodeTypeSlug: "section",
 					Data: map[string]any{
-						"title": "Day 2 - Bench Press",
+						"title":     "Day 2 - Bench Press",
+						"subtitle":  "Main upper-body strength day",
+						"kind":      "day",
+						"collapsed": false,
 					},
 				},
 				{
@@ -326,16 +354,23 @@ func SeedTemplates(ctx context.Context) error {
 				{
 					NodeTypeSlug: "section",
 					Data: map[string]any{
-						"title": "T1 Main Lift",
+						"title":     "Day 1 - T1 Main Lift",
+						"subtitle":  "Primary lift progression",
+						"kind":      "day",
+						"collapsed": false,
 					},
 				},
 				{
-					NodeTypeSlug: "exercise",
+					NodeTypeSlug: "linear_progression",
 					Data: map[string]any{
-						"exercise_name": "Squat",
-						"sets":          5,
-						"reps":          "3",
-						"progression":   "+5 lb/session",
+						"exercise_name":    "Squat",
+						"sets":             5,
+						"reps":             "3",
+						"start_load":       45,
+						"load_unit":        "lb",
+						"increment":        5,
+						"progression_rule": "add_each_session",
+						"rest_seconds":     180,
 					},
 				},
 				{
@@ -347,15 +382,23 @@ func SeedTemplates(ctx context.Context) error {
 				{
 					NodeTypeSlug: "section",
 					Data: map[string]any{
-						"title": "T2 Secondary Lift",
+						"title":     "T2 Secondary Lift",
+						"subtitle":  "Supplemental strength volume",
+						"kind":      "section",
+						"collapsed": false,
 					},
 				},
 				{
-					NodeTypeSlug: "exercise",
+					NodeTypeSlug: "linear_progression",
 					Data: map[string]any{
-						"exercise_name": "Bench Press",
-						"sets":          3,
-						"reps":          "10",
+						"exercise_name":    "Bench Press",
+						"sets":             3,
+						"reps":             "10",
+						"start_load":       45,
+						"load_unit":        "lb",
+						"increment":        5,
+						"progression_rule": "add_each_session",
+						"rest_seconds":     120,
 					},
 				},
 				{
@@ -367,7 +410,10 @@ func SeedTemplates(ctx context.Context) error {
 				{
 					NodeTypeSlug: "section",
 					Data: map[string]any{
-						"title": "T3 Accessories",
+						"title":     "T3 Accessories",
+						"subtitle":  "Higher-rep accessory work",
+						"kind":      "section",
+						"collapsed": false,
 					},
 				},
 				{

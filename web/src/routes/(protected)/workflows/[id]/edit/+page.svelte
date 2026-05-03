@@ -4,6 +4,7 @@
 	import type { PageData } from './$types';
 	import AddBlockModal from '$lib/editor/AddBlockModal.svelte';
 	import BlockRenderer from '$lib/blocks/BlockRenderer.svelte';
+	import { groupBlocksBySection, type SectionBlockGroup } from '$lib/sections/group';
 	import type {
 		DraftBlock,
 		NodeType,
@@ -48,10 +49,12 @@
 	let ignoreAutosave = $state(true);
 	let saveInFlight = $state(false);
 	let queuedSave = $state<{ source: 'autosave' | 'manual'; createVersion: boolean } | null>(null);
+	let sectionCollapseState = $state<Record<string, boolean>>({});
 
 	const hasWorkflow = $derived(Boolean(workflow));
 	const selectedBlock = $derived(blocks.find((block) => block.client_id === selectedBlockId) ?? null);
 	const hasUnsavedChanges = $derived(saveFingerprint() !== lastSavedFingerprint);
+	const blockGroups = $derived(groupBlocksBySection(blocks));
 	const waveWeeks = [1, 2, 3, 4] as const;
 
 	function initializeFromWorkflow(next: Workflow): void {
@@ -80,6 +83,17 @@
 
 	function selectBlock(clientId: string): void {
 		selectedBlockId = clientId;
+	}
+
+	function isSectionCollapsed(group: SectionBlockGroup<DraftBlock>): boolean {
+		return sectionCollapseState[group.id] ?? group.collapsed;
+	}
+
+	function toggleSection(group: SectionBlockGroup<DraftBlock>): void {
+		sectionCollapseState = {
+			...sectionCollapseState,
+			[group.id]: !isSectionCollapsed(group)
+		};
 	}
 
 	function setBlockData(clientId: string, updater: (current: Record<string, unknown>) => Record<string, unknown>): void {
@@ -466,77 +480,178 @@
 							</button>
 						</div>
 					{:else}
-						<ul class="space-y-3">
-							{#each blocks as block, index (block.client_id)}
-								<li
-									class={`rounded-md border bg-surface-container p-4 transition-colors ${
-										selectedBlockId === block.client_id
-											? 'border-primary/50 ring-1 ring-primary/30'
-											: dropClientId === block.client_id
-												? 'border-secondary/50'
-												: 'border-outline-variant/20'
-									}`}
-									draggable="true"
-									ondragstart={() => handleDragStart(block.client_id)}
-									ondragover={(event) => {
-										event.preventDefault();
-										dropClientId = block.client_id;
-									}}
-									ondragleave={() => {
-										if (dropClientId === block.client_id) dropClientId = null;
-									}}
-									ondrop={() => handleDrop(block.client_id)}
-									ondragend={() => {
-										dragClientId = null;
-										dropClientId = null;
-									}}
-								>
-									<div class="flex items-start gap-4">
-										<div class="flex flex-col items-center gap-2 pt-1">
-											<button
-												type="button"
-												class="flex h-8 w-8 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
-												onclick={() => moveBlock(block.client_id, -1)}
-											>
-												<span class="material-symbols-outlined text-base">keyboard_arrow_up</span>
-											</button>
-											<span class="material-symbols-outlined cursor-grab text-on-surface-variant">drag_indicator</span>
-											<button
-												type="button"
-												class="flex h-8 w-8 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
-												onclick={() => moveBlock(block.client_id, 1)}
-											>
-												<span class="material-symbols-outlined text-base">keyboard_arrow_down</span>
-											</button>
-										</div>
+						<div class="space-y-4">
+							{#each blockGroups as group (group.id)}
+								<div class="rounded-md border border-outline-variant/20 bg-surface-container-low p-3">
+									{#if group.section}
+										{@const block = group.section}
+										{@const index = blocks.findIndex((candidate) => candidate.client_id === block.client_id)}
+										<div
+											role="listitem"
+											class={`rounded-md border bg-surface-container p-4 transition-colors ${
+												selectedBlockId === block.client_id
+													? 'border-primary/50 ring-1 ring-primary/30'
+													: dropClientId === block.client_id
+														? 'border-secondary/50'
+														: 'border-outline-variant/20'
+											}`}
+											draggable="true"
+											ondragstart={() => handleDragStart(block.client_id)}
+											ondragover={(event) => {
+												event.preventDefault();
+												dropClientId = block.client_id;
+											}}
+											ondragleave={() => {
+												if (dropClientId === block.client_id) dropClientId = null;
+											}}
+											ondrop={() => handleDrop(block.client_id)}
+											ondragend={() => {
+												dragClientId = null;
+												dropClientId = null;
+											}}
+										>
+											<div class="flex items-start gap-4">
+												<div class="flex flex-col items-center gap-2 pt-1">
+													<button
+														type="button"
+														class="flex h-8 w-8 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+														onclick={() => moveBlock(block.client_id, -1)}
+													>
+														<span class="material-symbols-outlined text-base">keyboard_arrow_up</span>
+													</button>
+													<span class="material-symbols-outlined cursor-grab text-on-surface-variant">drag_indicator</span>
+													<button
+														type="button"
+														class="flex h-8 w-8 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+														onclick={() => moveBlock(block.client_id, 1)}
+													>
+														<span class="material-symbols-outlined text-base">keyboard_arrow_down</span>
+													</button>
+												</div>
 
-										<button type="button" class="min-w-0 flex-1 text-left" onclick={() => selectBlock(block.client_id)}>
-											<div class="mb-3 flex items-center justify-between gap-4">
-												<div class="flex items-center gap-3">
-													<div class="flex h-10 w-10 items-center justify-center rounded-md bg-surface-container-high text-primary">
-														<span class="material-symbols-outlined">
-															{resolveNodeTypeIcon(nodeTypeMap.get(block.node_type_slug)?.icon ?? 'extension')}
+												<button type="button" class="min-w-0 flex-1 text-left" onclick={() => selectBlock(block.client_id)}>
+													<div class="mb-3 flex items-center justify-between gap-4">
+														<div class="flex items-center gap-3">
+															<div class="flex h-10 w-10 items-center justify-center rounded-md bg-surface-container-high text-primary">
+																<span class="material-symbols-outlined">
+																	{resolveNodeTypeIcon(nodeTypeMap.get(block.node_type_slug)?.icon ?? 'extension')}
+																</span>
+															</div>
+															<div>
+																<p class="text-sm font-semibold text-on-surface">{group.title}</p>
+																<p class="text-xs text-on-surface-variant">
+																	{group.subtitle || nodeTypeMap.get(block.node_type_slug)?.description || 'Routine section'}
+																</p>
+															</div>
+														</div>
+														<span class="rounded bg-surface-container-high px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
+															#{index + 1}
 														</span>
 													</div>
-													<div>
-														<p class="text-sm font-semibold text-on-surface">
-															{nodeTypeMap.get(block.node_type_slug)?.name ?? blockLabel(block.node_type_slug)}
-														</p>
-														<p class="text-xs text-on-surface-variant">
-															{nodeTypeMap.get(block.node_type_slug)?.description ?? 'Routine block'}
-														</p>
-													</div>
-												</div>
-												<span class="rounded bg-surface-container-high px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-													#{index + 1}
-												</span>
+													<BlockRenderer block={block} nodeType={nodeTypeMap.get(block.node_type_slug)} />
+												</button>
+
+												<button
+													type="button"
+													class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+													aria-label={isSectionCollapsed(group) ? 'Expand section' : 'Collapse section'}
+													onclick={() => toggleSection(group)}
+												>
+													<span class="material-symbols-outlined">{isSectionCollapsed(group) ? 'unfold_more' : 'unfold_less'}</span>
+												</button>
 											</div>
-											<BlockRenderer block={block} nodeType={nodeTypeMap.get(block.node_type_slug)} />
-										</button>
-									</div>
-								</li>
+										</div>
+									{:else}
+										<div class="flex items-center justify-between px-2 py-2">
+											<div>
+												<p class="text-sm font-semibold text-on-surface">{group.title}</p>
+												<p class="text-xs text-on-surface-variant">{group.subtitle}</p>
+											</div>
+											<span class="rounded bg-surface-container-high px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">{group.blocks.length} blocks</span>
+										</div>
+									{/if}
+
+									{#if !isSectionCollapsed(group)}
+										<ul class="mt-3 space-y-3 border-l border-outline-variant/30 pl-4">
+											{#each group.blocks as block (block.client_id)}
+												{@const index = blocks.findIndex((candidate) => candidate.client_id === block.client_id)}
+												<li
+													class={`rounded-md border bg-surface-container p-4 transition-colors ${
+														selectedBlockId === block.client_id
+															? 'border-primary/50 ring-1 ring-primary/30'
+															: dropClientId === block.client_id
+																? 'border-secondary/50'
+																: 'border-outline-variant/20'
+													}`}
+													draggable="true"
+													ondragstart={() => handleDragStart(block.client_id)}
+													ondragover={(event) => {
+														event.preventDefault();
+														dropClientId = block.client_id;
+													}}
+													ondragleave={() => {
+														if (dropClientId === block.client_id) dropClientId = null;
+													}}
+													ondrop={() => handleDrop(block.client_id)}
+													ondragend={() => {
+														dragClientId = null;
+														dropClientId = null;
+													}}
+												>
+													<div class="flex items-start gap-4">
+														<div class="flex flex-col items-center gap-2 pt-1">
+															<button
+																type="button"
+																class="flex h-8 w-8 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+																onclick={() => moveBlock(block.client_id, -1)}
+															>
+																<span class="material-symbols-outlined text-base">keyboard_arrow_up</span>
+															</button>
+															<span class="material-symbols-outlined cursor-grab text-on-surface-variant">drag_indicator</span>
+															<button
+																type="button"
+																class="flex h-8 w-8 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+																onclick={() => moveBlock(block.client_id, 1)}
+															>
+																<span class="material-symbols-outlined text-base">keyboard_arrow_down</span>
+															</button>
+														</div>
+
+														<button type="button" class="min-w-0 flex-1 text-left" onclick={() => selectBlock(block.client_id)}>
+															<div class="mb-3 flex items-center justify-between gap-4">
+																<div class="flex items-center gap-3">
+																	<div class="flex h-10 w-10 items-center justify-center rounded-md bg-surface-container-high text-primary">
+																		<span class="material-symbols-outlined">
+																			{resolveNodeTypeIcon(nodeTypeMap.get(block.node_type_slug)?.icon ?? 'extension')}
+																		</span>
+																	</div>
+																	<div>
+																		<p class="text-sm font-semibold text-on-surface">
+																			{nodeTypeMap.get(block.node_type_slug)?.name ?? blockLabel(block.node_type_slug)}
+																		</p>
+																		<p class="text-xs text-on-surface-variant">
+																			{nodeTypeMap.get(block.node_type_slug)?.description ?? 'Routine block'}
+																		</p>
+																	</div>
+																</div>
+																<span class="rounded bg-surface-container-high px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
+																	#{index + 1}
+																</span>
+															</div>
+															<BlockRenderer block={block} nodeType={nodeTypeMap.get(block.node_type_slug)} />
+														</button>
+													</div>
+												</li>
+											{/each}
+										</ul>
+									{:else}
+										<div class="mt-3 rounded-md border border-dashed border-outline-variant/20 px-4 py-3 text-xs text-on-surface-variant">
+											{group.blocks.length} blocks hidden in this section.
+										</div>
+									{/if}
+								</div>
 							{/each}
-						</ul>
+						</div>
 					{/if}
 				{:else if activeTab === 'preview'}
 					<div class="space-y-3">
@@ -544,13 +659,36 @@
 							<p class="text-sm font-semibold text-on-surface">Preview</p>
 							<p class="text-xs text-on-surface-variant">Read-only outline of the routine in its current local state.</p>
 						</div>
-						{#each blocks as block, index (block.client_id)}
-							<div class="rounded-md border border-outline-variant/20 bg-surface-container p-4">
-								<div class="mb-2 flex items-center gap-3 text-xs uppercase tracking-[0.18em] text-on-surface-variant">
-									<span>{index + 1}</span>
-									<span>{nodeTypeMap.get(block.node_type_slug)?.name ?? blockLabel(block.node_type_slug)}</span>
+						{#each blockGroups as group (group.id)}
+							<div class="rounded-md border border-outline-variant/20 bg-surface-container-low p-3">
+								<div class="flex items-center justify-between gap-4 px-1 py-2">
+									<div>
+										<p class="text-sm font-semibold text-on-surface">{group.title}</p>
+										<p class="text-xs text-on-surface-variant">{group.subtitle || `${group.blocks.length} blocks`}</p>
+									</div>
+									<button
+										type="button"
+										class="flex h-9 w-9 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+										aria-label={isSectionCollapsed(group) ? 'Expand section' : 'Collapse section'}
+										onclick={() => toggleSection(group)}
+									>
+										<span class="material-symbols-outlined">{isSectionCollapsed(group) ? 'unfold_more' : 'unfold_less'}</span>
+									</button>
 								</div>
-								<BlockRenderer block={block} nodeType={nodeTypeMap.get(block.node_type_slug)} />
+								{#if !isSectionCollapsed(group)}
+									<div class="mt-3 space-y-3">
+										{#each group.blocks as block (block.client_id)}
+											{@const index = blocks.findIndex((candidate) => candidate.client_id === block.client_id)}
+											<div class="rounded-md border border-outline-variant/20 bg-surface-container p-4">
+												<div class="mb-2 flex items-center gap-3 text-xs uppercase tracking-[0.18em] text-on-surface-variant">
+													<span>{index + 1}</span>
+													<span>{nodeTypeMap.get(block.node_type_slug)?.name ?? blockLabel(block.node_type_slug)}</span>
+												</div>
+												<BlockRenderer block={block} nodeType={nodeTypeMap.get(block.node_type_slug)} />
+											</div>
+										{/each}
+									</div>
+								{/if}
 							</div>
 						{/each}
 					</div>
@@ -617,15 +755,59 @@
 
 						<div class="flex-1 space-y-5 overflow-y-auto px-5 py-5">
 							{#if selectedBlock.node_type_slug === 'section'}
-								<div class="space-y-2">
-									<label for="section-label" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Section label</label>
-									<input
-										id="section-label"
-										class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
-										value={typeof selectedBlock.data.label === 'string' ? selectedBlock.data.label : ''}
-										oninput={(event) => updateBlockField(selectedBlock.client_id, 'label', (event.currentTarget as HTMLInputElement).value)}
-										placeholder="Warm-up block"
-									/>
+								<div class="space-y-5">
+									<div class="space-y-2">
+										<label for="section-title" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Section title</label>
+										<input
+											id="section-title"
+											class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+											value={typeof selectedBlock.data.title === 'string' ? selectedBlock.data.title : typeof selectedBlock.data.label === 'string' ? selectedBlock.data.label : ''}
+											oninput={(event) => updateBlockField(selectedBlock.client_id, 'title', (event.currentTarget as HTMLInputElement).value)}
+											placeholder="Day 1 - Squat"
+										/>
+									</div>
+
+									<div class="space-y-2">
+										<label for="section-subtitle" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Subtitle</label>
+										<input
+											id="section-subtitle"
+											class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+											value={typeof selectedBlock.data.subtitle === 'string' ? selectedBlock.data.subtitle : ''}
+											oninput={(event) => updateBlockField(selectedBlock.client_id, 'subtitle', (event.currentTarget as HTMLInputElement).value)}
+											placeholder="Main lower-body strength day"
+										/>
+									</div>
+
+									<div class="grid gap-3 md:grid-cols-2">
+										<div class="space-y-2">
+											<label for="section-kind" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Kind</label>
+											<select
+												id="section-kind"
+												class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+												value={typeof selectedBlock.data.kind === 'string' ? selectedBlock.data.kind : 'section'}
+												onchange={(event) => updateBlockField(selectedBlock.client_id, 'kind', (event.currentTarget as HTMLSelectElement).value)}
+											>
+												<option value="day">Day</option>
+												<option value="section">Section</option>
+												<option value="warmup">Warm-up</option>
+												<option value="accessory">Accessory</option>
+												<option value="conditioning">Conditioning</option>
+											</select>
+										</div>
+
+										<div class="space-y-2">
+											<label for="section-collapsed" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Initial state</label>
+											<select
+												id="section-collapsed"
+												class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+												value={selectedBlock.data.collapsed === true ? 'collapsed' : 'expanded'}
+												onchange={(event) => updateBlockField(selectedBlock.client_id, 'collapsed', (event.currentTarget as HTMLSelectElement).value === 'collapsed')}
+											>
+												<option value="expanded">Expanded</option>
+												<option value="collapsed">Collapsed</option>
+											</select>
+										</div>
+									</div>
 								</div>
 							{:else if selectedBlock.node_type_slug === 'exercise'}
 								<div class="space-y-5">
@@ -727,6 +909,110 @@
 										value={typeof selectedBlock.data.duration === 'number' ? selectedBlock.data.duration : 30}
 										oninput={(event) => updateBlockField(selectedBlock.client_id, 'duration', Number((event.currentTarget as HTMLInputElement).value))}
 									/>
+								</div>
+							{:else if selectedBlock.node_type_slug === 'linear_progression'}
+								<div class="space-y-5">
+									<div class="space-y-2">
+										<label for="linear-exercise-name" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Exercise name</label>
+										<input
+											id="linear-exercise-name"
+											type="text"
+											class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+											value={typeof selectedBlock.data.exercise_name === 'string' ? selectedBlock.data.exercise_name : ''}
+											oninput={(event) => updateBlockField(selectedBlock.client_id, 'exercise_name', (event.currentTarget as HTMLInputElement).value)}
+										/>
+									</div>
+
+									<div class="grid grid-cols-2 gap-3">
+										<div class="space-y-2">
+											<label for="linear-sets" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Sets</label>
+											<input
+												id="linear-sets"
+												type="number"
+												min="1"
+												class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+												value={typeof selectedBlock.data.sets === 'number' ? selectedBlock.data.sets : 3}
+												oninput={(event) => updateBlockField(selectedBlock.client_id, 'sets', Number((event.currentTarget as HTMLInputElement).value))}
+											/>
+										</div>
+										<div class="space-y-2">
+											<label for="linear-reps" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Reps</label>
+											<input
+												id="linear-reps"
+												type="text"
+												class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+												value={typeof selectedBlock.data.reps === 'string' ? selectedBlock.data.reps : '5'}
+												oninput={(event) => updateBlockField(selectedBlock.client_id, 'reps', (event.currentTarget as HTMLInputElement).value)}
+											/>
+										</div>
+									</div>
+
+									<div class="grid grid-cols-[1fr_110px] gap-3">
+										<div class="space-y-2">
+											<label for="linear-start-load" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Current load</label>
+											<input
+												id="linear-start-load"
+												type="number"
+												step="0.5"
+												class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+												value={typeof selectedBlock.data.start_load === 'number' ? selectedBlock.data.start_load : ''}
+												oninput={(event) => updateBlockField(selectedBlock.client_id, 'start_load', Number((event.currentTarget as HTMLInputElement).value))}
+											/>
+										</div>
+										<div class="space-y-2">
+											<label for="linear-load-unit" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Unit</label>
+											<select
+												id="linear-load-unit"
+												class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+												value={typeof selectedBlock.data.load_unit === 'string' ? selectedBlock.data.load_unit : 'kg'}
+												onchange={(event) => updateBlockField(selectedBlock.client_id, 'load_unit', (event.currentTarget as HTMLSelectElement).value)}
+											>
+												<option value="kg">kg</option>
+												<option value="lb">lb</option>
+												<option value="percent_1rm">% 1RM</option>
+											</select>
+										</div>
+									</div>
+
+									<div class="grid gap-3 md:grid-cols-2">
+										<div class="space-y-2">
+											<label for="linear-increment" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Increment</label>
+											<input
+												id="linear-increment"
+												type="number"
+												step="0.5"
+												class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+												value={typeof selectedBlock.data.increment === 'number' ? selectedBlock.data.increment : 2.5}
+												oninput={(event) => updateBlockField(selectedBlock.client_id, 'increment', Number((event.currentTarget as HTMLInputElement).value))}
+											/>
+										</div>
+										<div class="space-y-2">
+											<label for="linear-rest-seconds" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Suggested rest</label>
+											<input
+												id="linear-rest-seconds"
+												type="number"
+												min="0"
+												class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+												value={typeof selectedBlock.data.rest_seconds === 'number' ? selectedBlock.data.rest_seconds : 120}
+												oninput={(event) => updateBlockField(selectedBlock.client_id, 'rest_seconds', Number((event.currentTarget as HTMLInputElement).value))}
+											/>
+										</div>
+									</div>
+
+									<div class="space-y-2">
+										<label for="linear-rule" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Progression rule</label>
+										<select
+											id="linear-rule"
+											class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+											value={typeof selectedBlock.data.progression_rule === 'string' ? selectedBlock.data.progression_rule : 'add_each_session'}
+											onchange={(event) => updateBlockField(selectedBlock.client_id, 'progression_rule', (event.currentTarget as HTMLSelectElement).value)}
+										>
+											<option value="add_each_session">Add each session</option>
+											<option value="add_weekly">Add weekly</option>
+											<option value="double_progression">Double progression</option>
+											<option value="manual">Manual</option>
+										</select>
+									</div>
 								</div>
 							{:else if selectedBlock.node_type_slug === 'wave'}
 								<div class="space-y-6">

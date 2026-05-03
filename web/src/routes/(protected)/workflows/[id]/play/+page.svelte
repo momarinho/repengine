@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import type { PageData } from './$types';
 	import type { PlayerBlock, PlayerRoutine } from '$lib/player/types';
@@ -7,6 +8,7 @@
 	const initialData = untrack(() => structuredClone(data)) as PageData;
 	const routine: PlayerRoutine | null = initialData.routine;
 	const initialBlockIndex = routine?.initialBlockIndex ?? 0;
+	const hasSectionQuery = page.url.searchParams.has('section');
 
 	let currentBlockIndex = $state(initialBlockIndex);
 	let completedBlockIds = $state<string[]>(routine?.blocks.slice(0, initialBlockIndex).map((block) => block.id) ?? []);
@@ -18,6 +20,7 @@
 	let isTimerRunning = $state(false);
 	let timerRemainingSeconds = $state(routine ? getInitialTimerSeconds(routine.blocks[initialBlockIndex]) : 0);
 	let mobileQueueOpen = $state(false);
+	let isChoosingSection = $state(Boolean(routine?.sections.length) && !hasSectionQuery);
 
 	const currentBlock = $derived(routine?.blocks[currentBlockIndex] ?? null);
 	const progressPercent = $derived(routine ? ((currentBlockIndex + 1) / routine.blocks.length) * 100 : 0);
@@ -74,6 +77,8 @@
 		switch (block.node_type_slug) {
 			case 'exercise':
 				return 'Exercise';
+			case 'linear_progression':
+				return 'Linear progression';
 			case 'exercise_timed':
 				return 'Timed effort';
 			case 'rest':
@@ -118,6 +123,7 @@
 	function getPrimaryActionLabel(block: PlayerBlock): string {
 		switch (block.node_type_slug) {
 			case 'exercise':
+			case 'linear_progression':
 				return getCurrentSet(block) >= (block.sets ?? 1) ? 'Complete Exercise' : 'Log Set';
 			case 'rest':
 				return isTimerRunning ? 'Pause Rest' : 'Start Rest';
@@ -139,6 +145,7 @@
 			case 'rest':
 				return '+30s';
 			case 'exercise':
+			case 'linear_progression':
 				return 'Start Rest';
 			case 'exercise_timed':
 				return 'Reset Timer';
@@ -186,12 +193,19 @@
 		goToBlock(currentBlockIndex - 1);
 	}
 
+	function startSection(index: number): void {
+		goToBlock(index);
+		completedBlockIds = routine?.blocks.slice(0, index).map((block) => block.id) ?? [];
+		isChoosingSection = false;
+	}
+
 	function runPrimaryAction(): void {
 		if (!currentBlock) return;
 		const block = currentBlock;
 
 		switch (block.node_type_slug) {
-			case 'exercise': {
+			case 'exercise':
+			case 'linear_progression': {
 				const nextSet = getCurrentSet(block) + 1;
 				if (nextSet > (block.sets ?? 1)) {
 					goToNextBlock();
@@ -248,6 +262,7 @@
 				timerRemainingSeconds += 30;
 				return;
 			case 'exercise':
+			case 'linear_progression':
 				timerRemainingSeconds = block.restSeconds ?? timerRemainingSeconds;
 				goToNextBlock();
 				return;
@@ -314,7 +329,49 @@
 	</div>
 {:else}
 <div class="min-h-screen overflow-hidden bg-background text-on-background">
-	{#if currentBlock}
+	{#if isChoosingSection}
+		<div class="min-h-screen px-6 py-10">
+			<div class="mx-auto max-w-5xl">
+				<div class="mb-8 flex flex-wrap items-center justify-between gap-4">
+					<div>
+						<a href={`/workflows/${routine.id}/edit`} class="text-xs font-bold uppercase tracking-[0.2em] text-tertiary">Back to editor</a>
+						<h1 class="mt-3 text-3xl font-bold tracking-tight text-on-background">{routine.name}</h1>
+						<p class="mt-2 text-sm text-on-surface-variant">{routine.description || 'Choose the section you want to execute now.'}</p>
+					</div>
+					<button
+						type="button"
+						class="rounded-md border border-outline-variant/20 bg-surface-container px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+						onclick={() => startSection(0)}
+					>
+						Start from beginning
+					</button>
+				</div>
+
+				<div class="grid gap-4 md:grid-cols-2">
+					{#each routine.sections as section}
+						<button
+							type="button"
+							class="rounded-xl border border-outline-variant/20 bg-surface-container p-5 text-left transition-colors hover:border-primary/40 hover:bg-surface-container-high"
+							onclick={() => startSection(section.startBlockIndex)}
+						>
+							<div class="mb-5 flex items-start justify-between gap-4">
+								<div>
+									<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-tertiary">{section.kind}</p>
+									<h2 class="mt-2 text-xl font-bold text-on-surface">{section.title}</h2>
+									<p class="mt-1 text-sm text-on-surface-variant">{section.subtitle || `${section.blockCount} blocks`}</p>
+								</div>
+								<span class="material-symbols-outlined text-primary">play_circle</span>
+							</div>
+							<div class="flex items-center justify-between border-t border-outline-variant/20 pt-4 text-xs text-on-surface-variant">
+								<span>{section.blockCount} blocks</span>
+								<span>Starts at #{section.startBlockIndex + 1}</span>
+							</div>
+						</button>
+					{/each}
+				</div>
+			</div>
+		</div>
+	{:else if currentBlock}
 	<header class="fixed top-0 z-40 flex w-full flex-col items-center border-b border-white/5 bg-background/80 backdrop-blur-xl">
 		<div class="flex h-14 w-full items-center justify-between px-6">
 			<div class="min-w-0">
@@ -344,14 +401,24 @@
 		<section class="custom-scrollbar flex-1 overflow-y-auto px-4 md:px-8">
 			<div class="mx-auto max-w-3xl py-6">
 				<div class="mb-6">
-					<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-tertiary">Active block</p>
+					<div class="flex flex-wrap items-center gap-2">
+						<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-tertiary">Active block</p>
+						{#if currentBlock.sectionTitle}
+							<span class="rounded bg-surface-container-high px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">
+								{currentBlock.sectionKind ?? 'section'} · {currentBlock.sectionTitle}
+							</span>
+						{/if}
+					</div>
 					<h1 class="mt-2 text-3xl font-bold tracking-tight text-on-background md:text-4xl">{currentBlock.title}</h1>
 					<p class="mt-2 text-sm text-on-surface-variant">
 						{currentBlock.subtitle}
-						{#if currentBlock.node_type_slug === 'exercise'}
+						{#if currentBlock.node_type_slug === 'exercise' || currentBlock.node_type_slug === 'linear_progression'}
 							• {routine.focus} • {routine.totalMinutes} min session
 						{/if}
 					</p>
+					{#if currentBlock.sectionSubtitle}
+						<p class="mt-1 text-xs text-on-surface-variant">{currentBlock.sectionSubtitle}</p>
+					{/if}
 				</div>
 
 				<div class="rounded-2xl border border-white/5 bg-surface-container p-6 shadow-xl md:p-8">
@@ -369,7 +436,7 @@
 						</span>
 					</div>
 
-					{#if currentBlock.node_type_slug === 'exercise'}
+					{#if currentBlock.node_type_slug === 'exercise' || currentBlock.node_type_slug === 'linear_progression'}
 						<div class="mb-10 grid grid-cols-2 gap-6 md:grid-cols-3">
 							<div class="space-y-1">
 								<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Current set</span>
@@ -387,11 +454,24 @@
 							<div class="col-span-2 space-y-1 md:col-span-1">
 								<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Load</span>
 								<div class="flex items-baseline gap-1">
-									<span class="font-display text-5xl font-bold">{currentBlock.load}</span>
+									<span class="font-display text-5xl font-bold">{currentBlock.load ?? '-'}</span>
 									<span class="text-xl font-light text-on-surface-variant">{currentBlock.loadUnit}</span>
 								</div>
 							</div>
 						</div>
+
+						{#if currentBlock.node_type_slug === 'linear_progression'}
+							<div class="mb-4 grid gap-4 rounded-xl border border-primary/10 bg-primary/5 p-5 md:grid-cols-2">
+								<div>
+									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Progression rule</p>
+									<p class="mt-2 text-lg font-semibold capitalize text-on-surface">{currentBlock.progressionRule?.replaceAll('_', ' ') ?? 'add each session'}</p>
+								</div>
+								<div>
+									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Next increase</p>
+									<p class="mt-2 text-lg font-semibold text-on-surface">+{currentBlock.increment ?? 0} {currentBlock.loadUnit ?? ''}</p>
+								</div>
+							</div>
+						{/if}
 
 						<div class="grid gap-4 rounded-xl border border-white/5 bg-surface-container-low p-5 md:grid-cols-2">
 							<div>
