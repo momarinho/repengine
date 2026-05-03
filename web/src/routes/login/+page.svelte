@@ -7,7 +7,7 @@
 </script>
 
 <svelte:head>
-	<title>RepEngine V2 - Login</title>
+	<title>RepEngine - Login</title>
 </svelte:head>
 
 <div class="min-h-screen bg-background flex items-center justify-center relative overflow-hidden">

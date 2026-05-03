@@ -60,6 +60,16 @@ func (e *AppError) WithExtra(key string, value any) *AppError {
 	return e
 }
 
+// ErrTemplateNotFound returns a 404 Not Found AppError for missing templates.
+func ErrTemplateNotFound() *AppError {
+	return New(http.StatusNotFound, "TEMPLATE_NOT_FOUND", "Template not found")
+}
+
+// ErrCloneJobNotFound returns a 404 Not Found AppError for missing clone jobs.
+func ErrCloneJobNotFound() *AppError {
+	return New(http.StatusNotFound, "CLONE_JOB_NOT_FOUND", "Clone job not found")
+}
+
 // ErrWorkflowNotFound returns a 404 Not Found AppError for missing workflows.
 func ErrWorkflowNotFound() *AppError {
 	return New(http.StatusNotFound, "WORKFLOW_NOT_FOUND", "Workflow not found")

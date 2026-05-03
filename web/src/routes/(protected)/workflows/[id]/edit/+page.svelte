@@ -363,6 +363,13 @@
 				</div>
 
 				<div class="flex items-center gap-3">
+					<a
+						href={`/workflows/${workflow!.id}/play`}
+						class="inline-flex h-11 items-center gap-2 rounded-md border border-outline-variant/20 bg-surface-container-low px-4 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
+					>
+						<span class="material-symbols-outlined text-base">play_circle</span>
+						Play
+					</a>
 					<div class={`rounded-md border border-outline-variant/20 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] ${statusTone(saveState)}`}>
 						{saveState === 'idle' ? 'Ready' : saveState}
 					</div>

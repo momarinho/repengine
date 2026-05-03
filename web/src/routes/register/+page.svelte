@@ -7,7 +7,7 @@
 </script>
 
 <svelte:head>
-	<title>RepEngine V2 - Register</title>
+	<title>RepEngine - Register</title>
 </svelte:head>
 
 <div class="absolute top-0 right-0 w-full h-full overflow-hidden pointer-events-none z-0">

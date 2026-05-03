@@ -31,7 +31,7 @@
 </script>
 
 <svelte:head>
-	<title>RepEngine V2 - My Routines</title>
+	<title>RepEngine - My Routines</title>
 </svelte:head>
 
 <div class="min-h-screen bg-background">

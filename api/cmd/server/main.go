@@ -39,6 +39,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := db.SeedTemplates(context.Background()); err != nil {
+		slog.Error("failed to seed templates", "err", err)
+		os.Exit(1)
+	}
+
 	if err := handlers.LoadNodeTypesCache(context.Background()); err != nil {
 		slog.Error("failed to load node types cache", "err", err)
 		os.Exit(1)
