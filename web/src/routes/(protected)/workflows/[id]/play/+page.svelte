@@ -124,7 +124,7 @@
 			case 'exercise_timed':
 				return isTimerRunning ? 'Pause Interval' : 'Start Interval';
 			case 'wave':
-				return currentWaveSetIndex >= ((currentWaveWeek?.prescriptions.length ?? 1) - 1) ? 'Complete Wave' : 'Log Set';
+				return 'Log Set';
 			case 'repeat':
 				return getCurrentRound(block) >= (block.rounds ?? 1) ? 'Complete Block' : 'Log Round';
 			case 'section':
