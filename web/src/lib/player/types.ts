@@ -15,6 +15,17 @@ export type WaveStep = {
 	rpe: string;
 };
 
+export type WaveSetPrescription = {
+	label: string;
+	reps: string;
+	intensity: string;
+	rpe: string;
+};
+
+export type WaveWeek = WaveStep & {
+	prescriptions: WaveSetPrescription[];
+};
+
 export type PlayerBlock = {
 	id: string;
 	node_type_slug: PlayerBlockType;
@@ -29,7 +40,8 @@ export type PlayerBlock = {
 	loadUnit?: string;
 	rounds?: number;
 	restSeconds?: number;
-	waveSteps?: WaveStep[];
+	waveSteps?: WaveWeek[];
+	activeWaveWeekIndex?: number;
 	notePlaceholder?: string;
 };
 

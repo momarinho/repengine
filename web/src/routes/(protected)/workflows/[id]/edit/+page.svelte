@@ -52,6 +52,7 @@
 	const hasWorkflow = $derived(Boolean(workflow));
 	const selectedBlock = $derived(blocks.find((block) => block.client_id === selectedBlockId) ?? null);
 	const hasUnsavedChanges = $derived(saveFingerprint() !== lastSavedFingerprint);
+	const waveWeeks = [1, 2, 3, 4] as const;
 
 	function initializeFromWorkflow(next: Workflow): void {
 		title = next.name;
@@ -728,16 +729,84 @@
 									/>
 								</div>
 							{:else if selectedBlock.node_type_slug === 'wave'}
-								<div class="space-y-2">
-									<label for="wave-sets" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Waves</label>
-									<input
-										id="wave-sets"
-										type="number"
-										min="1"
-										class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
-										value={typeof selectedBlock.data.sets === 'number' ? selectedBlock.data.sets : 3}
-										oninput={(event) => updateBlockField(selectedBlock.client_id, 'sets', Number((event.currentTarget as HTMLInputElement).value))}
-									/>
+								<div class="space-y-6">
+									<div class="space-y-2">
+										<label for="wave-exercise-name" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Exercise name</label>
+										<input
+											id="wave-exercise-name"
+											type="text"
+											class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+											value={typeof selectedBlock.data.exercise_name === 'string' ? selectedBlock.data.exercise_name : ''}
+											oninput={(event) => updateBlockField(selectedBlock.client_id, 'exercise_name', (event.currentTarget as HTMLInputElement).value)}
+										/>
+									</div>
+
+									<div class="grid gap-4 md:grid-cols-2">
+										<div class="space-y-2">
+											<label for="wave-active-week" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Active week</label>
+											<select
+												id="wave-active-week"
+												class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+												value={typeof selectedBlock.data.active_week === 'number' ? selectedBlock.data.active_week : 1}
+												onchange={(event) => updateBlockField(selectedBlock.client_id, 'active_week', Number((event.currentTarget as HTMLSelectElement).value))}
+											>
+												{#each waveWeeks as week}
+													<option value={week}>Week {week}</option>
+												{/each}
+											</select>
+										</div>
+										<div class="space-y-2">
+											<label for="wave-rest-seconds" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Suggested rest (seconds)</label>
+											<input
+												id="wave-rest-seconds"
+												type="number"
+												min="0"
+												class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+												value={typeof selectedBlock.data.rest_seconds === 'number' ? selectedBlock.data.rest_seconds : 120}
+												oninput={(event) => updateBlockField(selectedBlock.client_id, 'rest_seconds', Number((event.currentTarget as HTMLInputElement).value))}
+											/>
+										</div>
+									</div>
+
+									<div class="space-y-4">
+										{#each waveWeeks as week}
+											<div class="rounded-xl border border-outline-variant/20 bg-surface-container-high px-4 py-4">
+												<p class="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-tertiary">Week {week}</p>
+												<div class="grid gap-4 md:grid-cols-3">
+													<div class="space-y-2">
+														<label for={`wave-week-${week}-reps`} class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Reps</label>
+														<input
+															id={`wave-week-${week}-reps`}
+															type="text"
+															class="w-full rounded-md border border-outline-variant/20 bg-background px-3 py-2 text-sm text-on-surface outline-none"
+															value={typeof selectedBlock.data[`week_${week}_reps`] === 'string' ? selectedBlock.data[`week_${week}_reps`] : ''}
+															oninput={(event) => updateBlockField(selectedBlock.client_id, `week_${week}_reps`, (event.currentTarget as HTMLInputElement).value)}
+														/>
+													</div>
+													<div class="space-y-2">
+														<label for={`wave-week-${week}-intensity`} class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Intensity %</label>
+														<input
+															id={`wave-week-${week}-intensity`}
+															type="text"
+															class="w-full rounded-md border border-outline-variant/20 bg-background px-3 py-2 text-sm text-on-surface outline-none"
+															value={typeof selectedBlock.data[`week_${week}_intensity`] === 'string' ? selectedBlock.data[`week_${week}_intensity`] : ''}
+															oninput={(event) => updateBlockField(selectedBlock.client_id, `week_${week}_intensity`, (event.currentTarget as HTMLInputElement).value)}
+														/>
+													</div>
+													<div class="space-y-2">
+														<label for={`wave-week-${week}-rpe`} class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">RPE</label>
+														<input
+															id={`wave-week-${week}-rpe`}
+															type="text"
+															class="w-full rounded-md border border-outline-variant/20 bg-background px-3 py-2 text-sm text-on-surface outline-none"
+															value={typeof selectedBlock.data[`week_${week}_rpe`] === 'string' ? selectedBlock.data[`week_${week}_rpe`] : ''}
+															oninput={(event) => updateBlockField(selectedBlock.client_id, `week_${week}_rpe`, (event.currentTarget as HTMLInputElement).value)}
+														/>
+													</div>
+												</div>
+											</div>
+										{/each}
+									</div>
 								</div>
 							{:else if selectedBlock.node_type_slug === 'repeat'}
 								<div class="space-y-2">

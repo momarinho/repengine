@@ -167,7 +167,29 @@ func SeedNodeTypes(ctx context.Context) error {
 		{"exercise", "Exercise", "A single exercise node", "dumbbell", "{}"},
 		{"exercise_timed", "Timed Exercise", "Exercise with duration", "timer",
 			`{"duration": 30}`},
-		{"wave", "Wave", "Wave pattern for exercises", "activity", `{"sets": 3}`},
+		{
+			"wave",
+			"Wave",
+			"Progressive exercise block with set-by-set intensities and week presets",
+			"activity",
+			`{
+				"exercise_name": "",
+				"active_week": 1,
+				"rest_seconds": 120,
+				"week_1_reps": "5/5/5+",
+				"week_1_intensity": "65/75/85",
+				"week_1_rpe": "8/8/9",
+				"week_2_reps": "3/3/3+",
+				"week_2_intensity": "70/80/90",
+				"week_2_rpe": "8/8/9",
+				"week_3_reps": "5/3/1+",
+				"week_3_intensity": "75/85/95",
+				"week_3_rpe": "8/9/9",
+				"week_4_reps": "5/5/5",
+				"week_4_intensity": "40/50/60",
+				"week_4_rpe": "6/6/6"
+			}`,
+		},
 		{"repeat", "Repeat", "Repeat block", "repeat", `{"times": 3}`},
 		{"rest", "Rest", "Rest period between sets", "pause", `{"duration": 30}`},
 		{"section", "Section", "Section header", "folder", "{}"},
@@ -177,7 +199,12 @@ func SeedNodeTypes(ctx context.Context) error {
 		_, err := Pool.Exec(ctx,
 			`INSERT INTO node_types (slug, name, description, icon, schema)
                VALUES ($1, $2, $3, $4, $5)
-               ON CONFLICT (slug) DO NOTHING`,
+               ON CONFLICT (slug) DO UPDATE
+               SET
+                 name = EXCLUDED.name,
+                 description = EXCLUDED.description,
+                 icon = EXCLUDED.icon,
+                 schema = EXCLUDED.schema`,
 			n.slug, n.name, n.description, n.icon, n.schema)
 		if err != nil {
 			return err
@@ -222,11 +249,21 @@ func SeedTemplates(ctx context.Context) error {
 				{
 					NodeTypeSlug: "wave",
 					Data: map[string]any{
-						"exercise_name":     "Squat",
-						"week":              "week_1",
-						"reps":              "5/5/5+",
-						"intensity_percent": "65/75/85",
-						"rpe":               "8-9",
+						"exercise_name":    "Squat",
+						"active_week":      1,
+						"rest_seconds":     120,
+						"week_1_reps":      "5/5/5+",
+						"week_1_intensity": "65/75/85",
+						"week_1_rpe":       "8/8/9",
+						"week_2_reps":      "3/3/3+",
+						"week_2_intensity": "70/80/90",
+						"week_2_rpe":       "8/8/9",
+						"week_3_reps":      "5/3/1+",
+						"week_3_intensity": "75/85/95",
+						"week_3_rpe":       "8/9/9",
+						"week_4_reps":      "5/5/5",
+						"week_4_intensity": "40/50/60",
+						"week_4_rpe":       "6/6/6",
 					},
 				},
 				{
@@ -293,7 +330,7 @@ func SeedTemplates(ctx context.Context) error {
 					},
 				},
 				{
-					NodeTypeSlug: "wave",
+					NodeTypeSlug: "exercise",
 					Data: map[string]any{
 						"exercise_name": "Squat",
 						"sets":          5,

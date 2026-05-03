@@ -14,6 +14,7 @@ import (
 	"github.com/momarinho/rep_engine/internal/handlers"
 	"github.com/momarinho/rep_engine/internal/logger"
 	"github.com/momarinho/rep_engine/internal/middleware"
+	templatesvc "github.com/momarinho/rep_engine/internal/templates"
 	workflowsvc "github.com/momarinho/rep_engine/internal/workflows"
 )
 
@@ -52,6 +53,11 @@ func main() {
 	workflowRepo := workflowsvc.NewRepository(db.Pool)
 	workflowService := workflowsvc.NewService(workflowRepo)
 	handlers.SetWorkflowService(workflowService)
+
+	templateRepo := templatesvc.NewRepository(db.Pool)
+	templateWorker := templatesvc.NewCloneWorker(templateRepo)
+	templateService := templatesvc.NewService(templateRepo, templateWorker)
+	handlers.SetTemplateService(templateService)
 
 	app := fiber.New()
 
@@ -105,6 +111,14 @@ func main() {
 	workflows.Delete("/:id", handlers.DeleteWorkflow)
 	workflows.Post("/:id/versions", handlers.CreateVersion)
 	workflows.Get("/:id/versions", handlers.ListVersions)
+
+	templates := app.Group("/templates", middleware.RequireAuth)
+	templates.Get("/", handlers.ListTemplates)
+	templates.Get("/:id", handlers.GetTemplate)
+	templates.Post("/:id/clone", handlers.CloneTemplate)
+
+	cloneJobs := app.Group("/clone-jobs", middleware.RequireAuth)
+	cloneJobs.Get("/:id", handlers.GetCloneJob)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)

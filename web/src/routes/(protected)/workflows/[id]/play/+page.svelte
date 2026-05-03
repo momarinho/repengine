@@ -5,38 +5,39 @@
 
 	const { data }: { data: PageData } = $props();
 	const initialData = untrack(() => structuredClone(data)) as PageData;
-	const routine: PlayerRoutine = initialData.routine;
-	const initialBlockIndex = routine.initialBlockIndex;
+	const routine: PlayerRoutine | null = initialData.routine;
+	const initialBlockIndex = routine?.initialBlockIndex ?? 0;
 
 	let currentBlockIndex = $state(initialBlockIndex);
-	let completedBlockIds = $state<string[]>(routine.blocks.slice(0, initialBlockIndex).map((block) => block.id));
+	let completedBlockIds = $state<string[]>(routine?.blocks.slice(0, initialBlockIndex).map((block) => block.id) ?? []);
 	let currentSetByBlock = $state<Record<string, number>>({});
 	let roundByBlock = $state<Record<string, number>>({});
-	let waveStepByBlock = $state<Record<string, number>>({});
+	let waveSetByBlock = $state<Record<string, number>>({});
 	let notesByBlock = $state<Record<string, string>>({});
-	let sessionElapsedSeconds = $state(routine.elapsedSeconds);
+	let sessionElapsedSeconds = $state(routine?.elapsedSeconds ?? 0);
 	let isTimerRunning = $state(false);
-	let timerRemainingSeconds = $state(getInitialTimerSeconds(routine.blocks[initialBlockIndex]));
+	let timerRemainingSeconds = $state(routine ? getInitialTimerSeconds(routine.blocks[initialBlockIndex]) : 0);
 	let mobileQueueOpen = $state(false);
 
-	const currentBlock = $derived(routine.blocks[currentBlockIndex]);
-	const progressPercent = $derived(((currentBlockIndex + 1) / routine.blocks.length) * 100);
-	const upcomingBlocks = $derived(routine.blocks.slice(currentBlockIndex + 1, currentBlockIndex + 4));
+	const currentBlock = $derived(routine?.blocks[currentBlockIndex] ?? null);
+	const progressPercent = $derived(routine ? ((currentBlockIndex + 1) / routine.blocks.length) * 100 : 0);
+	const upcomingBlocks = $derived(routine?.blocks.slice(currentBlockIndex + 1, currentBlockIndex + 4) ?? []);
 	const completedBlocks = $derived(
-		routine.blocks.filter((block) => completedBlockIds.includes(block.id)).slice(-3).reverse()
+		routine?.blocks.filter((block) => completedBlockIds.includes(block.id)).slice(-3).reverse() ?? []
 	);
 	const isFirstBlock = $derived(currentBlockIndex === 0);
-	const isLastBlock = $derived(currentBlockIndex === routine.blocks.length - 1);
-	const currentExerciseSet = $derived(getCurrentSet(currentBlock));
-	const currentRepeatRound = $derived(getCurrentRound(currentBlock));
-	const currentWaveStepIndex = $derived(getCurrentWaveStepIndex(currentBlock));
-	const currentWaveStep = $derived(
-		currentBlock.node_type_slug === 'wave' && currentBlock.waveSteps
-			? currentBlock.waveSteps[currentWaveStepIndex]
+	const isLastBlock = $derived(routine ? currentBlockIndex === routine.blocks.length - 1 : true);
+	const currentExerciseSet = $derived(currentBlock ? getCurrentSet(currentBlock) : 1);
+	const currentRepeatRound = $derived(currentBlock ? getCurrentRound(currentBlock) : 1);
+	const currentWaveSetIndex = $derived(currentBlock ? getCurrentWaveSetIndex(currentBlock) : 0);
+	const currentWaveWeek = $derived(
+		currentBlock?.node_type_slug === 'wave' && currentBlock.waveSteps
+			? currentBlock.waveSteps[currentBlock.activeWaveWeekIndex ?? 0]
 			: null
 	);
-	const primaryActionLabel = $derived(getPrimaryActionLabel(currentBlock));
-	const secondaryActionLabel = $derived(getSecondaryActionLabel(currentBlock));
+	const currentWaveSet = $derived(currentWaveWeek ? currentWaveWeek.prescriptions[currentWaveSetIndex] : null);
+	const primaryActionLabel = $derived(currentBlock ? getPrimaryActionLabel(currentBlock) : 'Continue');
+	const secondaryActionLabel = $derived(currentBlock ? getSecondaryActionLabel(currentBlock) : null);
 
 	function getInitialTimerSeconds(block: PlayerBlock): number {
 		if (block.node_type_slug === 'rest' || block.node_type_slug === 'exercise_timed') {
@@ -54,8 +55,8 @@
 		return roundByBlock[block.id] ?? 1;
 	}
 
-	function getCurrentWaveStepIndex(block: PlayerBlock): number {
-		return waveStepByBlock[block.id] ?? 0;
+	function getCurrentWaveSetIndex(block: PlayerBlock): number {
+		return waveSetByBlock[block.id] ?? 0;
 	}
 
 	function formatClock(totalSeconds: number): string {
@@ -123,7 +124,7 @@
 			case 'exercise_timed':
 				return isTimerRunning ? 'Pause Interval' : 'Start Interval';
 			case 'wave':
-				return currentWaveStepIndex >= (block.waveSteps?.length ?? 1) - 1 ? 'Complete Wave' : 'Next Wave';
+				return currentWaveSetIndex >= ((currentWaveWeek?.prescriptions.length ?? 1) - 1) ? 'Complete Wave' : 'Log Set';
 			case 'repeat':
 				return getCurrentRound(block) >= (block.rounds ?? 1) ? 'Complete Block' : 'Log Round';
 			case 'section':
@@ -144,14 +145,14 @@
 			case 'repeat':
 				return 'Skip Round';
 			case 'wave':
-				return 'Reset Wave';
+				return 'Reset Sets';
 			default:
 				return null;
 		}
 	}
 
 	function markBlockCompleted(index: number): void {
-		const blockID = routine.blocks[index]?.id;
+		const blockID = routine?.blocks[index]?.id;
 		if (!blockID) return;
 
 		if (!completedBlockIds.includes(blockID)) {
@@ -160,7 +161,7 @@
 	}
 
 	function goToBlock(index: number): void {
-		if (index < 0 || index >= routine.blocks.length) return;
+		if (!routine || index < 0 || index >= routine.blocks.length) return;
 
 		currentBlockIndex = index;
 		timerRemainingSeconds = getInitialTimerSeconds(routine.blocks[index]);
@@ -169,7 +170,7 @@
 	}
 
 	function goToNextBlock(): void {
-		if (currentBlockIndex >= routine.blocks.length - 1) return;
+		if (!routine || currentBlockIndex >= routine.blocks.length - 1) return;
 		markBlockCompleted(currentBlockIndex);
 		goToBlock(currentBlockIndex + 1);
 	}
@@ -177,7 +178,7 @@
 	function goToPreviousBlock(): void {
 		if (currentBlockIndex <= 0) return;
 
-		const previousBlockID = routine.blocks[currentBlockIndex - 1]?.id;
+		const previousBlockID = routine?.blocks[currentBlockIndex - 1]?.id;
 		if (previousBlockID) {
 			completedBlockIds = completedBlockIds.filter((id) => id !== previousBlockID);
 		}
@@ -186,6 +187,7 @@
 	}
 
 	function runPrimaryAction(): void {
+		if (!currentBlock) return;
 		const block = currentBlock;
 
 		switch (block.node_type_slug) {
@@ -211,13 +213,14 @@
 				return;
 			}
 			case 'wave': {
-				const nextStep = getCurrentWaveStepIndex(block) + 1;
-				if (nextStep >= (block.waveSteps?.length ?? 1)) {
+				const nextSet = getCurrentWaveSetIndex(block) + 1;
+				const totalSets = block.waveSteps?.[block.activeWaveWeekIndex ?? 0]?.prescriptions.length ?? 1;
+				if (nextSet >= totalSets) {
 					goToNextBlock();
 					return;
 				}
 
-				waveStepByBlock = { ...waveStepByBlock, [block.id]: nextStep };
+				waveSetByBlock = { ...waveSetByBlock, [block.id]: nextSet };
 				return;
 			}
 			case 'repeat': {
@@ -237,6 +240,7 @@
 	}
 
 	function runSecondaryAction(): void {
+		if (!currentBlock) return;
 		const block = currentBlock;
 
 		switch (block.node_type_slug) {
@@ -257,12 +261,13 @@
 				return;
 			}
 			case 'wave':
-				waveStepByBlock = { ...waveStepByBlock, [block.id]: 0 };
+				waveSetByBlock = { ...waveSetByBlock, [block.id]: 0 };
 				return;
 		}
 	}
 
 	$effect(() => {
+		if (!routine) return;
 		const sessionInterval = setInterval(() => {
 			sessionElapsedSeconds += 1;
 		}, 1000);
@@ -271,6 +276,7 @@
 	});
 
 	$effect(() => {
+		if (!routine || !currentBlock) return;
 		if (!isTimerRunning) return;
 		if (currentBlock.node_type_slug !== 'rest' && currentBlock.node_type_slug !== 'exercise_timed') return;
 		if (timerRemainingSeconds <= 0) return;
@@ -290,10 +296,25 @@
 </script>
 
 <svelte:head>
-	<title>{routine.name} - Workout Player</title>
+	<title>{routine ? `${routine.name} - Workout Player` : 'Workout Player'} - RepEngine</title>
 </svelte:head>
 
+{#if !routine}
+	<div class="min-h-screen bg-background px-8 py-16 text-on-background">
+		<div class="mx-auto max-w-3xl rounded-2xl border border-error/30 bg-error/10 px-6 py-8">
+			<h1 class="text-2xl font-bold text-error">Workout unavailable</h1>
+			<p class="mt-3 text-sm text-error/90">{data.error ?? 'This workflow cannot be rendered in the player right now.'}</p>
+			<a
+				href="/dashboard"
+				class="mt-6 inline-flex rounded-md border border-error/30 px-4 py-2 text-sm font-semibold text-error transition-colors hover:bg-error/10"
+			>
+				Back to dashboard
+			</a>
+		</div>
+	</div>
+{:else}
 <div class="min-h-screen overflow-hidden bg-background text-on-background">
+	{#if currentBlock}
 	<header class="fixed top-0 z-40 flex w-full flex-col items-center border-b border-white/5 bg-background/80 backdrop-blur-xl">
 		<div class="flex h-14 w-full items-center justify-between px-6">
 			<div class="min-w-0">
@@ -436,31 +457,46 @@
 							<div class="grid gap-4 md:grid-cols-3">
 								<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
 									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Current step</p>
-									<p class="mt-2 text-2xl font-bold text-on-surface">{currentWaveStep?.label}</p>
+									<p class="mt-2 text-2xl font-bold text-on-surface">{currentWaveWeek?.label}</p>
 								</div>
 								<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
-									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Reps</p>
-									<p class="mt-2 text-2xl font-bold text-on-surface">{currentWaveStep?.reps}</p>
+									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Current set</p>
+									<p class="mt-2 text-2xl font-bold text-on-surface">{currentWaveSetIndex + 1} / {currentWaveWeek?.prescriptions.length ?? 1}</p>
 								</div>
 								<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
-									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Intensity / RPE</p>
-									<p class="mt-2 text-lg font-semibold text-on-surface">{currentWaveStep?.intensity} • {currentWaveStep?.rpe}</p>
+									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Set prescription</p>
+									<p class="mt-2 text-lg font-semibold text-on-surface">{currentWaveSet?.reps} • {currentWaveSet?.intensity}% • RPE {currentWaveSet?.rpe}</p>
+								</div>
+							</div>
+
+							<div class="grid gap-4 rounded-xl border border-white/5 bg-surface-container-low p-5 md:grid-cols-2">
+								<div>
+									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Suggested rest</p>
+									<p class="mt-2 text-2xl font-bold text-on-surface">{formatClock(currentBlock.restSeconds ?? 0)}</p>
+								</div>
+								<div>
+									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Set completion</p>
+									<div class="mt-3 flex gap-2">
+										{#each Array(currentWaveWeek?.prescriptions.length ?? 0) as _, index}
+											<div class={`h-2 flex-1 rounded-full ${index < currentWaveSetIndex ? 'bg-secondary' : 'bg-surface-variant'}`}></div>
+										{/each}
+									</div>
 								</div>
 							</div>
 
 							<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
 								<div class="mb-4 flex items-center justify-between">
 									<span class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Wave progression</span>
-									<span class="text-xs font-medium text-secondary">{currentWaveStep?.label}</span>
+									<span class="text-xs font-medium text-secondary">{currentWaveWeek?.label}</span>
 								</div>
 								<div class="flex gap-2">
 									{#each currentBlock.waveSteps ?? [] as step, index}
-										<div class={`h-2 flex-1 rounded-full ${index <= currentWaveStepIndex ? 'bg-secondary' : 'bg-surface-variant'}`}></div>
+										<div class={`h-2 flex-1 rounded-full ${index <= (currentBlock.activeWaveWeekIndex ?? 0) ? 'bg-secondary' : 'bg-surface-variant'}`}></div>
 									{/each}
 								</div>
 								<div class="mt-5 grid gap-3 md:grid-cols-2">
 									{#each currentBlock.waveSteps ?? [] as step, index}
-										<div class={`rounded-xl border px-4 py-3 ${index === currentWaveStepIndex ? 'border-secondary/30 bg-secondary/10' : 'border-white/5 bg-surface-container'}`}>
+										<div class={`rounded-xl border px-4 py-3 ${index === (currentBlock.activeWaveWeekIndex ?? 0) ? 'border-secondary/30 bg-secondary/10' : 'border-white/5 bg-surface-container'}`}>
 											<p class="text-sm font-semibold text-on-surface">{step.label}</p>
 											<p class="mt-1 text-xs text-on-surface-variant">{step.reps} • {step.intensity} • RPE {step.rpe}</p>
 										</div>
@@ -698,7 +734,22 @@
 			</div>
 		</section>
 	{/if}
+	{:else}
+		<div class="px-8 py-16">
+			<div class="mx-auto max-w-3xl rounded-2xl border border-error/30 bg-error/10 px-6 py-8">
+				<h1 class="text-2xl font-bold text-error">Workout unavailable</h1>
+				<p class="mt-3 text-sm text-error/90">The player could not resolve the current block for this workflow.</p>
+				<a
+					href={`/workflows/${routine.id}/edit`}
+					class="mt-6 inline-flex rounded-md border border-error/30 px-4 py-2 text-sm font-semibold text-error transition-colors hover:bg-error/10"
+				>
+					Back to editor
+				</a>
+			</div>
+		</div>
+	{/if}
 </div>
+{/if}
 
 <style>
 	.custom-scrollbar::-webkit-scrollbar {

@@ -39,9 +39,12 @@
 	<header class="sticky top-0 z-30 bg-background/80 backdrop-blur-md border-b border-surface-container-low px-8 py-6 flex justify-between items-center">
 		<h2 class="font-headline text-3xl font-bold text-on-surface tracking-tight">My Routines</h2>
 		<div class="flex items-center gap-4">
-			<button class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors">
-				<span class="material-symbols-outlined">search</span>
-			</button>
+			<a
+				href="/templates"
+				class="rounded-md border border-outline-variant/20 px-4 py-2.5 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+			>
+				Browse Templates
+			</a>
 			<a href="/dashboard/new" class="btn-primary-gradient text-on-primary-fixed font-body font-semibold px-6 py-2.5 rounded-md flex items-center gap-2 hover:opacity-90 transition-opacity">
 				<span class="material-symbols-outlined text-sm">add</span>
 				New Routine
@@ -95,6 +98,20 @@
 						</a>
 						<div class="flex flex-wrap gap-2 mb-6">
 							<span class="px-2 py-1 rounded-md bg-[#26233a] text-[#c4a7e7] font-label text-xs tracking-wider uppercase">{workflow.blocks?.length || 0} Blocks</span>
+						</div>
+						<div class="mb-5 flex gap-2">
+							<a
+								href={`/workflows/${workflow.id}/edit`}
+								class="rounded-md bg-surface-container-high px-3 py-2 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container-highest"
+							>
+								Edit
+							</a>
+							<a
+								href={`/workflows/${workflow.id}/play`}
+								class="rounded-md border border-primary/20 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+							>
+								Start Workout
+							</a>
 						</div>
 						<div class="flex justify-between items-end mt-auto pt-4 border-t border-outline-variant/10">
 							<span class="font-body text-xs text-outline">{workflow.is_public ? 'Public' : 'Private'}</span>

@@ -70,6 +70,11 @@ func ErrCloneJobNotFound() *AppError {
 	return New(http.StatusNotFound, "CLONE_JOB_NOT_FOUND", "Clone job not found")
 }
 
+// ErrCloneFailed returns a 500 Internal Server Error AppError for failed clone jobs.
+func ErrCloneFailed() *AppError {
+	return New(http.StatusInternalServerError, "CLONE_FAILED", "Clone failed")
+}
+
 // ErrWorkflowNotFound returns a 404 Not Found AppError for missing workflows.
 func ErrWorkflowNotFound() *AppError {
 	return New(http.StatusNotFound, "WORKFLOW_NOT_FOUND", "Workflow not found")
