@@ -2,13 +2,19 @@
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import type { PageData } from './$types';
-	import type { PlayerBlock, PlayerRoutine } from '$lib/player/types';
+	import type { PlayerBlock, PlayerRoutine, PlayerSection } from '$lib/player/types';
 
 	const { data }: { data: PageData } = $props();
 	const initialData = untrack(() => structuredClone(data)) as PageData;
 	const routine: PlayerRoutine | null = initialData.routine;
 	const initialBlockIndex = routine?.initialBlockIndex ?? 0;
 	const hasSectionQuery = page.url.searchParams.has('section');
+	const initialSection =
+		routine?.sections.find(
+			(section) =>
+				initialBlockIndex >= section.startBlockIndex &&
+				initialBlockIndex < section.startBlockIndex + section.blockCount
+		) ?? null;
 
 	let currentBlockIndex = $state(initialBlockIndex);
 	let completedBlockIds = $state<string[]>(routine?.blocks.slice(0, initialBlockIndex).map((block) => block.id) ?? []);
@@ -27,15 +33,33 @@
 	let isIntraSetRestRunning = $state(false);
 	let mobileQueueOpen = $state(false);
 	let isChoosingSection = $state(Boolean(routine?.sections.length) && !hasSectionQuery);
+	let activeSection = $state<PlayerSection | null>(initialSection);
+	let isSessionComplete = $state(false);
 
 	const currentBlock = $derived(routine?.blocks[currentBlockIndex] ?? null);
-	const progressPercent = $derived(routine ? ((currentBlockIndex + 1) / routine.blocks.length) * 100 : 0);
-	const upcomingBlocks = $derived(routine?.blocks.slice(currentBlockIndex + 1, currentBlockIndex + 4) ?? []);
+	const activeSectionEndIndex = $derived(
+		routine
+			? activeSection
+				? Math.min(activeSection.startBlockIndex + activeSection.blockCount - 1, routine.blocks.length - 1)
+				: routine.blocks.length - 1
+			: 0
+	);
+	const activeSectionStartIndex = $derived(activeSection?.startBlockIndex ?? 0);
+	const progressPercent = $derived(
+		routine
+			? ((currentBlockIndex - activeSectionStartIndex + 1) /
+					Math.max(activeSectionEndIndex - activeSectionStartIndex + 1, 1)) *
+				100
+			: 0
+	);
+	const upcomingBlocks = $derived(
+		routine?.blocks.slice(currentBlockIndex + 1, activeSectionEndIndex + 1).slice(0, 3) ?? []
+	);
 	const completedBlocks = $derived(
 		routine?.blocks.filter((block) => completedBlockIds.includes(block.id)).slice(-3).reverse() ?? []
 	);
 	const isFirstBlock = $derived(currentBlockIndex === 0);
-	const isLastBlock = $derived(routine ? currentBlockIndex === routine.blocks.length - 1 : true);
+	const isLastBlock = $derived(routine ? currentBlockIndex >= activeSectionEndIndex : true);
 	const currentExerciseSet = $derived(currentBlock ? getCurrentSet(currentBlock) : 1);
 	const currentRepeatRound = $derived(currentBlock ? getCurrentRound(currentBlock) : 1);
 	const currentWaveSetIndex = $derived(currentBlock ? getCurrentWaveSetIndex(currentBlock) : 0);
@@ -194,8 +218,16 @@
 	}
 
 	function goToNextBlock(): void {
-		if (!routine || currentBlockIndex >= routine.blocks.length - 1) return;
+		if (!routine) return;
 		markBlockCompleted(currentBlockIndex);
+
+		if (currentBlockIndex >= activeSectionEndIndex) {
+			isSessionComplete = true;
+			isTimerRunning = false;
+			clearIntraSetRest();
+			return;
+		}
+
 		goToBlock(currentBlockIndex + 1);
 	}
 
@@ -210,7 +242,10 @@
 		goToBlock(currentBlockIndex - 1);
 	}
 
-	function startSection(index: number): void {
+	function startSection(section: PlayerSection | null): void {
+		const index = section?.startBlockIndex ?? 0;
+		activeSection = section;
+		isSessionComplete = false;
 		goToBlock(index);
 		completedBlockIds = routine?.blocks.slice(0, index).map((block) => block.id) ?? [];
 		isChoosingSection = false;
@@ -411,7 +446,7 @@
 					<button
 						type="button"
 						class="rounded-md border border-outline-variant/20 bg-surface-container px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
-						onclick={() => startSection(0)}
+						onclick={() => startSection(null)}
 					>
 						Start from beginning
 					</button>
@@ -422,7 +457,7 @@
 						<button
 							type="button"
 							class="rounded-xl border border-outline-variant/20 bg-surface-container p-5 text-left transition-colors hover:border-primary/40 hover:bg-surface-container-high"
-							onclick={() => startSection(section.startBlockIndex)}
+							onclick={() => startSection(section)}
 						>
 							<div class="mb-5 flex items-start justify-between gap-4">
 								<div>
@@ -438,6 +473,39 @@
 							</div>
 						</button>
 					{/each}
+				</div>
+			</div>
+		</div>
+	{:else if isSessionComplete}
+		<div class="min-h-screen px-6 py-16">
+			<div class="mx-auto max-w-3xl rounded-2xl border border-primary/20 bg-surface-container p-8 text-center shadow-xl">
+				<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Session complete</p>
+				<h1 class="mt-3 text-3xl font-bold tracking-tight text-on-background">
+					{activeSection?.title ?? routine.name} finished
+				</h1>
+				<p class="mt-3 text-sm text-on-surface-variant">
+					{activeSection?.subtitle || 'This selected section has been completed.'}
+				</p>
+				<div class="mt-8 flex flex-wrap justify-center gap-3">
+					<button
+						type="button"
+						class="rounded-md border border-outline-variant/20 bg-surface-container-high px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-highest"
+						onclick={() => (isChoosingSection = true)}
+					>
+						Choose another section
+					</button>
+					<a
+						href={`/workflows/${routine.id}/edit`}
+						class="rounded-md border border-outline-variant/20 px-4 py-2 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+					>
+						Back to editor
+					</a>
+					<a
+						href="/dashboard"
+						class="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-on-primary-fixed transition-opacity hover:opacity-90"
+					>
+						Dashboard
+					</a>
 				</div>
 			</div>
 		</div>
@@ -844,7 +912,6 @@
 				type="button"
 				class="flex h-12 w-12 items-center justify-center rounded-xl bg-surface-variant/20 text-on-surface-variant transition-all hover:bg-surface-variant/40 disabled:opacity-40"
 				onclick={goToNextBlock}
-				disabled={isLastBlock}
 			>
 				<span class="material-symbols-outlined">skip_next</span>
 			</button>
