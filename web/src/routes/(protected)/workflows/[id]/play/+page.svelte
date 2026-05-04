@@ -19,6 +19,12 @@
 	let sessionElapsedSeconds = $state(routine?.elapsedSeconds ?? 0);
 	let isTimerRunning = $state(false);
 	let timerRemainingSeconds = $state(routine ? getInitialTimerSeconds(routine.blocks[initialBlockIndex]) : 0);
+	let intraSetRest = $state<{
+		blockID: string;
+		remainingSeconds: number;
+		nextLabel: string;
+	} | null>(null);
+	let isIntraSetRestRunning = $state(false);
 	let mobileQueueOpen = $state(false);
 	let isChoosingSection = $state(Boolean(routine?.sections.length) && !hasSectionQuery);
 
@@ -39,6 +45,7 @@
 			: null
 	);
 	const currentWaveSet = $derived(currentWaveWeek ? currentWaveWeek.prescriptions[currentWaveSetIndex] : null);
+	const isRestingBetweenSets = $derived(Boolean(intraSetRest && currentBlock && intraSetRest.blockID === currentBlock.id));
 	const primaryActionLabel = $derived(currentBlock ? getPrimaryActionLabel(currentBlock) : 'Continue');
 	const secondaryActionLabel = $derived(currentBlock ? getSecondaryActionLabel(currentBlock) : null);
 
@@ -121,6 +128,10 @@
 	}
 
 	function getPrimaryActionLabel(block: PlayerBlock): string {
+		if (isRestingBetweenSets) {
+			return isIntraSetRestRunning ? 'Pause Rest' : 'Resume Rest';
+		}
+
 		switch (block.node_type_slug) {
 			case 'exercise':
 			case 'linear_progression':
@@ -141,6 +152,10 @@
 	}
 
 	function getSecondaryActionLabel(block: PlayerBlock): string | null {
+		if (isRestingBetweenSets) {
+			return 'Skip Rest';
+		}
+
 		switch (block.node_type_slug) {
 			case 'rest':
 				return '+30s';
@@ -173,6 +188,8 @@
 		currentBlockIndex = index;
 		timerRemainingSeconds = getInitialTimerSeconds(routine.blocks[index]);
 		isTimerRunning = false;
+		intraSetRest = null;
+		isIntraSetRestRunning = false;
 		mobileQueueOpen = false;
 	}
 
@@ -199,9 +216,31 @@
 		isChoosingSection = false;
 	}
 
+	function startIntraSetRest(block: PlayerBlock, nextLabel: string): void {
+		const duration = block.restSeconds ?? 0;
+		if (duration <= 0) return;
+
+		intraSetRest = {
+			blockID: block.id,
+			remainingSeconds: duration,
+			nextLabel
+		};
+		isIntraSetRestRunning = true;
+	}
+
+	function clearIntraSetRest(): void {
+		intraSetRest = null;
+		isIntraSetRestRunning = false;
+	}
+
 	function runPrimaryAction(): void {
 		if (!currentBlock) return;
 		const block = currentBlock;
+
+		if (isRestingBetweenSets) {
+			isIntraSetRestRunning = !isIntraSetRestRunning;
+			return;
+		}
 
 		switch (block.node_type_slug) {
 			case 'exercise':
@@ -213,7 +252,7 @@
 				}
 
 				currentSetByBlock = { ...currentSetByBlock, [block.id]: nextSet };
-				timerRemainingSeconds = block.restSeconds ?? timerRemainingSeconds;
+				startIntraSetRest(block, `Set ${nextSet}`);
 				return;
 			}
 			case 'rest':
@@ -235,6 +274,7 @@
 				}
 
 				waveSetByBlock = { ...waveSetByBlock, [block.id]: nextSet };
+				startIntraSetRest(block, `Set ${nextSet + 1}`);
 				return;
 			}
 			case 'repeat': {
@@ -256,6 +296,11 @@
 	function runSecondaryAction(): void {
 		if (!currentBlock) return;
 		const block = currentBlock;
+
+		if (isRestingBetweenSets) {
+			clearIntraSetRest();
+			return;
+		}
 
 		switch (block.node_type_slug) {
 			case 'rest':
@@ -307,6 +352,31 @@
 		}, 1000);
 
 		return () => clearInterval(timerInterval);
+	});
+
+	$effect(() => {
+		if (!intraSetRest) return;
+		if (!isIntraSetRestRunning) return;
+		if (intraSetRest.remainingSeconds <= 0) return;
+
+		const restInterval = setInterval(() => {
+			if (!intraSetRest) return;
+			if (intraSetRest.remainingSeconds <= 1) {
+				intraSetRest = {
+					...intraSetRest,
+					remainingSeconds: 0
+				};
+				isIntraSetRestRunning = false;
+				return;
+			}
+
+			intraSetRest = {
+				...intraSetRest,
+				remainingSeconds: intraSetRest.remainingSeconds - 1
+			};
+		}, 1000);
+
+		return () => clearInterval(restInterval);
 	});
 </script>
 
@@ -487,6 +557,18 @@
 								</div>
 							</div>
 						</div>
+
+						{#if isRestingBetweenSets && intraSetRest}
+							<div class="mt-4 rounded-xl border border-primary/20 bg-primary/10 p-5">
+								<div class="flex flex-wrap items-center justify-between gap-4">
+									<div>
+										<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Rest between sets</p>
+										<p class="mt-2 text-sm text-on-surface-variant">Next: {intraSetRest.nextLabel}</p>
+									</div>
+									<p class="font-display text-4xl font-bold text-on-surface">{formatClock(intraSetRest.remainingSeconds)}</p>
+								</div>
+							</div>
+						{/if}
 					{:else if currentBlock.node_type_slug === 'rest' || currentBlock.node_type_slug === 'exercise_timed'}
 						<div class="flex flex-col items-center justify-center py-4">
 							<div class="relative flex h-56 w-56 items-center justify-center">
@@ -561,8 +643,20 @@
 											<div class={`h-2 flex-1 rounded-full ${index < currentWaveSetIndex ? 'bg-secondary' : 'bg-surface-variant'}`}></div>
 										{/each}
 									</div>
-								</div>
 							</div>
+						</div>
+
+							{#if isRestingBetweenSets && intraSetRest}
+								<div class="rounded-xl border border-secondary/20 bg-secondary/10 p-5">
+									<div class="flex flex-wrap items-center justify-between gap-4">
+										<div>
+											<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-secondary">Rest between wave sets</p>
+											<p class="mt-2 text-sm text-on-surface-variant">Next: {intraSetRest.nextLabel}</p>
+										</div>
+										<p class="font-display text-4xl font-bold text-on-surface">{formatClock(intraSetRest.remainingSeconds)}</p>
+									</div>
+								</div>
+							{/if}
 
 							<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
 								<div class="mb-4 flex items-center justify-between">

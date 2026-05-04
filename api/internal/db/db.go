@@ -164,9 +164,10 @@ func SeedNodeTypes(ctx context.Context) error {
 		slug, name, description, icon string
 		schema                        string
 	}{
-		{"exercise", "Exercise", "A single exercise node", "dumbbell", "{}"},
+		{"exercise", "Exercise", "A single exercise node", "dumbbell",
+			`{"exercise_name": "", "sets": 3, "reps": "", "rest_seconds": 90}`},
 		{"exercise_timed", "Timed Exercise", "Exercise with duration", "timer",
-			`{"duration": 30}`},
+			`{"exercise_name": "", "duration": 30}`},
 		{
 			"wave",
 			"Wave",
@@ -187,7 +188,13 @@ func SeedNodeTypes(ctx context.Context) error {
 				"week_3_rpe": "",
 				"week_4_reps": "",
 				"week_4_intensity": "",
-				"week_4_rpe": ""
+				"week_4_rpe": "",
+				"week_5_reps": "",
+				"week_5_intensity": "",
+				"week_5_rpe": "",
+				"week_6_reps": "",
+				"week_6_intensity": "",
+				"week_6_rpe": ""
 			}`,
 		},
 		{
@@ -247,6 +254,93 @@ type templateSeed struct {
 type templateBlockSeed struct {
 	NodeTypeSlug string
 	Data         map[string]any
+}
+
+func sectionBlock(title, subtitle, kind string) templateBlockSeed {
+	return templateBlockSeed{
+		NodeTypeSlug: "section",
+		Data: map[string]any{
+			"title":     title,
+			"subtitle":  subtitle,
+			"kind":      kind,
+			"collapsed": false,
+		},
+	}
+}
+
+func hybridWaveBlock(exercise string, restSeconds int) templateBlockSeed {
+	return templateBlockSeed{
+		NodeTypeSlug: "wave",
+		Data: map[string]any{
+			"exercise_name":    exercise,
+			"active_week":      1,
+			"rest_seconds":     restSeconds,
+			"week_1_reps":      "10/10/10",
+			"week_1_intensity": "65/65/65",
+			"week_1_rpe":       "7/7/7",
+			"week_2_reps":      "8/8/8",
+			"week_2_intensity": "75/75/75",
+			"week_2_rpe":       "8/8/8",
+			"week_3_reps":      "5/5/5",
+			"week_3_intensity": "85/85/85",
+			"week_3_rpe":       "9/9/9",
+			"week_4_reps":      "10/10/10",
+			"week_4_intensity": "70/70/70",
+			"week_4_rpe":       "7/7/7",
+			"week_5_reps":      "8/8/8",
+			"week_5_intensity": "80/80/80",
+			"week_5_rpe":       "8/8/8",
+			"week_6_reps":      "5/5/5",
+			"week_6_intensity": "90/90/90",
+			"week_6_rpe":       "9/9/10",
+		},
+	}
+}
+
+func exerciseBlock(exercise, reps string, sets int) templateBlockSeed {
+	return templateBlockSeed{
+		NodeTypeSlug: "exercise",
+		Data: map[string]any{
+			"exercise_name": exercise,
+			"sets":          sets,
+			"reps":          reps,
+		},
+	}
+}
+
+func timedExerciseBlock(exercise string, duration int) templateBlockSeed {
+	return templateBlockSeed{
+		NodeTypeSlug: "exercise_timed",
+		Data: map[string]any{
+			"exercise_name": exercise,
+			"duration":      duration,
+		},
+	}
+}
+
+func linearProgressionBlock(exercise, reps, loadUnit string, sets int, startLoad, increment float64, restSeconds int) templateBlockSeed {
+	return templateBlockSeed{
+		NodeTypeSlug: "linear_progression",
+		Data: map[string]any{
+			"exercise_name":    exercise,
+			"sets":             sets,
+			"reps":             reps,
+			"start_load":       startLoad,
+			"load_unit":        loadUnit,
+			"increment":        increment,
+			"progression_rule": "add_each_session",
+			"rest_seconds":     restSeconds,
+		},
+	}
+}
+
+func restBlock(duration int) templateBlockSeed {
+	return templateBlockSeed{
+		NodeTypeSlug: "rest",
+		Data: map[string]any{
+			"duration": duration,
+		},
+	}
 }
 
 func SeedTemplates(ctx context.Context) error {
@@ -424,6 +518,42 @@ func SeedTemplates(ctx context.Context) error {
 						"reps":          "15",
 					},
 				},
+			},
+		},
+		{
+			Name:        "Hybrid Wave Strength + Calisthenics",
+			Description: "Four-day hybrid split combining wave-loaded compounds with calisthenics skill and volume work.",
+			Category:    "hybrid",
+			IsOfficial:  true,
+			Metadata: map[string]any{
+				"duration":  "6 weeks",
+				"frequency": "4 days/week",
+				"level":     "intermediate",
+			},
+			Blocks: []templateBlockSeed{
+				sectionBlock("Day 1 - Upper Push", "Wave-loaded overhead press with dips and handstand skill practice.", "day"),
+				hybridWaveBlock("Barbell Overhead Press", 180),
+				exerciseBlock("Ring Dips", "6-10", 3),
+				timedExerciseBlock("Handstand Push-Up Practice", 600),
+				restBlock(120),
+
+				sectionBlock("Day 2 - Lower Body", "Squat wave loading with unilateral calisthenics and posterior-chain volume.", "day"),
+				hybridWaveBlock("Back Squat", 180),
+				exerciseBlock("Pistol Squat Progression", "5/leg", 3),
+				linearProgressionBlock("Romanian Deadlift", "8", "kg", 3, 60, 2.5, 120),
+				restBlock(120),
+
+				sectionBlock("Day 3 - Upper Pull", "Weighted pull-up wave loading with ring rows and front lever practice.", "day"),
+				hybridWaveBlock("Weighted Pull-Up", 180),
+				exerciseBlock("Ring Rows", "12-15", 3),
+				timedExerciseBlock("Front Lever Progression", 480),
+				restBlock(120),
+
+				sectionBlock("Day 4 - Posterior Chain", "Deadlift wave loading with split squat progression and hamstring control.", "day"),
+				hybridWaveBlock("Deadlift", 210),
+				linearProgressionBlock("Bulgarian Split Squat", "8-10/leg", "kg", 3, 20, 2.5, 120),
+				exerciseBlock("Nordic Hamstring Curl", "6", 3),
+				restBlock(150),
 			},
 		},
 	}

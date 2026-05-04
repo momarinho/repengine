@@ -9,7 +9,9 @@
 
 	const exercise = $derived(typeof block.data.exercise_name === 'string' ? block.data.exercise_name : 'Exercise');
 	const sets = $derived(typeof block.data.sets === 'number' ? block.data.sets : null);
-	const reps = $derived(typeof block.data.reps === 'number' ? block.data.reps : null);
+	const reps = $derived(
+		typeof block.data.reps === 'number' || typeof block.data.reps === 'string' ? block.data.reps : null
+	);
 	const loadUnit = $derived(typeof block.data.load_unit === 'string' ? block.data.load_unit : null);
 	const loadValue = $derived(
 		typeof block.data.load_value === 'number' || typeof block.data.load_value === 'string'

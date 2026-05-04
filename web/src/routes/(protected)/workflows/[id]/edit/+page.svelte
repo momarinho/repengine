@@ -55,7 +55,7 @@
 	const selectedBlock = $derived(blocks.find((block) => block.client_id === selectedBlockId) ?? null);
 	const hasUnsavedChanges = $derived(saveFingerprint() !== lastSavedFingerprint);
 	const blockGroups = $derived(groupBlocksBySection(blocks));
-	const waveWeeks = [1, 2, 3, 4] as const;
+	const waveWeeks = [1, 2, 3, 4, 5, 6] as const;
 
 	function initializeFromWorkflow(next: Workflow): void {
 		title = next.name;
@@ -875,17 +875,15 @@
 									</div>
 
 									<div class="space-y-2">
-										<label for="exercise-rest-protocol" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Rest Protocol</label>
-										<select
-											id="exercise-rest-protocol"
+										<label for="exercise-rest-seconds" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Rest between sets (seconds)</label>
+										<input
+											id="exercise-rest-seconds"
+											type="number"
+											min="0"
 											class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
-											value={typeof selectedBlock.data.rest_protocol === 'string' ? selectedBlock.data.rest_protocol : 'self-paced'}
-											onchange={(event) => updateBlockField(selectedBlock.client_id, 'rest_protocol', (event.currentTarget as HTMLSelectElement).value)}
-										>
-											<option value="self-paced">Self-paced</option>
-											<option value="strict">Strict</option>
-											<option value="walk-back">Walk-back</option>
-										</select>
+											value={typeof selectedBlock.data.rest_seconds === 'number' ? selectedBlock.data.rest_seconds : 90}
+											oninput={(event) => updateBlockField(selectedBlock.client_id, 'rest_seconds', Number((event.currentTarget as HTMLInputElement).value))}
+										/>
 									</div>
 
 									<div class="space-y-2">
@@ -899,16 +897,28 @@
 									</div>
 								</div>
 							{:else if selectedBlock.node_type_slug === 'exercise_timed'}
-								<div class="space-y-2">
-									<label for="timed-duration" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Duration (seconds)</label>
-									<input
-										id="timed-duration"
-										type="number"
-										min="5"
-										class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
-										value={typeof selectedBlock.data.duration === 'number' ? selectedBlock.data.duration : 30}
-										oninput={(event) => updateBlockField(selectedBlock.client_id, 'duration', Number((event.currentTarget as HTMLInputElement).value))}
-									/>
+								<div class="space-y-5">
+									<div class="space-y-2">
+										<label for="timed-exercise-name" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Exercise name</label>
+										<input
+											id="timed-exercise-name"
+											type="text"
+											class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+											value={typeof selectedBlock.data.exercise_name === 'string' ? selectedBlock.data.exercise_name : ''}
+											oninput={(event) => updateBlockField(selectedBlock.client_id, 'exercise_name', (event.currentTarget as HTMLInputElement).value)}
+										/>
+									</div>
+									<div class="space-y-2">
+										<label for="timed-duration" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Duration (seconds)</label>
+										<input
+											id="timed-duration"
+											type="number"
+											min="5"
+											class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+											value={typeof selectedBlock.data.duration === 'number' ? selectedBlock.data.duration : 30}
+											oninput={(event) => updateBlockField(selectedBlock.client_id, 'duration', Number((event.currentTarget as HTMLInputElement).value))}
+										/>
+									</div>
 								</div>
 							{:else if selectedBlock.node_type_slug === 'linear_progression'}
 								<div class="space-y-5">

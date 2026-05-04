@@ -26,3 +26,14 @@ export const PUT: RequestHandler = async ({ params, cookies, fetch, request }) =
 	const body = await safeJson<unknown>(response);
 	return json(body, { status: response.status });
 };
+
+export const DELETE: RequestHandler = async ({ params, cookies, fetch }) => {
+	const token = cookies.get('token');
+
+	const response = await apiFetch(fetch, `/workflows/${params.id}`, token, {
+		method: 'DELETE'
+	});
+
+	const body = await safeJson<unknown>(response);
+	return json(body, { status: response.status });
+};

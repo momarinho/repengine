@@ -1,9 +1,14 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+	const initialWorkflows = untrack(() => [...data.workflows]);
 
 	let filter = $state('all');
+	let workflows = $state(initialWorkflows);
+	let deletingWorkflowID = $state<number | null>(null);
+	let deleteError = $state('');
 
 	const filters = [
 		{ key: 'all', label: 'All Routines' },
@@ -12,8 +17,30 @@
 	];
 
 	const filteredWorkflows = $derived(
-		filter === 'all' ? data.workflows : data.workflows
+		filter === 'all' ? workflows : workflows
 	);
+
+	async function deleteWorkflow(id: number, name: string): Promise<void> {
+		if (deletingWorkflowID !== null) return;
+		if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+
+		deletingWorkflowID = id;
+		deleteError = '';
+
+		const response = await fetch(`/api/workflows/${id}`, {
+			method: 'DELETE'
+		});
+
+		if (!response.ok) {
+			const body = await response.json().catch(() => null);
+			deleteError = body?.message ?? 'Unable to delete routine right now.';
+			deletingWorkflowID = null;
+			return;
+		}
+
+		workflows = workflows.filter((workflow) => workflow.id !== id);
+		deletingWorkflowID = null;
+	}
 
 	function formatDate(dateStr: string): string {
 		const date = new Date(dateStr);
@@ -57,6 +84,11 @@
 		{#if data.newRoutineFailed}
 			<div class="mb-6 rounded-md border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
 				Unable to create a new routine right now. Try again.
+			</div>
+		{/if}
+		{#if deleteError}
+			<div class="mb-6 rounded-md border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
+				{deleteError}
 			</div>
 		{/if}
 
@@ -112,6 +144,14 @@
 							>
 								Start Workout
 							</a>
+							<button
+								type="button"
+								class="rounded-md border border-error/25 bg-error/10 px-3 py-2 text-xs font-semibold text-error transition-colors hover:bg-error/20 disabled:cursor-not-allowed disabled:opacity-60"
+								disabled={deletingWorkflowID === workflow.id}
+								onclick={() => deleteWorkflow(workflow.id, workflow.name)}
+							>
+								{deletingWorkflowID === workflow.id ? 'Deleting...' : 'Delete'}
+							</button>
 						</div>
 						<div class="flex justify-between items-end mt-auto pt-4 border-t border-outline-variant/10">
 							<span class="font-body text-xs text-outline">{workflow.is_public ? 'Public' : 'Private'}</span>

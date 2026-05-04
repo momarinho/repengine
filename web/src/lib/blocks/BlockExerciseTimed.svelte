@@ -7,13 +7,18 @@
 
 	let { block }: Props = $props();
 
+	const exercise = $derived(
+		typeof block.data.exercise_name === 'string' && block.data.exercise_name.trim() !== ''
+			? block.data.exercise_name
+			: 'Timed Exercise'
+	);
 	const duration = $derived(typeof block.data.duration === 'number' ? block.data.duration : 0);
 </script>
 
 <div class="space-y-3">
 	<div class="flex items-start justify-between gap-3">
 		<div>
-			<p class="text-sm font-semibold text-on-surface">Timed Exercise</p>
+			<p class="text-sm font-semibold text-on-surface">{exercise}</p>
 			<p class="text-xs text-on-surface-variant">Clock-based effort</p>
 		</div>
 		<span class="material-symbols-outlined text-primary">timer</span>

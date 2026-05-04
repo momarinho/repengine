@@ -18,3 +18,6 @@ web/cookies.txt
 
 # Docker / logs
 *.log
+
+.gitignore
+/docs

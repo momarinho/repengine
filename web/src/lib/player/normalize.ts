@@ -171,7 +171,7 @@ function buildWavePrescriptions(reps: string, intensity: string, rpe: string): W
 function mapWaveWeeks(data: Record<string, unknown>): { weeks: WaveWeek[]; activeWeekIndex: number } {
 	const weeks: WaveWeek[] = [];
 
-	for (let week = 1; week <= 4; week += 1) {
+	for (let week = 1; week <= 6; week += 1) {
 		const reps = asString(data[`week_${week}_reps`]);
 		const intensity = asString(data[`week_${week}_intensity`]);
 		const rpe = asString(data[`week_${week}_rpe`]);
