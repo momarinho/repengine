@@ -34,6 +34,10 @@ export const DELETE: RequestHandler = async ({ params, cookies, fetch }) => {
 		method: 'DELETE'
 	});
 
+	if (response.status === 204) {
+		return new Response(null, { status: 204 });
+	}
+
 	const body = await safeJson<unknown>(response);
 	return json(body, { status: response.status });
 };

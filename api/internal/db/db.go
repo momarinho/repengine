@@ -308,6 +308,12 @@ func exerciseBlock(exercise, reps string, sets int) templateBlockSeed {
 	}
 }
 
+func exerciseBlockWithNotes(exercise, reps string, sets int, notes string) templateBlockSeed {
+	block := exerciseBlock(exercise, reps, sets)
+	block.Data["notes"] = notes
+	return block
+}
+
 func timedExerciseBlock(exercise string, duration int) templateBlockSeed {
 	return templateBlockSeed{
 		NodeTypeSlug: "exercise_timed",
@@ -521,39 +527,64 @@ func SeedTemplates(ctx context.Context) error {
 			},
 		},
 		{
-			Name:        "Hybrid Wave Strength + Calisthenics",
-			Description: "Four-day hybrid split combining wave-loaded compounds with calisthenics skill and volume work.",
+			Name:        "Hybrid Calisthenics + Weights",
+			Description: "Wave progression plan combining weighted compounds with calisthenics rep and skill progressions.",
 			Category:    "hybrid",
 			IsOfficial:  true,
 			Metadata: map[string]any{
-				"duration":  "6 weeks",
+				"duration":  "6 weeks + 1 deload week",
 				"frequency": "4 days/week",
 				"level":     "intermediate",
+				"mesocycle": "6 weeks, then 1 deload week",
+				"schedule":  "Mon Upper Push, Tue Lower Body, Thu Upper Pull, Fri Lower Power",
+				"skill_goals": []string{
+					"Crow Pose",
+					"Front Lever",
+					"Handstand Push-Up",
+					"Pistol Squat",
+				},
 			},
 			Blocks: []templateBlockSeed{
-				sectionBlock("Day 1 - Upper Push", "Wave-loaded overhead press with dips and handstand skill practice.", "day"),
+				sectionBlock("Day 1 - Upper Push", "Monday. Wave-loaded pressing plus push-up and crow pose progressions.", "day"),
 				hybridWaveBlock("Barbell Overhead Press", 180),
-				exerciseBlock("Ring Dips", "6-10", 3),
-				timedExerciseBlock("Handstand Push-Up Practice", 600),
 				restBlock(120),
+				hybridWaveBlock("Weighted Ring Dips", 180),
+				restBlock(90),
+				exerciseBlockWithNotes("Push-Up Variation", "AMRAP", 3, "Advance variant at 20 clean reps. Ladder: Standard -> Archer -> Ring Push-Up -> Weighted -> Pseudo Planche."),
+				timedExerciseBlock("Crow Pose Practice", 600),
 
-				sectionBlock("Day 2 - Lower Body", "Squat wave loading with unilateral calisthenics and posterior-chain volume.", "day"),
+				sectionBlock("Day 2 - Lower Body", "Tuesday. Squat wave loading with hinge progression and lower-body skill work.", "day"),
 				hybridWaveBlock("Back Squat", 180),
-				exerciseBlock("Pistol Squat Progression", "5/leg", 3),
-				linearProgressionBlock("Romanian Deadlift", "8", "kg", 3, 60, 2.5, 120),
 				restBlock(120),
+				linearProgressionBlock("Romanian Deadlift", "8-10", "kg", 3, 60, 2.5, 120),
+				restBlock(90),
+				exerciseBlockWithNotes("Pistol Squat Progression", "5/leg", 3, "Advance variation weekly. Ladder: Assisted band/TRX -> Box Pistol -> Full Pistol -> Weighted Pistol."),
+				exerciseBlockWithNotes("Nordic Hamstring Curl", "6", 3, "Eccentric focus with 5-second negative."),
 
-				sectionBlock("Day 3 - Upper Pull", "Weighted pull-up wave loading with ring rows and front lever practice.", "day"),
+				sectionBlock("Day 3 - Rest / Mobility", "Wednesday. Active recovery for wrists, hips, hamstrings, and thoracic spine.", "day"),
+				timedExerciseBlock("Wrist Prep + Wrist Circles", 300),
+				timedExerciseBlock("Hip Flexor + Hamstring Stretch", 480),
+				timedExerciseBlock("Thoracic Spine Mobility", 300),
+
+				sectionBlock("Day 4 - Upper Pull", "Thursday. Pull-up wave loading with horizontal pulling and front lever skill work.", "day"),
 				hybridWaveBlock("Weighted Pull-Up", 180),
+				restBlock(120),
+				linearProgressionBlock("Barbell / Dumbbell Row", "8-10", "kg", 3, 40, 2.5, 120),
+				restBlock(90),
 				exerciseBlock("Ring Rows", "12-15", 3),
 				timedExerciseBlock("Front Lever Progression", 480),
-				restBlock(120),
 
-				sectionBlock("Day 4 - Posterior Chain", "Deadlift wave loading with split squat progression and hamstring control.", "day"),
+				sectionBlock("Day 5 - Lower Power + Posterior Chain", "Friday. Deadlift wave loading with unilateral strength and hamstring control.", "day"),
 				hybridWaveBlock("Deadlift", 210),
-				linearProgressionBlock("Bulgarian Split Squat", "8-10/leg", "kg", 3, 20, 2.5, 120),
-				exerciseBlock("Nordic Hamstring Curl", "6", 3),
 				restBlock(150),
+				linearProgressionBlock("Bulgarian Split Squat", "8-10/leg", "kg", 3, 20, 2.5, 120),
+				restBlock(90),
+				exerciseBlockWithNotes("Nordic Hamstring Curl", "6", 3, "Eccentric focus with 5-second negative."),
+
+				sectionBlock("Key Principles", "Use fixed sets, protect skill quality, and deload every 7th week.", "section"),
+				exerciseBlockWithNotes("Wave Loading Rules", "Fixed sets", 1, "Wave load only primary compounds: OHP, Ring Dips, Back Squat, Pull-Ups, Deadlift. Weeks 1-6 use 65/75/85 -> 70/80/90%. Week 7 deloads at 50-60%."),
+				exerciseBlockWithNotes("Calisthenics Skill Rules", "Technical quality", 1, "Stop crow pose, pistol, and front lever work when form breaks. No grinding skill reps."),
+				exerciseBlockWithNotes("Push-Up Finisher Principle", "Hypertrophy", 1, "After ring dips, use push-up variation as hypertrophy work without adding another heavy press."),
 			},
 		},
 	}
