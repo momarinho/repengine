@@ -76,6 +76,24 @@ func createTestUser(t *testing.T, pool *pgxpool.Pool, prefix string) int {
 	return userID
 }
 
+func createEmptySchemaNodeType(t *testing.T, pool *pgxpool.Pool, slug string) {
+	t.Helper()
+
+	ctx := context.Background()
+	_, err := pool.Exec(ctx, `
+		INSERT INTO node_types (slug, name, description, icon, schema)
+		VALUES ($1, $2, $3, $4, '{}'::jsonb)
+		ON CONFLICT (slug) DO UPDATE SET schema = EXCLUDED.schema
+	`, slug, "Marshal Failure Fixture", "Test-only node type with empty schema", "test")
+	if err != nil {
+		t.Fatalf("failed to create empty schema node type: %v", err)
+	}
+
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM node_types WHERE slug = $1`, slug)
+	})
+}
+
 func createWorkflowFixture(t *testing.T, pool *pgxpool.Pool, userID int) (int, time.Time) {
 	t.Helper()
 
@@ -187,6 +205,8 @@ func TestServiceCreateWorkflow_RollsBackWhenInsertBlocksFails(t *testing.T) {
 	service, pool := newIntegrationService(t)
 
 	userID := createTestUser(t, pool, "tx-create-rollback")
+	nodeTypeSlug := fmt.Sprintf("marshal_failure_%d", time.Now().UnixNano())
+	createEmptySchemaNodeType(t, pool, nodeTypeSlug)
 	workflowName := fmt.Sprintf("tx-create-%d", time.Now().UnixNano())
 
 	_, err := service.CreateWorkflow(ctx, CreateWorkflowInput{
@@ -196,9 +216,9 @@ func TestServiceCreateWorkflow_RollsBackWhenInsertBlocksFails(t *testing.T) {
 		IsPublic:    false,
 		Blocks: []WorkflowBlock{
 			{
-				// "section" has empty schema, so validation passes.
+				// This test-only node type has empty schema, so validation passes.
 				// The failure happens later inside json.Marshal in InsertBlocksTx.
-				NodeTypeSlug: "section",
+				NodeTypeSlug: nodeTypeSlug,
 				Data: map[string]any{
 					"boom": make(chan int),
 				},
@@ -222,6 +242,8 @@ func TestServiceUpdateWorkflow_RollsBackWhenReplaceBlocksFails(t *testing.T) {
 	service, pool := newIntegrationService(t)
 
 	userID := createTestUser(t, pool, "tx-update-rollback")
+	nodeTypeSlug := fmt.Sprintf("marshal_failure_%d", time.Now().UnixNano())
+	createEmptySchemaNodeType(t, pool, nodeTypeSlug)
 	workflowID, originalUpdatedAt := createWorkflowFixture(t, pool, userID)
 
 	_, err := service.UpdateWorkflow(ctx, UpdateWorkflowInput{
@@ -232,10 +254,10 @@ func TestServiceUpdateWorkflow_RollsBackWhenReplaceBlocksFails(t *testing.T) {
 		UpdatedAt:   originalUpdatedAt,
 		Blocks: []WorkflowBlock{
 			{
-				// "section" has empty schema, so validation passes.
+				// This test-only node type has empty schema, so validation passes.
 				// ReplaceBlocksTx deletes existing blocks, then json.Marshal fails.
 				// The transaction must restore both the workflow row and the old block.
-				NodeTypeSlug: "section",
+				NodeTypeSlug: nodeTypeSlug,
 				Data: map[string]any{
 					"boom": make(chan int),
 				},

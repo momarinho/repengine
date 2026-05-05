@@ -130,6 +130,37 @@ func RunMigrations(ctx context.Context) error {
               updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
               UNIQUE(template_id, user_id, idempotency_key)
           );`,
+		`CREATE TABLE IF NOT EXISTS workout_sessions (
+                id SERIAL PRIMARY KEY,
+                workflow_id INTEGER NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                section_title VARCHAR(255),
+                section_position INTEGER,
+                status VARCHAR(20) NOT NULL DEFAULT 'in_progress',
+                started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                completed_at TIMESTAMP WITH TIME ZONE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            );`,
+
+		`CREATE TABLE IF NOT EXISTS workout_set_logs (
+                id SERIAL PRIMARY KEY,
+                session_id INTEGER NOT NULL REFERENCES workout_sessions(id) ON DELETE CASCADE,
+                workflow_block_id INTEGER REFERENCES workflow_blocks(id) ON DELETE SET NULL,
+                block_position INTEGER NOT NULL,
+                node_type_slug VARCHAR(50) NOT NULL REFERENCES node_types(slug),
+                set_number INTEGER NOT NULL,
+                target_reps VARCHAR(50),
+                actual_reps INTEGER,
+                target_load NUMERIC,
+                actual_load NUMERIC,
+                load_unit VARCHAR(10),
+                target_rpe VARCHAR(20),
+                actual_rpe NUMERIC,
+                completed BOOLEAN NOT NULL DEFAULT FALSE,
+                notes TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            );`,
 	}
 	for _, q := range queries {
 		if _, err := Pool.Exec(ctx, q); err != nil {
@@ -149,6 +180,11 @@ func RunMigrations(ctx context.Context) error {
 		`CREATE INDEX IF NOT EXISTS idx_template_blocks_template_id ON template_blocks(template_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_clone_jobs_user_id ON clone_jobs(user_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_clone_jobs_template_user_key ON clone_jobs(template_id, user_id, idempotency_key);`,
+		`CREATE INDEX IF NOT EXISTS idx_workout_sessions_user_id ON workout_sessions(user_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_workout_sessions_workflow_id ON workout_sessions(workflow_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_workout_sessions_status ON workout_sessions(status);`,
+		`CREATE INDEX IF NOT EXISTS idx_workout_set_logs_session_id ON workout_set_logs(session_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_workout_set_logs_workflow_block_id ON workout_set_logs(workflow_block_id);`,
 	}
 	for _, q := range indexQueries {
 		if _, err := Pool.Exec(ctx, q); err != nil {
