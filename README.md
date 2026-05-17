@@ -1,16 +1,60 @@
 # RepEngine
 
-A full-stack training routine builder powered by a **Go API**, **SvelteKit frontend**, and **PostgreSQL**.  
-The current focus is a robust block editor, versioned workflows, and production-minded engineering foundations.
+RepEngine is a full-stack training routine builder with a Go API, a SvelteKit frontend, and PostgreSQL.
+
+The project currently delivers:
+
+- authenticated workflow management
+- a block-based workout editor
+- workflow versioning
+- official templates with async clone jobs
+- a local-first workout player for section-based execution
+
+The workout player is currently `local-only`. It does not create persistent workout sessions in the backend yet.
 
 ## Stack
 
-- **Backend:** Go, Fiber, pgx/pgxpool, JWT, bcrypt, slog
-- **Frontend:** SvelteKit (Svelte 5), TypeScript, Tailwind
-- **Database:** PostgreSQL 16
-- **Dev environment:** Docker Compose
+- Backend: Go, Fiber, pgx/pgxpool, JWT, bcrypt, slog
+- Frontend: SvelteKit (Svelte 5), TypeScript, Tailwind
+- Database: PostgreSQL 16
+- Dev environment: Docker Compose
+
+## Current Product Surface
+
+### Implemented
+
+- Auth: register, login, logout
+- Node types API
+- Workflow CRUD
+- Workflow version history
+- Block editor with `section`, `exercise`, `linear_progression`, `wave`, `repeat`, `rest`, and `exercise_timed`
+- Templates catalog
+- Template cloning with clone-job polling
+- Workout player V1
+- Workout player 5.5 local runtime
+
+### Workout player 5.5
+
+The player already supports:
+
+- choosing a section to execute
+- local set / round / block logging
+- local notes per block
+- timers and intra-set rest
+- simple completion summary
+- browser persistence via `localStorage`
+
+The player does not yet support:
+
+- backend-persisted workout sessions
+- backend-persisted set logs
+- workout history by workflow
+- progression state
+- autoregulation
 
 ## Running locally
+
+### With Docker
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build
@@ -28,18 +72,45 @@ Health check:
 curl http://localhost:8080/health
 ```
 
+### Without Docker
+
+API environment lives in `api/.env` or shell env vars:
+
+```env
+DATABASE_URL=postgres://rep:rep@localhost:5432/repengine
+JWT_SECRET=your-secret-key-here
+```
+
+Run the API:
+
+```bash
+cd api
+go run ./cmd/server
+```
+
+Run the frontend:
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
 ## Available API
 
 ### Auth
+
 - `POST /auth/register`
 - `POST /auth/login`
 - `POST /auth/logout`
 
 ### Node Types
+
 - `GET /node-types`
 - `GET /node-types/:slug`
 
 ### Workflows
+
 - `GET /workflows`
 - `POST /workflows`
 - `GET /workflows/:id`
@@ -48,9 +119,19 @@ curl http://localhost:8080/health
 - `POST /workflows/:id/versions`
 - `GET /workflows/:id/versions`
 
-## Backend Validation
+### Templates
 
-### Automated tests
+- `GET /templates`
+- `GET /templates/:id`
+- `POST /templates/:id/clone`
+
+### Clone Jobs
+
+- `GET /clone-jobs/:id`
+
+## Validation
+
+### Backend tests
 
 From `api/`:
 
@@ -58,10 +139,18 @@ From `api/`:
 go test ./...
 ```
 
-Integration tests for transactional rollback require a reachable PostgreSQL database.
+Integration tests require a reachable PostgreSQL database.
 If `DATABASE_URL` is not exported, the tests attempt to load `api/.env`.
 
-### Performance benchmark
+### Frontend checks
+
+From `web/`:
+
+```bash
+npm run check
+```
+
+### Workflow update benchmark
 
 From `api/`:
 
@@ -75,30 +164,39 @@ Default benchmark settings:
 - `BENCH_RUNS=80`
 - `BENCH_WARMUP=5`
 
-These defaults are chosen to stay below the API rate limit during a local run.
+Latest local result on `2026-05-02`:
 
-Latest local result on 2026-05-02:
+- runs: `80`
+- warmup: `5`
+- failures: `0`
+- avg: `4.10ms`
+- p50: `4.01ms`
+- p95: `4.45ms`
+- max: `6.10ms`
 
-- runs: 80
-- warmup: 5
-- failures: 0
-- avg: 4.10ms
-- p50: 4.01ms
-- p95: 4.45ms
-- max: 6.10ms
+Status: `PASS` (`p95 < 200ms`)
 
-Status: PASS (`p95 < 200ms`)
+## Status
 
-## Current status
+### Completed
 
-Completed:
+- Sprint 0: foundation
+- Sprint 1: auth
+- Sprint 1.5: API quality foundation
+- Sprint 2: node types API
+- Sprint 3: workflows CRUD, pagination, versioning
+- Sprint 4: block editor frontend
+- Sprint 5: templates and player V1
+- Sprint 5.5: local-first player runtime polish
 
-- Sprint 0 (foundation)
-- Sprint 1 (auth)
-- Sprint 1.5 (API quality foundation)
-- Sprint 2 (node types API)
-- Sprint 3 (workflows CRUD + versioning + pagination)
+### Not completed yet
 
-In progress:
+- Sprint 6: persistent workout sessions and set logging
+- Sprint 7: autoregulation and progression state
+- Sprint 8: deploy hardening
 
-- Sprint 4 (Block Editor frontend)
+## Important Notes
+
+- SQL migration files exist in `api/migrations/`, but the app currently boots schema through `api/internal/db/db.go`.
+- `workout_sessions` and `workout_set_logs` database structures exist in the repo, but there are no exposed handlers or registered routes for them yet.
+- The current Docker setup is development-oriented: `docker-compose.dev.yml`, `api/Dockerfile`, and `web/Dockerfile`.

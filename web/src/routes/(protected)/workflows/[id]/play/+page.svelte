@@ -1,14 +1,45 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { page } from '$app/state';
-	import { untrack } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import type { PageData } from './$types';
 	import type { PlayerBlock, PlayerRoutine, PlayerSection } from '$lib/player/types';
+
+	type SessionActivityKind = 'set' | 'round' | 'block' | 'timer';
+
+	type SessionActivity = {
+		id: string;
+		blockID: string;
+		blockTitle: string;
+		blockType: PlayerBlock['node_type_slug'];
+		label: string;
+		detail: string;
+		kind: SessionActivityKind;
+		createdAt: number;
+		note?: string;
+	};
+
+	type PersistedPlayerState = {
+		version: 1;
+		currentBlockIndex: number;
+		completedBlockIds: string[];
+		currentSetByBlock: Record<string, number>;
+		roundByBlock: Record<string, number>;
+		waveSetByBlock: Record<string, number>;
+		notesByBlock: Record<string, string>;
+		sessionElapsedSeconds: number;
+		activeSectionID: string | null;
+		isChoosingSection: boolean;
+		isSessionComplete: boolean;
+		activityEntries: SessionActivity[];
+	};
 
 	const { data }: { data: PageData } = $props();
 	const initialData = untrack(() => structuredClone(data)) as PageData;
 	const routine: PlayerRoutine | null = initialData.routine;
 	const initialBlockIndex = routine?.initialBlockIndex ?? 0;
 	const hasSectionQuery = page.url.searchParams.has('section');
+	const localSessionKey = routine ? `repengine:player:${routine.id}` : null;
 	const initialSection =
 		routine?.sections.find(
 			(section) =>
@@ -35,6 +66,8 @@
 	let isChoosingSection = $state(Boolean(routine?.sections.length) && !hasSectionQuery);
 	let activeSection = $state<PlayerSection | null>(initialSection);
 	let isSessionComplete = $state(false);
+	let activityEntries = $state<SessionActivity[]>([]);
+	let hasRestoredSession = $state(false);
 
 	const currentBlock = $derived(routine?.blocks[currentBlockIndex] ?? null);
 	const activeSectionEndIndex = $derived(
@@ -72,6 +105,13 @@
 	const isRestingBetweenSets = $derived(Boolean(intraSetRest && currentBlock && intraSetRest.blockID === currentBlock.id));
 	const primaryActionLabel = $derived(currentBlock ? getPrimaryActionLabel(currentBlock) : 'Continue');
 	const secondaryActionLabel = $derived(currentBlock ? getSecondaryActionLabel(currentBlock) : null);
+	const loggedSetCount = $derived(activityEntries.filter((entry) => entry.kind === 'set').length);
+	const loggedRoundCount = $derived(activityEntries.filter((entry) => entry.kind === 'round').length);
+	const completedBlockCount = $derived(activityEntries.filter((entry) => entry.kind === 'block').length);
+	const noteCount = $derived(
+		Object.values(notesByBlock).filter((value) => value.trim().length > 0).length
+	);
+	const recentActivity = $derived(activityEntries.slice(-5).reverse());
 
 	function getInitialTimerSeconds(block: PlayerBlock): number {
 		if (block.node_type_slug === 'rest' || block.node_type_slug === 'exercise_timed') {
@@ -93,6 +133,10 @@
 		return waveSetByBlock[block.id] ?? 0;
 	}
 
+	function getSectionByID(sectionID: string | null): PlayerSection | null {
+		return sectionID ? routine?.sections.find((section) => section.id === sectionID) ?? null : null;
+	}
+
 	function formatClock(totalSeconds: number): string {
 		const minutes = Math.floor(totalSeconds / 60)
 			.toString()
@@ -102,6 +146,13 @@
 			.padStart(2, '0');
 
 		return `${minutes}:${seconds}`;
+	}
+
+	function formatActivityTime(timestamp: number): string {
+		return new Date(timestamp).toLocaleTimeString([], {
+			hour: '2-digit',
+			minute: '2-digit'
+		});
 	}
 
 	function typeLabel(block: PlayerBlock): string {
@@ -161,11 +212,13 @@
 			case 'linear_progression':
 				return getCurrentSet(block) >= (block.sets ?? 1) ? 'Complete Exercise' : 'Log Set';
 			case 'rest':
-				return isTimerRunning ? 'Pause Rest' : 'Start Rest';
+				return timerRemainingSeconds <= 0 ? 'Complete Rest' : isTimerRunning ? 'Pause Rest' : 'Start Rest';
 			case 'exercise_timed':
-				return isTimerRunning ? 'Pause Interval' : 'Start Interval';
+				return timerRemainingSeconds <= 0 ? 'Complete Interval' : isTimerRunning ? 'Pause Interval' : 'Start Interval';
 			case 'wave':
-				return 'Log Set';
+				return currentWaveSetIndex + 1 >= (currentWaveWeek?.prescriptions.length ?? 1)
+					? 'Complete Wave'
+					: 'Log Set';
 			case 'repeat':
 				return getCurrentRound(block) >= (block.rounds ?? 1) ? 'Complete Block' : 'Log Round';
 			case 'section':
@@ -195,6 +248,56 @@
 			default:
 				return null;
 		}
+	}
+
+	function appendActivity(block: PlayerBlock, kind: SessionActivityKind, label: string, detail: string): void {
+		const note = notesByBlock[block.id]?.trim();
+		activityEntries = [
+			...activityEntries,
+			{
+				id: `${block.id}-${Date.now()}-${activityEntries.length + 1}`,
+				blockID: block.id,
+				blockTitle: block.title,
+				blockType: block.node_type_slug,
+				label,
+				detail,
+				kind,
+				createdAt: Date.now(),
+				note: note || undefined
+			}
+		];
+	}
+
+	function completeCurrentBlock(block: PlayerBlock, detail: string): void {
+		appendActivity(block, 'block', 'Block complete', detail);
+		goToNextBlock();
+	}
+
+	function resetRuntimeState(index: number, section: PlayerSection | null, chooserOpen: boolean): void {
+		activeSection = section;
+		currentBlockIndex = index;
+		completedBlockIds = [];
+		currentSetByBlock = {};
+		roundByBlock = {};
+		waveSetByBlock = {};
+		notesByBlock = {};
+		activityEntries = [];
+		sessionElapsedSeconds = 0;
+		isTimerRunning = false;
+		timerRemainingSeconds = routine ? getInitialTimerSeconds(routine.blocks[index]) : 0;
+		intraSetRest = null;
+		isIntraSetRestRunning = false;
+		mobileQueueOpen = false;
+		isChoosingSection = chooserOpen;
+		isSessionComplete = false;
+	}
+
+	function clearLocalSession(): void {
+		if (browser && localSessionKey) {
+			localStorage.removeItem(localSessionKey);
+		}
+
+		resetRuntimeState(initialBlockIndex, initialSection, Boolean(routine?.sections.length) && !hasSectionQuery);
 	}
 
 	function markBlockCompleted(index: number): void {
@@ -244,11 +347,7 @@
 
 	function startSection(section: PlayerSection | null): void {
 		const index = section?.startBlockIndex ?? 0;
-		activeSection = section;
-		isSessionComplete = false;
-		goToBlock(index);
-		completedBlockIds = routine?.blocks.slice(0, index).map((block) => block.id) ?? [];
-		isChoosingSection = false;
+		resetRuntimeState(index, section, false);
 	}
 
 	function startIntraSetRest(block: PlayerBlock, nextLabel: string): void {
@@ -280,12 +379,19 @@
 		switch (block.node_type_slug) {
 			case 'exercise':
 			case 'linear_progression': {
-				const nextSet = getCurrentSet(block) + 1;
-				if (nextSet > (block.sets ?? 1)) {
-					goToNextBlock();
+				const currentSet = getCurrentSet(block);
+				appendActivity(
+					block,
+					'set',
+					`Set ${currentSet}`,
+					`${block.reps ?? '-'} reps${block.load !== undefined ? ` @ ${block.load} ${block.loadUnit ?? ''}` : ''}`.trim()
+				);
+				if (currentSet >= (block.sets ?? 1)) {
+					completeCurrentBlock(block, `${block.sets ?? 1} sets logged`);
 					return;
 				}
 
+				const nextSet = currentSet + 1;
 				currentSetByBlock = { ...currentSetByBlock, [block.id]: nextSet };
 				startIntraSetRest(block, `Set ${nextSet}`);
 				return;
@@ -293,7 +399,16 @@
 			case 'rest':
 			case 'exercise_timed': {
 				if (timerRemainingSeconds <= 0) {
-					goToNextBlock();
+					appendActivity(
+						block,
+						'timer',
+						block.node_type_slug === 'rest' ? 'Rest complete' : 'Interval complete',
+						`${formatClock(getInitialTimerSeconds(block))} elapsed`
+					);
+					completeCurrentBlock(
+						block,
+						block.node_type_slug === 'rest' ? 'Recovery finished' : 'Interval finished'
+					);
 					return;
 				}
 
@@ -301,30 +416,45 @@
 				return;
 			}
 			case 'wave': {
-				const nextSet = getCurrentWaveSetIndex(block) + 1;
+				const currentSet = getCurrentWaveSetIndex(block);
 				const totalSets = block.waveSteps?.[block.activeWaveWeekIndex ?? 0]?.prescriptions.length ?? 1;
-				if (nextSet >= totalSets) {
-					goToNextBlock();
+				const prescription = block.waveSteps?.[block.activeWaveWeekIndex ?? 0]?.prescriptions[currentSet];
+				appendActivity(
+					block,
+					'set',
+					`Set ${currentSet + 1}`,
+					`${prescription?.reps ?? '-'} reps • ${prescription?.intensity ?? '-'}% • RPE ${prescription?.rpe ?? '-'}`
+				);
+				if (currentSet + 1 >= totalSets) {
+					completeCurrentBlock(block, `${totalSets} wave sets logged`);
 					return;
 				}
 
+				const nextSet = currentSet + 1;
 				waveSetByBlock = { ...waveSetByBlock, [block.id]: nextSet };
 				startIntraSetRest(block, `Set ${nextSet + 1}`);
 				return;
 			}
 			case 'repeat': {
-				const nextRound = getCurrentRound(block) + 1;
-				if (nextRound > (block.rounds ?? 1)) {
-					goToNextBlock();
+				const currentRound = getCurrentRound(block);
+				appendActivity(
+					block,
+					'round',
+					`Round ${currentRound}`,
+					`${block.reps ?? 'Circuit round'}`
+				);
+				if (currentRound >= (block.rounds ?? 1)) {
+					completeCurrentBlock(block, `${block.rounds ?? 1} rounds logged`);
 					return;
 				}
 
+				const nextRound = currentRound + 1;
 				roundByBlock = { ...roundByBlock, [block.id]: nextRound };
 				return;
 			}
 			case 'section':
 			default:
-				goToNextBlock();
+				completeCurrentBlock(block, 'Section checkpoint reached');
 		}
 	}
 
@@ -343,8 +473,7 @@
 				return;
 			case 'exercise':
 			case 'linear_progression':
-				timerRemainingSeconds = block.restSeconds ?? timerRemainingSeconds;
-				goToNextBlock();
+				startIntraSetRest(block, `Set ${getCurrentSet(block)}`);
 				return;
 			case 'exercise_timed':
 				timerRemainingSeconds = block.durationSeconds ?? 0;
@@ -360,6 +489,50 @@
 				return;
 		}
 	}
+
+	onMount(() => {
+		if (!browser || !routine || !localSessionKey) {
+			hasRestoredSession = true;
+			return;
+		}
+
+		const rawState = localStorage.getItem(localSessionKey);
+		if (!rawState) {
+			hasRestoredSession = true;
+			return;
+		}
+
+		try {
+			const savedState = JSON.parse(rawState) as PersistedPlayerState;
+			const savedSection = getSectionByID(savedState.activeSectionID);
+			const blockIDs = new Set(routine.blocks.map((block) => block.id));
+			const sectionStart = savedSection?.startBlockIndex ?? 0;
+			const sectionEnd = savedSection
+				? savedSection.startBlockIndex + savedSection.blockCount - 1
+				: routine.blocks.length - 1;
+			const normalizedIndex = Math.min(
+				Math.max(savedState.currentBlockIndex ?? sectionStart, sectionStart),
+				sectionEnd
+			);
+
+			currentBlockIndex = normalizedIndex;
+			completedBlockIds = (savedState.completedBlockIds ?? []).filter((id) => blockIDs.has(id));
+			currentSetByBlock = savedState.currentSetByBlock ?? {};
+			roundByBlock = savedState.roundByBlock ?? {};
+			waveSetByBlock = savedState.waveSetByBlock ?? {};
+			notesByBlock = savedState.notesByBlock ?? {};
+			sessionElapsedSeconds = Math.max(savedState.sessionElapsedSeconds ?? 0, 0);
+			activeSection = savedSection;
+			isChoosingSection = Boolean(savedState.isChoosingSection);
+			isSessionComplete = Boolean(savedState.isSessionComplete);
+			activityEntries = (savedState.activityEntries ?? []).filter((entry) => blockIDs.has(entry.blockID));
+			timerRemainingSeconds = getInitialTimerSeconds(routine.blocks[normalizedIndex]);
+		} catch {
+			localStorage.removeItem(localSessionKey);
+		}
+
+		hasRestoredSession = true;
+	});
 
 	$effect(() => {
 		if (!routine) return;
@@ -412,6 +585,27 @@
 		}, 1000);
 
 		return () => clearInterval(restInterval);
+	});
+
+	$effect(() => {
+		if (!browser || !routine || !localSessionKey || !hasRestoredSession) return;
+
+		const state: PersistedPlayerState = {
+			version: 1,
+			currentBlockIndex,
+			completedBlockIds,
+			currentSetByBlock,
+			roundByBlock,
+			waveSetByBlock,
+			notesByBlock,
+			sessionElapsedSeconds,
+			activeSectionID: activeSection?.id ?? null,
+			isChoosingSection,
+			isSessionComplete,
+			activityEntries
+		};
+
+		localStorage.setItem(localSessionKey, JSON.stringify(state));
 	});
 </script>
 
@@ -478,21 +672,76 @@
 		</div>
 	{:else if isSessionComplete}
 		<div class="min-h-screen px-6 py-16">
-			<div class="mx-auto max-w-3xl rounded-2xl border border-primary/20 bg-surface-container p-8 text-center shadow-xl">
+			<div class="mx-auto max-w-3xl rounded-2xl border border-primary/20 bg-surface-container p-8 shadow-xl">
 				<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Session complete</p>
-				<h1 class="mt-3 text-3xl font-bold tracking-tight text-on-background">
+				<h1 class="mt-3 text-3xl font-bold tracking-tight text-on-background text-center">
 					{activeSection?.title ?? routine.name} finished
 				</h1>
-				<p class="mt-3 text-sm text-on-surface-variant">
+				<p class="mt-3 text-sm text-on-surface-variant text-center">
 					{activeSection?.subtitle || 'This selected section has been completed.'}
 				</p>
+				<div class="mt-8 grid gap-4 md:grid-cols-4">
+					<div class="rounded-xl border border-white/5 bg-surface-container-low p-4 text-center">
+						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Duration</p>
+						<p class="mt-2 text-2xl font-bold text-on-surface">{formatClock(sessionElapsedSeconds)}</p>
+					</div>
+					<div class="rounded-xl border border-white/5 bg-surface-container-low p-4 text-center">
+						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Blocks</p>
+						<p class="mt-2 text-2xl font-bold text-on-surface">{completedBlockCount}</p>
+					</div>
+					<div class="rounded-xl border border-white/5 bg-surface-container-low p-4 text-center">
+						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Sets</p>
+						<p class="mt-2 text-2xl font-bold text-on-surface">{loggedSetCount}</p>
+					</div>
+					<div class="rounded-xl border border-white/5 bg-surface-container-low p-4 text-center">
+						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Notes</p>
+						<p class="mt-2 text-2xl font-bold text-on-surface">{noteCount}</p>
+					</div>
+				</div>
+				{#if recentActivity.length > 0}
+					<div class="mt-8 rounded-xl border border-white/5 bg-surface-container-low p-5">
+						<div class="flex items-center justify-between gap-4">
+							<h2 class="text-sm font-bold uppercase tracking-[0.18em] text-on-surface-variant">Recent activity</h2>
+							<span class="text-xs text-on-surface-variant">Local only</span>
+						</div>
+						<div class="mt-4 space-y-3">
+							{#each recentActivity as entry}
+								<div class="rounded-lg border border-white/5 bg-surface-container px-4 py-3">
+									<div class="flex items-center justify-between gap-4">
+										<p class="text-sm font-semibold text-on-surface">{entry.blockTitle}</p>
+										<span class="text-[10px] uppercase tracking-[0.18em] text-on-surface-variant">{formatActivityTime(entry.createdAt)}</span>
+									</div>
+									<p class="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-primary">{entry.label}</p>
+									<p class="mt-1 text-sm text-on-surface-variant">{entry.detail}</p>
+									{#if entry.note}
+										<p class="mt-2 text-xs text-on-surface-variant">Note: {entry.note}</p>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
 				<div class="mt-8 flex flex-wrap justify-center gap-3">
+					<button
+						type="button"
+						class="rounded-md border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/15"
+						onclick={() => startSection(activeSection)}
+					>
+						Restart section
+					</button>
 					<button
 						type="button"
 						class="rounded-md border border-outline-variant/20 bg-surface-container-high px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-highest"
 						onclick={() => (isChoosingSection = true)}
 					>
 						Choose another section
+					</button>
+					<button
+						type="button"
+						class="rounded-md border border-outline-variant/20 px-4 py-2 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+						onclick={clearLocalSession}
+					>
+						Clear local run
 					</button>
 					<a
 						href={`/workflows/${routine.id}/edit`}
@@ -784,7 +1033,7 @@
 
 					<div class="mt-8">
 						<label for="session-notes" class="mb-2 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-							Session notes
+							Block notes
 						</label>
 						<input
 							id="session-notes"
@@ -853,18 +1102,58 @@
 				<h3 class="mb-4 text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Session log</h3>
 				<div class="space-y-2 text-[11px] font-medium text-on-surface-variant">
 					<div class="flex justify-between gap-4">
-						<span>Total volume</span>
-						<span class="text-on-background">{routine.totalVolume}</span>
+						<span>Elapsed</span>
+						<span class="text-on-background">{formatClock(sessionElapsedSeconds)}</span>
 					</div>
 					<div class="flex justify-between gap-4">
-						<span>Average intensity</span>
-						<span class="text-on-background">{routine.averageIntensity}</span>
+						<span>Blocks complete</span>
+						<span class="text-on-background">{completedBlockCount}</span>
 					</div>
 					<div class="flex justify-between gap-4">
-						<span>Peak heart rate</span>
-						<span class="text-on-background">{routine.peakHeartRate}</span>
+						<span>Sets logged</span>
+						<span class="text-on-background">{loggedSetCount}</span>
+					</div>
+					<div class="flex justify-between gap-4">
+						<span>Rounds logged</span>
+						<span class="text-on-background">{loggedRoundCount}</span>
+					</div>
+					<div class="flex justify-between gap-4">
+						<span>Notes captured</span>
+						<span class="text-on-background">{noteCount}</span>
 					</div>
 				</div>
+				<div class="mt-5 rounded-xl border border-white/5 bg-surface-container-low p-4">
+					<div class="flex items-center justify-between gap-3">
+						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Local mode</p>
+						<button
+							type="button"
+							class="text-[10px] font-bold uppercase tracking-[0.18em] text-tertiary transition-colors hover:text-primary"
+							onclick={clearLocalSession}
+						>
+							Reset
+						</button>
+					</div>
+					<p class="mt-2 text-xs text-on-surface-variant">
+						This run stays in the browser for now. No backend session has been created yet.
+					</p>
+				</div>
+				{#if recentActivity.length > 0}
+					<div class="mt-5">
+						<h4 class="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Recent activity</h4>
+						<div class="space-y-3">
+							{#each recentActivity.slice(0, 4) as entry}
+								<div class="rounded-xl border border-white/5 bg-surface-container-low/50 p-3">
+									<div class="flex items-center justify-between gap-3">
+										<p class="truncate text-xs font-bold text-on-surface">{entry.blockTitle}</p>
+										<span class="text-[9px] uppercase tracking-[0.16em] text-on-surface-variant">{formatActivityTime(entry.createdAt)}</span>
+									</div>
+									<p class="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-primary">{entry.label}</p>
+									<p class="mt-1 text-[11px] text-on-surface-variant">{entry.detail}</p>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
 			</div>
 		</aside>
 	</main>
