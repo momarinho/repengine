@@ -99,18 +99,19 @@ func (r *Repository) InsertSetLog(ctx context.Context, in InsertSetLogInput) (Wo
 			actual_reps,
 			actual_load,
 			actual_rpe,
+			actual_rir,
 			completed,
 			notes
 		)
 		SELECT
 			$1, $2, $3, $4, $5, $6, $7, $8,
 			$9, $10, $11, $12, $13, $14, $15,
-			$16, $17, $18, $19, $20
+			$16, $17, $18, $19, $20, $21
 		WHERE EXISTS (
 			SELECT 1 FROM workout_sessions
 			WHERE id = $1
-			  AND user_id = $21
-			  AND status = $22
+			  AND user_id = $22
+			  AND status = $23
 		)
 		ON CONFLICT (session_id, block_client_id, set_index)
 		WHERE block_client_id IS NOT NULL AND block_client_id <> ''
@@ -124,12 +125,14 @@ func (r *Repository) InsertSetLog(ctx context.Context, in InsertSetLogInput) (Wo
 			actual_reps = EXCLUDED.actual_reps,
 			actual_load = EXCLUDED.actual_load,
 			actual_rpe = EXCLUDED.actual_rpe,
+			actual_rir = EXCLUDED.actual_rir,
 			completed = EXCLUDED.completed,
 			notes = EXCLUDED.notes
 		RETURNING id, session_id, workflow_block_id, block_client_id, node_type_slug,
 		          set_index, COALESCE(prescribed_reps, ''), COALESCE(prescribed_load, ''),
 		          COALESCE(prescribed_intensity, ''), COALESCE(prescribed_rpe, ''),
 		          COALESCE(actual_reps, ''), COALESCE(actual_load, ''), COALESCE(actual_rpe, ''),
+		          COALESCE(actual_rir, ''),
 		          completed, COALESCE(notes, ''), created_at
 	`,
 		in.SessionID,
@@ -150,6 +153,7 @@ func (r *Repository) InsertSetLog(ctx context.Context, in InsertSetLogInput) (Wo
 		in.ActualReps,
 		in.ActualLoad,
 		in.ActualRPE,
+		in.ActualRIR,
 		in.Completed,
 		in.Notes,
 		in.UserID,
@@ -211,6 +215,7 @@ func (r *Repository) ListSessionLogs(ctx context.Context, sessionID int) ([]Work
 		       set_index, COALESCE(prescribed_reps, ''), COALESCE(prescribed_load, ''),
 		       COALESCE(prescribed_intensity, ''), COALESCE(prescribed_rpe, ''),
 		       COALESCE(actual_reps, ''), COALESCE(actual_load, ''), COALESCE(actual_rpe, ''),
+		       COALESCE(actual_rir, ''),
 		       completed, COALESCE(notes, ''), created_at
 		FROM workout_set_logs
 		WHERE session_id = $1
@@ -326,6 +331,7 @@ func scanWorkoutSetLog(row pgx.Row) (WorkoutSetLog, error) {
 		&log.ActualReps,
 		&log.ActualLoad,
 		&log.ActualRPE,
+		&log.ActualRIR,
 		&log.Completed,
 		&log.Notes,
 		&log.CreatedAt,

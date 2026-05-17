@@ -232,25 +232,19 @@ func (s *Service) validateBlock(ctx context.Context, block WorkflowBlock) error 
 		return apperrors.ErrBlockInvalid("data is required for this node_type_slug")
 	}
 
-	for key, schemaValue := range schema {
-		dataValue, exists := block.Data[key]
+	for key := range block.Data {
+		schemaValue, exists := schema[key]
 		if !exists {
-			return apperrors.ErrBlockInvalid(fmt.Sprintf("missing data field %q", key))
+			return apperrors.ErrBlockInvalid(
+				fmt.Sprintf("unknown data field %q for node_type_slug %q", key, block.NodeTypeSlug),
+			)
 		}
-		if !isSameJSONType(schemaValue, dataValue) {
+		if !isSameJSONType(schemaValue, block.Data[key]) {
 			return apperrors.ErrBlockInvalid(
 				fmt.Sprintf(
 					"invalid type for data field %q: expected %s, got %s",
-					key, jsonTypeName(schemaValue), jsonTypeName(dataValue),
+					key, jsonTypeName(schemaValue), jsonTypeName(block.Data[key]),
 				),
-			)
-		}
-	}
-
-	for key := range block.Data {
-		if _, exists := schema[key]; !exists {
-			return apperrors.ErrBlockInvalid(
-				fmt.Sprintf("unknown data field %q for node_type_slug %q", key, block.NodeTypeSlug),
 			)
 		}
 	}
@@ -263,6 +257,10 @@ func isSameJSONType(expected, actual any) bool {
 	actualType := jsonTypeName(actual)
 
 	if expectedType == "number" && actualType == "number" {
+		return true
+	}
+	if (expectedType == "number" && actualType == "null") ||
+		(expectedType == "null" && actualType == "number") {
 		return true
 	}
 

@@ -346,6 +346,100 @@ func TestServiceUpdateWorkflow_ForDifferentOwner_ReturnsForbidden(t *testing.T) 
 	}
 }
 
+func TestServiceCreateWorkflow_AllowsOptionalSchemaFieldsToBeOmitted(t *testing.T) {
+	ctx := context.Background()
+	tx := &fakeTx{}
+
+	repo := &fakeRepo{
+		getNodeTypeSchemaFunc: func(ctx context.Context, slug string) (map[string]any, error) {
+			return map[string]any{
+				"exercise_name": "",
+				"sets":          3,
+				"reps":          "",
+				"rest_seconds":  90,
+				"notes":         "",
+			}, nil
+		},
+		beginTxFunc: func(ctx context.Context) (dbtx, error) {
+			return tx, nil
+		},
+		createWorkflowTxFunc: func(ctx context.Context, tx dbtx, in CreateWorkflowInput) (Workflow, error) {
+			return Workflow{ID: 1, UserID: in.UserID, Name: in.Name}, nil
+		},
+		insertBlocksTxFunc: func(ctx context.Context, tx dbtx, workflowID int, blocks []WorkflowBlock) ([]WorkflowBlock, error) {
+			return blocks, nil
+		},
+	}
+
+	service := NewService(repo)
+	_, err := service.CreateWorkflow(ctx, CreateWorkflowInput{
+		UserID: 1,
+		Name:   "Sprint 7",
+		Blocks: []WorkflowBlock{
+			{
+				NodeTypeSlug: "exercise",
+				Data: map[string]any{
+					"exercise_name": "Crow Pose Practice",
+					"sets":          3,
+					"reps":          "20-30s",
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateWorkflow returned error: %v", err)
+	}
+}
+
+func TestServiceCreateWorkflow_AcceptsNumberWhenSchemaFieldIsNull(t *testing.T) {
+	ctx := context.Background()
+	tx := &fakeTx{}
+
+	repo := &fakeRepo{
+		getNodeTypeSchemaFunc: func(ctx context.Context, slug string) (map[string]any, error) {
+			return map[string]any{
+				"exercise_name": "",
+				"sets":          3,
+				"reps":          "",
+				"start_load":    nil,
+				"load_unit":     "kg",
+				"increment":     2.5,
+			}, nil
+		},
+		beginTxFunc: func(ctx context.Context) (dbtx, error) {
+			return tx, nil
+		},
+		createWorkflowTxFunc: func(ctx context.Context, tx dbtx, in CreateWorkflowInput) (Workflow, error) {
+			return Workflow{ID: 1, UserID: in.UserID, Name: in.Name}, nil
+		},
+		insertBlocksTxFunc: func(ctx context.Context, tx dbtx, workflowID int, blocks []WorkflowBlock) ([]WorkflowBlock, error) {
+			return blocks, nil
+		},
+	}
+
+	service := NewService(repo)
+	_, err := service.CreateWorkflow(ctx, CreateWorkflowInput{
+		UserID: 1,
+		Name:   "Sprint 7",
+		Blocks: []WorkflowBlock{
+			{
+				NodeTypeSlug: "linear_progression",
+				Data: map[string]any{
+					"exercise_name": "Squat",
+					"sets":          3,
+					"reps":          "5",
+					"start_load":    100.0,
+					"load_unit":     "kg",
+					"increment":     2.5,
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateWorkflow returned error: %v", err)
+	}
+}
+
 func TestServiceDeleteWorkflow_NotFound(t *testing.T) {
 	ctx := context.Background()
 

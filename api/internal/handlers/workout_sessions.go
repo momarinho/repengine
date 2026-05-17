@@ -30,6 +30,7 @@ type CreateWorkoutSetLogRequest struct {
 	ActualReps          string `json:"actual_reps"`
 	ActualLoad          string `json:"actual_load"`
 	ActualRPE           string `json:"actual_rpe"`
+	ActualRIR           string `json:"actual_rir"`
 	Completed           bool   `json:"completed"`
 	Notes               string `json:"notes"`
 }
@@ -170,6 +171,7 @@ func CreateWorkoutSetLog(c *fiber.Ctx) error {
 		ActualReps:          req.ActualReps,
 		ActualLoad:          req.ActualLoad,
 		ActualRPE:           req.ActualRPE,
+		ActualRIR:           req.ActualRIR,
 		Completed:           req.Completed,
 		Notes:               req.Notes,
 	})

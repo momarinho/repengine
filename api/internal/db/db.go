@@ -173,9 +173,34 @@ func RunMigrations(ctx context.Context) error {
                 prescribed_intensity VARCHAR(50),
                 prescribed_rpe VARCHAR(50),
                 actual_rpe VARCHAR(50),
+                actual_rir VARCHAR(50),
                 completed BOOLEAN NOT NULL DEFAULT TRUE,
                 notes TEXT,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            );`,
+		`CREATE TABLE IF NOT EXISTS progression_states (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                workflow_id INTEGER NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+                workflow_block_id INTEGER,
+                block_key VARCHAR(255) NOT NULL,
+                node_type_slug VARCHAR(50) NOT NULL,
+                state_type VARCHAR(30) NOT NULL,
+                exercise_name VARCHAR(255),
+                outcome VARCHAR(30) NOT NULL,
+                current_load VARCHAR(50),
+                suggested_load VARCHAR(50),
+                current_week INTEGER,
+                suggested_week INTEGER,
+                suggested_intensity_offset VARCHAR(50),
+                avg_actual_rpe VARCHAR(50),
+                avg_actual_rir VARCHAR(50),
+                last_session_id INTEGER REFERENCES workout_sessions(id) ON DELETE SET NULL,
+                last_log_count INTEGER NOT NULL DEFAULT 0,
+                summary TEXT,
+                metadata JSONB NOT NULL DEFAULT '{}',
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
             );`,
 	}
 	for _, q := range queries {
@@ -229,6 +254,10 @@ func RunMigrations(ctx context.Context) error {
 		return err
 	}
 	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE workout_set_logs ADD COLUMN IF NOT EXISTS actual_rir VARCHAR(50)`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
 		`ALTER TABLE workout_set_logs ADD COLUMN IF NOT EXISTS prescribed_reps VARCHAR(50)`); err != nil {
 		return err
 	}
@@ -254,6 +283,82 @@ func RunMigrations(ctx context.Context) error {
 	}
 	if _, err := Pool.Exec(ctx,
 		`ALTER TABLE workout_set_logs ADD COLUMN IF NOT EXISTS actual_rpe VARCHAR(50)`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE progression_states ADD COLUMN IF NOT EXISTS workflow_block_id INTEGER`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE progression_states ADD COLUMN IF NOT EXISTS block_key VARCHAR(255)`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE progression_states ADD COLUMN IF NOT EXISTS node_type_slug VARCHAR(50)`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE progression_states ADD COLUMN IF NOT EXISTS state_type VARCHAR(30)`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE progression_states ADD COLUMN IF NOT EXISTS exercise_name VARCHAR(255)`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE progression_states ADD COLUMN IF NOT EXISTS outcome VARCHAR(30)`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE progression_states ADD COLUMN IF NOT EXISTS current_load VARCHAR(50)`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE progression_states ADD COLUMN IF NOT EXISTS suggested_load VARCHAR(50)`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE progression_states ADD COLUMN IF NOT EXISTS current_week INTEGER`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE progression_states ADD COLUMN IF NOT EXISTS suggested_week INTEGER`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE progression_states ADD COLUMN IF NOT EXISTS suggested_intensity_offset VARCHAR(50)`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE progression_states ADD COLUMN IF NOT EXISTS avg_actual_rpe VARCHAR(50)`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE progression_states ADD COLUMN IF NOT EXISTS avg_actual_rir VARCHAR(50)`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE progression_states ADD COLUMN IF NOT EXISTS last_session_id INTEGER REFERENCES workout_sessions(id) ON DELETE SET NULL`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE progression_states ADD COLUMN IF NOT EXISTS last_log_count INTEGER NOT NULL DEFAULT 0`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE progression_states ADD COLUMN IF NOT EXISTS summary TEXT`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE progression_states ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE progression_states ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE progression_states ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()`); err != nil {
 		return err
 	}
 	cleanupQueries := []string{
@@ -313,6 +418,10 @@ func RunMigrations(ctx context.Context) error {
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_workout_set_logs_session_block_set
 			ON workout_set_logs(session_id, block_client_id, set_index)
 			WHERE block_client_id IS NOT NULL AND block_client_id <> '';`,
+		`CREATE INDEX IF NOT EXISTS idx_progression_states_workflow_id ON progression_states(workflow_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_progression_states_user_id ON progression_states(user_id);`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_progression_states_user_workflow_block_key
+			ON progression_states(user_id, workflow_id, block_key);`,
 	}
 	for _, q := range indexQueries {
 		if _, err := Pool.Exec(ctx, q); err != nil {
@@ -329,7 +438,7 @@ func SeedNodeTypes(ctx context.Context) error {
 		schema                        string
 	}{
 		{"exercise", "Exercise", "A single exercise node", "dumbbell",
-			`{"exercise_name": "", "sets": 3, "reps": "", "rest_seconds": 90}`},
+			`{"exercise_name": "", "sets": 3, "reps": "", "rest_seconds": 90, "notes": ""}`},
 		{"exercise_timed", "Timed Exercise", "Exercise with duration", "timer",
 			`{"exercise_name": "", "duration": 30}`},
 		{

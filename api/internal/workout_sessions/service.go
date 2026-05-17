@@ -5,14 +5,16 @@ import (
 	"strings"
 
 	apperrors "github.com/momarinho/rep_engine/internal/errors"
+	progressionstates "github.com/momarinho/rep_engine/internal/progression_states"
 )
 
 type Service struct {
-	repo workoutSessionRepo
+	repo        workoutSessionRepo
+	progression progressionApplier
 }
 
-func NewService(repo workoutSessionRepo) *Service {
-	return &Service{repo: repo}
+func NewService(repo workoutSessionRepo, progression progressionApplier) *Service {
+	return &Service{repo: repo, progression: progression}
 }
 
 func (s *Service) StartSession(ctx context.Context, in StartSessionInput) (WorkoutSession, error) {
@@ -88,6 +90,7 @@ func (s *Service) InsertSetLog(ctx context.Context, in InsertSetLogInput) (Worko
 		ActualReps:          strings.TrimSpace(in.ActualReps),
 		ActualLoad:          strings.TrimSpace(in.ActualLoad),
 		ActualRPE:           strings.TrimSpace(in.ActualRPE),
+		ActualRIR:           strings.TrimSpace(in.ActualRIR),
 		Completed:           in.Completed,
 		Notes:               strings.TrimSpace(in.Notes),
 	})
@@ -119,6 +122,34 @@ func (s *Service) CompleteSession(ctx context.Context, in CompleteSessionInput) 
 			return WorkoutSession{}, apperrors.ErrWorkoutSessionNotFound()
 		}
 		return WorkoutSession{}, apperrors.ErrInternal()
+	}
+
+	if s.progression != nil {
+		logs := make([]progressionstates.CompletedSetLog, 0, len(session.Logs))
+		for _, log := range session.Logs {
+			logs = append(logs, progressionstates.CompletedSetLog{
+				WorkflowBlockID:     log.WorkflowBlockID,
+				BlockClientID:       log.BlockClientID,
+				NodeTypeSlug:        log.NodeTypeSlug,
+				SetIndex:            log.SetIndex,
+				PrescribedReps:      log.PrescribedReps,
+				PrescribedLoad:      log.PrescribedLoad,
+				PrescribedIntensity: log.PrescribedIntensity,
+				PrescribedRPE:       log.PrescribedRPE,
+				ActualReps:          log.ActualReps,
+				ActualLoad:          log.ActualLoad,
+				ActualRPE:           log.ActualRPE,
+				ActualRIR:           log.ActualRIR,
+				Completed:           log.Completed,
+				Notes:               log.Notes,
+			})
+		}
+		_ = s.progression.ApplySessionProgression(ctx, progressionstates.ApplySessionProgressionInput{
+			UserID:     in.UserID,
+			WorkflowID: session.WorkflowID,
+			SessionID:  session.ID,
+			Logs:       logs,
+		})
 	}
 
 	return session, nil

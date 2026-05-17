@@ -2,8 +2,9 @@
 	import { browser } from '$app/environment';
 	import { page } from '$app/state';
 	import { onMount, untrack } from 'svelte';
+	import type { ProgressionState } from '$lib/progression-states/types';
 	import type { PageData } from './$types';
-	import type { PlayerBlock, PlayerRoutine, PlayerSection } from '$lib/player/types';
+	import type { PlayerBlock, PlayerRoutine, PlayerSection, WaveWeek } from '$lib/player/types';
 	import type { WorkoutSession, WorkoutSetLog } from '$lib/workout-sessions/types';
 
 	type SessionActivityKind = 'set' | 'round' | 'block' | 'timer';
@@ -21,7 +22,7 @@
 	};
 
 	type PersistedPlayerState = {
-		version: 1;
+		version: 2;
 		currentBlockIndex: number;
 		completedBlockIds: string[];
 		currentSetByBlock: Record<string, number>;
@@ -31,6 +32,7 @@
 		actualRepsByBlock: Record<string, string>;
 		actualLoadByBlock: Record<string, string>;
 		actualRPEByBlock: Record<string, string>;
+		actualRIRByBlock: Record<string, string>;
 		sessionElapsedSeconds: number;
 		activeSectionID: string | null;
 		backendSessionID: number | null;
@@ -61,6 +63,7 @@
 	let actualRepsByBlock = $state<Record<string, string>>({});
 	let actualLoadByBlock = $state<Record<string, string>>({});
 	let actualRPEByBlock = $state<Record<string, string>>({});
+	let actualRIRByBlock = $state<Record<string, string>>({});
 	let sessionElapsedSeconds = $state(routine?.elapsedSeconds ?? 0);
 	let isTimerRunning = $state(false);
 	let timerRemainingSeconds = $state(routine ? getInitialTimerSeconds(routine.blocks[initialBlockIndex]) : 0);
@@ -77,12 +80,21 @@
 	let activityEntries = $state<SessionActivity[]>([]);
 	let hasRestoredSession = $state(false);
 	let sessionHistory = $state<WorkoutSession[]>(initialData.sessionHistory ?? []);
+	let progressionStates = $state<ProgressionState[]>(initialData.progressionStates ?? []);
 	let activePersistedSession = $state<WorkoutSession | null>(null);
 	let completedSessionSummary = $state<WorkoutSession | null>(null);
 	let isSyncingSession = $state(false);
 	let sessionError = $state<string | null>(null);
-
+	const progressionStateByBlockID = $derived(
+		progressionStates.reduce<Record<number, ProgressionState>>((acc, state) => {
+			acc[state.workflow_block_id] = state;
+			return acc;
+		}, {})
+	);
 	const currentBlock = $derived(routine?.blocks[currentBlockIndex] ?? null);
+	const currentProgressionState = $derived(
+		currentBlock?.workflowBlockID ? progressionStateByBlockID[currentBlock.workflowBlockID] ?? null : null
+	);
 	const activeSectionEndIndex = $derived(
 		routine
 			? activeSection
@@ -109,11 +121,7 @@
 	const currentExerciseSet = $derived(currentBlock ? getCurrentSet(currentBlock) : 1);
 	const currentRepeatRound = $derived(currentBlock ? getCurrentRound(currentBlock) : 1);
 	const currentWaveSetIndex = $derived(currentBlock ? getCurrentWaveSetIndex(currentBlock) : 0);
-	const currentWaveWeek = $derived(
-		currentBlock?.node_type_slug === 'wave' && currentBlock.waveSteps
-			? currentBlock.waveSteps[currentBlock.activeWaveWeekIndex ?? 0]
-			: null
-	);
+	const currentWaveWeek = $derived(currentBlock?.node_type_slug === 'wave' ? resolveWaveWeek(currentBlock) : null);
 	const currentWaveSet = $derived(currentWaveWeek ? currentWaveWeek.prescriptions[currentWaveSetIndex] : null);
 	const isRestingBetweenSets = $derived(Boolean(intraSetRest && currentBlock && intraSetRest.blockID === currentBlock.id));
 	const primaryActionLabel = $derived(currentBlock ? getPrimaryActionLabel(currentBlock) : 'Continue');
@@ -208,16 +216,106 @@
 		actualReps: string;
 		actualLoad: string;
 		actualRPE: string;
+		actualRIR: string;
 	} {
 		const actualReps = actualRepsByBlock[blockID]?.trim() ?? '';
 		const actualLoad = actualLoadByBlock[blockID]?.trim() ?? '';
 		const actualRPE = actualRPEByBlock[blockID]?.trim() ?? '';
+		const actualRIR = actualRIRByBlock[blockID]?.trim() ?? '';
 
 		return {
 			actualReps,
 			actualLoad,
-			actualRPE
+			actualRPE,
+			actualRIR
 		};
+	}
+
+	function getBlockProgressionState(block: PlayerBlock | null): ProgressionState | null {
+		if (!block?.workflowBlockID) return null;
+		return progressionStateByBlockID[block.workflowBlockID] ?? null;
+	}
+
+	function formatSignedMetric(value: string): string {
+		const trimmed = value.trim();
+		if (!trimmed || trimmed === '0' || trimmed === '+0' || trimmed === '-0') return '0%';
+		return `${trimmed}%`;
+	}
+
+	function applyWaveIntensityOffset(intensity: string, offset: string): string {
+		const trimmedOffset = offset.trim();
+		if (!trimmedOffset || trimmedOffset === '0' || trimmedOffset === '+0' || trimmedOffset === '-0') {
+			return intensity;
+		}
+
+		const numericOffset = Number.parseFloat(trimmedOffset);
+		if (!Number.isFinite(numericOffset)) return intensity;
+
+		return intensity
+			.split('/')
+			.map((part) => {
+				const base = Number.parseFloat(part.trim());
+				if (!Number.isFinite(base)) return part.trim();
+				const adjusted = base + numericOffset;
+				return Number.isInteger(adjusted) ? String(adjusted) : adjusted.toFixed(1);
+			})
+			.join('/');
+	}
+
+	function resolveWaveWeek(block: PlayerBlock | null): WaveWeek | null {
+		if (!block || block.node_type_slug !== 'wave' || !block.waveSteps?.length) return null;
+		const progression = getBlockProgressionState(block);
+		const suggestedWeekIndex =
+			progression?.state_type === 'wave' && progression.suggested_week > 0
+				? progression.suggested_week - 1
+				: block.activeWaveWeekIndex ?? 0;
+		const weekIndex = Math.min(Math.max(suggestedWeekIndex, 0), block.waveSteps.length - 1);
+		const week = block.waveSteps[weekIndex];
+		const offset = progression?.state_type === 'wave' ? progression.suggested_intensity_offset : '';
+
+		return {
+			...week,
+			intensity: applyWaveIntensityOffset(week.intensity, offset),
+			prescriptions: week.prescriptions.map((set) => ({
+				...set,
+				intensity: applyWaveIntensityOffset(set.intensity, offset)
+			}))
+		};
+	}
+
+	function getResolvedPrescribedLoad(block: PlayerBlock): string {
+		const progression = getBlockProgressionState(block);
+		if (progression?.state_type === 'linear' && progression.suggested_load) {
+			return progression.suggested_load;
+		}
+		if (block.load !== undefined) {
+			return `${block.load}${block.loadUnit ? ` ${block.loadUnit}` : ''}`;
+		}
+		return '';
+	}
+
+	function getProgressionSummary(state: ProgressionState | null): string | null {
+		return state?.summary?.trim() ? state.summary : null;
+	}
+
+	function getProgressionDetail(state: ProgressionState | null): string | null {
+		if (!state) return null;
+		if (state.state_type === 'linear') {
+			return state.suggested_load
+				? `Current ${state.current_load || '-'} -> next ${state.suggested_load}`
+				: state.current_load || null;
+		}
+		if (state.state_type === 'wave') {
+			const weekDetail = state.suggested_week > 0 ? `Week ${state.suggested_week}` : 'Current wave';
+			const offsetDetail =
+				state.suggested_intensity_offset && state.suggested_intensity_offset !== '0'
+					? ` • ${formatSignedMetric(state.suggested_intensity_offset)}`
+					: '';
+			return `${weekDetail}${offsetDetail}`;
+		}
+		return typeof state.metadata?.suggested_action === 'string'
+			? String(state.metadata.suggested_action).replaceAll('_', ' ')
+			: null;
 	}
 
 	function typeLabel(block: PlayerBlock): string {
@@ -327,6 +425,15 @@
 		sessionHistory = [session, ...sessionHistory.filter((entry) => entry.id !== session.id)];
 	}
 
+	async function refreshProgressionStates(): Promise<void> {
+		if (!routine) return;
+		const response = await fetch(`/api/workflows/${routine.id}/progression-states`);
+		if (!response.ok) return;
+		const states = await parseApiResponse<ProgressionState[]>(response);
+		if (!states) return;
+		progressionStates = states;
+	}
+
 	async function restorePersistedSession(sessionID: number): Promise<void> {
 		const response = await fetch(`/api/workout-sessions/${sessionID}`);
 		if (!response.ok) {
@@ -379,25 +486,22 @@
 			actualReps: string;
 			actualLoad: string;
 			actualRPE: string;
+			actualRIR: string;
 		}
 	): Record<string, unknown> {
-		const prescribedLoad =
-			block.load !== undefined
-				? `${block.load}${block.loadUnit ? ` ${block.loadUnit}` : ''}`
-				: '';
-
 		return {
 			workflow_block_id: block.workflowBlockID ?? null,
 			block_client_id: block.id,
 			node_type_slug: block.node_type_slug,
 			set_index: setIndex,
 			prescribed_reps: block.reps ?? '',
-			prescribed_load: prescribedLoad,
+			prescribed_load: getResolvedPrescribedLoad(block),
 			prescribed_intensity: prescribedIntensity,
 			prescribed_rpe: prescribedRPE,
 			actual_reps: actual.actualReps,
 			actual_load: actual.actualLoad,
 			actual_rpe: actual.actualRPE,
+			actual_rir: actual.actualRIR,
 			completed: true,
 			notes: notesByBlock[block.id] ?? ''
 		};
@@ -444,6 +548,7 @@
 		completedSessionSummary = session;
 		activePersistedSession = null;
 		syncSessionHistory(session);
+		await refreshProgressionStates();
 	}
 
 	async function retryCompleteSession(): Promise<void> {
@@ -493,6 +598,7 @@
 		actualRepsByBlock = {};
 		actualLoadByBlock = {};
 		actualRPEByBlock = {};
+		actualRIRByBlock = {};
 		activityEntries = [];
 		sessionElapsedSeconds = 0;
 		isTimerRunning = false;
@@ -645,9 +751,9 @@
 					block,
 					'set',
 					`Set ${currentSet}`,
-					actual.actualReps || actual.actualLoad || actual.actualRPE
-						? `${actual.actualReps || block.reps || '-'} reps${actual.actualLoad ? ` @ ${actual.actualLoad}` : ''}${actual.actualRPE ? ` • RPE ${actual.actualRPE}` : ''}`.trim()
-						: `${block.reps ?? '-'} reps${block.load !== undefined ? ` @ ${block.load} ${block.loadUnit ?? ''}` : ''}`.trim()
+					actual.actualReps || actual.actualLoad || actual.actualRPE || actual.actualRIR
+						? `${actual.actualReps || block.reps || '-'} reps${actual.actualLoad ? ` @ ${actual.actualLoad}` : ''}${actual.actualRPE ? ` • RPE ${actual.actualRPE}` : ''}${actual.actualRIR ? ` • RIR ${actual.actualRIR}` : ''}`.trim()
+						: `${block.reps ?? '-'} reps${getResolvedPrescribedLoad(block) ? ` @ ${getResolvedPrescribedLoad(block)}` : ''}`.trim()
 				);
 				if (currentSet >= (block.sets ?? 1)) {
 					completeCurrentBlock(block, `${block.sets ?? 1} sets logged`);
@@ -680,8 +786,9 @@
 			}
 			case 'wave': {
 				const currentSet = getCurrentWaveSetIndex(block);
-				const totalSets = block.waveSteps?.[block.activeWaveWeekIndex ?? 0]?.prescriptions.length ?? 1;
-				const prescription = block.waveSteps?.[block.activeWaveWeekIndex ?? 0]?.prescriptions[currentSet];
+				const resolvedWeek = resolveWaveWeek(block);
+				const totalSets = resolvedWeek?.prescriptions.length ?? 1;
+				const prescription = resolvedWeek?.prescriptions[currentSet];
 				const actual = readActualInputs(block.id);
 				isSyncingSession = true;
 				sessionError = null;
@@ -698,6 +805,7 @@
 						actual_reps: actual.actualReps,
 						actual_load: actual.actualLoad,
 						actual_rpe: actual.actualRPE,
+						actual_rir: actual.actualRIR,
 						completed: true,
 						notes: notesByBlock[block.id] ?? ''
 					});
@@ -711,8 +819,8 @@
 					block,
 					'set',
 					`Set ${currentSet + 1}`,
-					actual.actualReps || actual.actualLoad || actual.actualRPE
-						? `${actual.actualReps || prescription?.reps || '-'} reps${actual.actualLoad ? ` @ ${actual.actualLoad}` : ''}${actual.actualRPE ? ` • RPE ${actual.actualRPE}` : ''}`
+					actual.actualReps || actual.actualLoad || actual.actualRPE || actual.actualRIR
+						? `${actual.actualReps || prescription?.reps || '-'} reps${actual.actualLoad ? ` @ ${actual.actualLoad}` : ''}${actual.actualRPE ? ` • RPE ${actual.actualRPE}` : ''}${actual.actualRIR ? ` • RIR ${actual.actualRIR}` : ''}`
 						: `${prescription?.reps ?? '-'} reps • ${prescription?.intensity ?? '-'}% • RPE ${prescription?.rpe ?? '-'}`
 				);
 				if (currentSet + 1 >= totalSets) {
@@ -743,6 +851,7 @@
 						actual_reps: actual.actualReps,
 						actual_load: actual.actualLoad,
 						actual_rpe: actual.actualRPE,
+						actual_rir: actual.actualRIR,
 						completed: true,
 						notes: notesByBlock[block.id] ?? ''
 					});
@@ -756,8 +865,8 @@
 					block,
 					'round',
 					`Round ${currentRound}`,
-					actual.actualReps || actual.actualLoad || actual.actualRPE
-						? `${actual.actualReps || block.reps || 'Circuit round'}${actual.actualLoad ? ` @ ${actual.actualLoad}` : ''}${actual.actualRPE ? ` • RPE ${actual.actualRPE}` : ''}`
+					actual.actualReps || actual.actualLoad || actual.actualRPE || actual.actualRIR
+						? `${actual.actualReps || block.reps || 'Circuit round'}${actual.actualLoad ? ` @ ${actual.actualLoad}` : ''}${actual.actualRPE ? ` • RPE ${actual.actualRPE}` : ''}${actual.actualRIR ? ` • RIR ${actual.actualRIR}` : ''}`
 						: `${block.reps ?? 'Circuit round'}`
 				);
 				if (currentRound >= (block.rounds ?? 1)) {
@@ -851,6 +960,7 @@
 			actualRepsByBlock = savedState.actualRepsByBlock ?? {};
 			actualLoadByBlock = savedState.actualLoadByBlock ?? {};
 			actualRPEByBlock = savedState.actualRPEByBlock ?? {};
+			actualRIRByBlock = savedState.actualRIRByBlock ?? {};
 			sessionElapsedSeconds = Math.max(savedState.sessionElapsedSeconds ?? 0, 0);
 			activeSection = savedSection;
 			isChoosingSection = Boolean(savedState.isChoosingSection);
@@ -928,7 +1038,7 @@
 		if (!browser || !routine || !localSessionKey || !hasRestoredSession) return;
 
 		const state: PersistedPlayerState = {
-			version: 1,
+			version: 2,
 			currentBlockIndex,
 			completedBlockIds,
 			currentSetByBlock,
@@ -938,6 +1048,7 @@
 			actualRepsByBlock,
 			actualLoadByBlock,
 			actualRPEByBlock,
+			actualRIRByBlock,
 			sessionElapsedSeconds,
 			activeSectionID: activeSection?.id ?? null,
 			backendSessionID: activePersistedSession?.id ?? completedSessionSummary?.id ?? null,
@@ -1217,6 +1328,29 @@
 						</span>
 					</div>
 
+					{#if currentProgressionState}
+						<div class="mb-6 rounded-xl border border-secondary/20 bg-secondary/10 p-5">
+							<div class="flex flex-wrap items-start justify-between gap-4">
+								<div>
+									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-secondary">Progression suggestion</p>
+									<p class="mt-2 text-lg font-semibold text-on-surface">{getProgressionSummary(currentProgressionState)}</p>
+									{#if getProgressionDetail(currentProgressionState)}
+										<p class="mt-2 text-sm text-on-surface-variant">{getProgressionDetail(currentProgressionState)}</p>
+									{/if}
+								</div>
+								<div class="text-right text-xs text-on-surface-variant">
+									<p class="uppercase tracking-[0.16em]">{currentProgressionState.state_type}</p>
+									{#if currentProgressionState.avg_actual_rpe || currentProgressionState.avg_actual_rir}
+										<p class="mt-2">
+											{currentProgressionState.avg_actual_rpe ? `RPE ${currentProgressionState.avg_actual_rpe}` : 'RPE -'}
+											{currentProgressionState.avg_actual_rir ? ` • RIR ${currentProgressionState.avg_actual_rir}` : ''}
+										</p>
+									{/if}
+								</div>
+							</div>
+						</div>
+					{/if}
+
 					{#if currentBlock.node_type_slug === 'exercise' || currentBlock.node_type_slug === 'linear_progression'}
 						<div class="mb-10 grid grid-cols-2 gap-6 md:grid-cols-3">
 							<div class="space-y-1">
@@ -1235,8 +1369,7 @@
 							<div class="col-span-2 space-y-1 md:col-span-1">
 								<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Load</span>
 								<div class="flex items-baseline gap-1">
-									<span class="font-display text-5xl font-bold">{currentBlock.load ?? '-'}</span>
-									<span class="text-xl font-light text-on-surface-variant">{currentBlock.loadUnit}</span>
+									<span class="font-display text-5xl font-bold">{getResolvedPrescribedLoad(currentBlock) || '-'}</span>
 								</div>
 							</div>
 						</div>
@@ -1281,7 +1414,7 @@
 							</div>
 						{/if}
 
-						<div class="mt-4 grid gap-4 rounded-xl border border-white/5 bg-surface-container-low p-5 md:grid-cols-3">
+						<div class="mt-4 grid gap-4 rounded-xl border border-white/5 bg-surface-container-low p-5 md:grid-cols-4">
 							<div>
 								<label for="actual-reps" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
 								<input
@@ -1302,7 +1435,7 @@
 								<input
 									id="actual-load"
 									class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-									placeholder={currentBlock.load !== undefined ? `${currentBlock.load} ${currentBlock.loadUnit ?? ''}` : 'e.g. 80 kg'}
+									placeholder={getResolvedPrescribedLoad(currentBlock) || 'e.g. 80 kg'}
 									value={actualLoadByBlock[currentBlock.id] ?? ''}
 									oninput={(event) => {
 										actualLoadByBlock = {
@@ -1322,6 +1455,21 @@
 									oninput={(event) => {
 										actualRPEByBlock = {
 											...actualRPEByBlock,
+											[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+										};
+									}}
+								/>
+							</div>
+							<div>
+								<label for="actual-rir" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RIR</label>
+								<input
+									id="actual-rir"
+									class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+									placeholder="e.g. 2"
+									value={actualRIRByBlock[currentBlock.id] ?? ''}
+									oninput={(event) => {
+										actualRIRByBlock = {
+											...actualRIRByBlock,
 											[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
 										};
 									}}
@@ -1417,7 +1565,7 @@
 								</div>
 							{/if}
 
-							<div class="grid gap-4 rounded-xl border border-white/5 bg-surface-container-low p-5 md:grid-cols-3">
+							<div class="grid gap-4 rounded-xl border border-white/5 bg-surface-container-low p-5 md:grid-cols-4">
 								<div>
 									<label for="wave-actual-reps" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
 									<input
@@ -1460,6 +1608,21 @@
 												...actualRPEByBlock,
 												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
 											};
+									}}
+								/>
+							</div>
+								<div>
+									<label for="wave-actual-rir" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RIR</label>
+									<input
+										id="wave-actual-rir"
+										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+										placeholder="e.g. 1"
+										value={actualRIRByBlock[currentBlock.id] ?? ''}
+										oninput={(event) => {
+											actualRIRByBlock = {
+												...actualRIRByBlock,
+												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+											};
 										}}
 									/>
 								</div>
@@ -1472,14 +1635,14 @@
 								</div>
 								<div class="flex gap-2">
 									{#each currentBlock.waveSteps ?? [] as step, index}
-										<div class={`h-2 flex-1 rounded-full ${index <= (currentBlock.activeWaveWeekIndex ?? 0) ? 'bg-secondary' : 'bg-surface-variant'}`}></div>
+										<div class={`h-2 flex-1 rounded-full ${index <= ((currentProgressionState?.state_type === 'wave' && currentProgressionState.suggested_week > 0 ? currentProgressionState.suggested_week - 1 : currentBlock.activeWaveWeekIndex ?? 0)) ? 'bg-secondary' : 'bg-surface-variant'}`}></div>
 									{/each}
 								</div>
 								<div class="mt-5 grid gap-3 md:grid-cols-2">
 									{#each currentBlock.waveSteps ?? [] as step, index}
-										<div class={`rounded-xl border px-4 py-3 ${index === (currentBlock.activeWaveWeekIndex ?? 0) ? 'border-secondary/30 bg-secondary/10' : 'border-white/5 bg-surface-container'}`}>
+										<div class={`rounded-xl border px-4 py-3 ${index === ((currentProgressionState?.state_type === 'wave' && currentProgressionState.suggested_week > 0 ? currentProgressionState.suggested_week - 1 : currentBlock.activeWaveWeekIndex ?? 0)) ? 'border-secondary/30 bg-secondary/10' : 'border-white/5 bg-surface-container'}`}>
 											<p class="text-sm font-semibold text-on-surface">{step.label}</p>
-											<p class="mt-1 text-xs text-on-surface-variant">{step.reps} • {step.intensity} • RPE {step.rpe}</p>
+											<p class="mt-1 text-xs text-on-surface-variant">{step.reps} • {applyWaveIntensityOffset(step.intensity, currentProgressionState?.state_type === 'wave' ? currentProgressionState.suggested_intensity_offset : '')} • RPE {step.rpe}</p>
 										</div>
 									{/each}
 								</div>
@@ -1511,7 +1674,7 @@
 								</div>
 							</div>
 
-							<div class="grid gap-4 rounded-xl border border-white/5 bg-surface-container-low p-5 md:grid-cols-3">
+							<div class="grid gap-4 rounded-xl border border-white/5 bg-surface-container-low p-5 md:grid-cols-4">
 								<div>
 									<label for="repeat-actual-reps" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
 									<input
@@ -1552,6 +1715,21 @@
 										oninput={(event) => {
 											actualRPEByBlock = {
 												...actualRPEByBlock,
+												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+											};
+									}}
+								/>
+							</div>
+								<div>
+									<label for="repeat-actual-rir" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RIR</label>
+									<input
+										id="repeat-actual-rir"
+										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+										placeholder="Optional"
+										value={actualRIRByBlock[currentBlock.id] ?? ''}
+										oninput={(event) => {
+											actualRIRByBlock = {
+												...actualRIRByBlock,
 												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
 											};
 										}}

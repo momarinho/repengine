@@ -2,12 +2,14 @@ import type { PageServerLoad } from './$types';
 import type { Workflow } from '$lib/editor/types';
 import { normalizeWorkflow } from '$lib/editor/normalize';
 import { normalizePlayerRoutine } from '$lib/player/normalize';
+import type { ProgressionState } from '$lib/progression-states/types';
 import { apiFetch, safeJson } from '$lib/server/api';
 import type { PaginatedWorkoutSessions, WorkoutSession } from '$lib/workout-sessions/types';
 
 type LoadResult = {
 	routine: ReturnType<typeof normalizePlayerRoutine>;
 	sessionHistory: WorkoutSession[];
+	progressionStates: ProgressionState[];
 	error: string | null;
 };
 
@@ -29,6 +31,7 @@ export const load = (async ({ params, cookies, fetch, url }) => {
 		return {
 			routine: null,
 			sessionHistory: [],
+			progressionStates: [],
 			error: errorMessage
 		} satisfies LoadResult;
 	}
@@ -41,10 +44,17 @@ export const load = (async ({ params, cookies, fetch, url }) => {
 	const sessionsPayload = sessionsResponse.ok
 		? await safeJson<PaginatedWorkoutSessions>(sessionsResponse)
 		: null;
+	const progressionResponse = await apiFetch(fetch, `/workflows/${params.id}/progression-states`, token, {
+		method: 'GET'
+	});
+	const progressionPayload = progressionResponse.ok
+		? await safeJson<ProgressionState[]>(progressionResponse)
+		: null;
 
 	return {
 		routine,
 		sessionHistory: sessionsPayload?.data ?? [],
+		progressionStates: progressionPayload ?? [],
 		error: routine ? null : 'Routine payload is invalid for the player.'
 	} satisfies LoadResult;
 }) satisfies PageServerLoad;

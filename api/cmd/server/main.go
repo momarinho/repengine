@@ -14,6 +14,7 @@ import (
 	"github.com/momarinho/rep_engine/internal/handlers"
 	"github.com/momarinho/rep_engine/internal/logger"
 	"github.com/momarinho/rep_engine/internal/middleware"
+	progressionstatesvc "github.com/momarinho/rep_engine/internal/progression_states"
 	templatesvc "github.com/momarinho/rep_engine/internal/templates"
 	workflowsvc "github.com/momarinho/rep_engine/internal/workflows"
 	workoutsessionsvc "github.com/momarinho/rep_engine/internal/workout_sessions"
@@ -60,8 +61,12 @@ func main() {
 	templateService := templatesvc.NewService(templateRepo, templateWorker)
 	handlers.SetTemplateService(templateService)
 
+	progressionStateRepo := progressionstatesvc.NewRepository(db.Pool)
+	progressionStateService := progressionstatesvc.NewService(progressionStateRepo)
+	handlers.SetProgressionStateService(progressionStateService)
+
 	workoutSessionRepo := workoutsessionsvc.NewRepository(db.Pool)
-	workoutSessionService := workoutsessionsvc.NewService(workoutSessionRepo)
+	workoutSessionService := workoutsessionsvc.NewService(workoutSessionRepo, progressionStateService)
 	handlers.SetWorkoutSessionService(workoutSessionService)
 
 	app := fiber.New()
@@ -118,6 +123,7 @@ func main() {
 	workflows.Get("/:id/versions", handlers.ListVersions)
 	workflows.Get("/:id/sessions", handlers.ListWorkoutSessions)
 	workflows.Post("/:id/sessions", handlers.StartWorkoutSession)
+	workflows.Get("/:id/progression-states", handlers.ListProgressionStates)
 
 	templates := app.Group("/templates", middleware.RequireAuth)
 	templates.Get("/", handlers.ListTemplates)

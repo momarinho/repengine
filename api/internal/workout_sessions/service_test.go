@@ -109,7 +109,7 @@ func TestServiceStartSession_Success(t *testing.T) {
 		},
 	}
 
-	service := NewService(repo)
+	service := NewService(repo, nil)
 
 	out, err := service.StartSession(ctx, StartSessionInput{
 		UserID:       2,
@@ -154,7 +154,7 @@ func TestServiceStartSession_ReusesExistingActiveSession(t *testing.T) {
 		},
 	}
 
-	service := NewService(repo)
+	service := NewService(repo, nil)
 
 	out, err := service.StartSession(ctx, StartSessionInput{
 		UserID:     3,
@@ -186,7 +186,7 @@ func TestServiceInsertSetLog_InactiveSession(t *testing.T) {
 		},
 	}
 
-	service := NewService(repo)
+	service := NewService(repo, nil)
 
 	_, err := service.InsertSetLog(ctx, InsertSetLogInput{
 		UserID:       1,
@@ -228,7 +228,7 @@ func TestServiceCompleteSession_ReturnsUpdatedSession(t *testing.T) {
 		},
 	}
 
-	service := NewService(repo)
+	service := NewService(repo, nil)
 
 	out, err := service.CompleteSession(ctx, CompleteSessionInput{
 		UserID:    7,
@@ -259,7 +259,7 @@ func TestServiceListSessions_WorkflowNotOwned(t *testing.T) {
 		},
 	}
 
-	service := NewService(repo)
+	service := NewService(repo, nil)
 
 	_, err := service.ListSessions(ctx, ListSessionsInput{
 		UserID:     1,
@@ -281,7 +281,7 @@ func TestServiceGetSession_NotFound(t *testing.T) {
 		},
 	}
 
-	service := NewService(repo)
+	service := NewService(repo, nil)
 
 	_, err := service.GetSession(ctx, GetSessionInput{
 		UserID:    1,

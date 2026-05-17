@@ -9,8 +9,9 @@ The project currently delivers:
 - workflow versioning
 - official templates with async clone jobs
 - a persistent workout player for section-based execution
+ - basic progression state and autoregulation suggestions
 
-The workout player now creates persistent workout sessions and set logs in the backend, while still keeping local browser state for in-progress UX.
+The workout player now creates persistent workout sessions and set logs in the backend, keeps local browser state for in-progress UX, and derives simple next-session progression suggestions from real logs.
 
 ## Stack
 
@@ -34,8 +35,9 @@ The workout player now creates persistent workout sessions and set logs in the b
 - Workout player 5.5 local runtime
 - Workout sessions and set logging
 - Session reliability hardening
+ - Progression states and simple autoregulation
 
-### Workout player 6 / 6.5
+### Workout player 6 / 6.5 / 7
 
 The player already supports:
 
@@ -44,18 +46,24 @@ The player already supports:
 - persistent set / round logging
 - local runtime state for in-progress UX
 - local notes per block
-- actual reps / load / RPE entry
+- actual reps / load / RPE / RIR entry
 - timers and intra-set rest
 - session completion summary
 - workout history by workflow
 - browser persistence via `localStorage`
 - session resume / active-session reuse
 - duplicate log protection for repeated clicks / retries
+- progression state by workflow block
+- simple next-session suggestions for `linear_progression`
+- simple week / intensity adjustment suggestions for `wave`
+- simple skill progression suggestions for skill-like `exercise` / `exercise_timed` blocks
 
-The player does not yet support:
+The player still does not support:
 
-- progression state
-- autoregulation
+- complex autoregulation
+- sophisticated training-max logic
+- analytics / charts
+- mobile / offline sync
 
 ## Running locally
 
@@ -125,6 +133,7 @@ npm run dev
 - `GET /workflows/:id/versions`
 - `GET /workflows/:id/sessions`
 - `POST /workflows/:id/sessions`
+- `GET /workflows/:id/progression-states`
 
 ### Workout Sessions
 
@@ -165,15 +174,17 @@ npm run check
 
 ### Manual validation
 
-Manual validation of the workout session flow is still pending.
-
-Recommended quick pass:
+Recommended Sprint 7 validation:
 
 - start a section and confirm a session is created
-- log a few sets and verify they persist
+- log a few sets with `actual reps`, `actual load`, `actual RPE`, and `actual RIR`
 - reload during the workout and confirm the active session resumes
 - finish the section and confirm the session becomes `completed`
 - verify the session appears in workflow history
+- re-open the same workflow and confirm progression suggestions now appear on the relevant blocks
+- for `linear_progression`, confirm the suggested next load changes after an easy vs hard session
+- for `wave`, confirm the suggested week or intensity offset changes after an easy vs hard session
+- for skill-like blocks, confirm the suggestion can stay / advance / regress based on logged effort and reps
 
 ### Workflow update benchmark
 
@@ -215,15 +226,17 @@ Status: `PASS` (`p95 < 200ms`)
 - Sprint 5.5: local-first player runtime polish
 - Sprint 6: persistent workout sessions and set logging
 - Sprint 6.5: session reliability and log integrity
+- Sprint 7: autoregulation and progression state
 
 ### Not completed yet
 
-- Sprint 7: autoregulation and progression state
 - Sprint 8: deploy hardening
 
 ## Important Notes
 
 - SQL migration files exist in `api/migrations/`, but the app currently boots schema through `api/internal/db/db.go`.
 - Session hardening currently includes active-session reuse, deduplicated set logging, and migration locking.
+- Sprint 7 progression is intentionally simple: it is based on completed logs plus `RPE/RIR`, not on advanced readiness modeling.
 - The repo now contains both the Sprint 6 session API and the Sprint 6.5 hardening migration in `api/migrations/010_harden_workout_sessions_and_logs.sql`.
+- The repo now also contains the Sprint 7 progression schema in `api/migrations/011_create_progression_states.sql`.
 - The current Docker setup is development-oriented: `docker-compose.dev.yml`, `api/Dockerfile`, and `web/Dockerfile`.

@@ -1,6 +1,14 @@
 package workoutsessions
 
-import "context"
+import (
+	"context"
+
+	progressionstates "github.com/momarinho/rep_engine/internal/progression_states"
+)
+
+type progressionApplier interface {
+	ApplySessionProgression(ctx context.Context, in progressionstates.ApplySessionProgressionInput) error
+}
 
 type workoutSessionRepo interface {
 	StartSession(ctx context.Context, in StartSessionInput) (WorkoutSession, error)

@@ -35,6 +35,7 @@ type WorkoutSetLog struct {
 	ActualReps          string    `json:"actual_reps"`
 	ActualLoad          string    `json:"actual_load"`
 	ActualRPE           string    `json:"actual_rpe"`
+	ActualRIR           string    `json:"actual_rir"`
 	Completed           bool      `json:"completed"`
 	Notes               string    `json:"notes"`
 	CreatedAt           time.Time `json:"created_at"`
@@ -67,6 +68,7 @@ type InsertSetLogInput struct {
 	ActualReps          string
 	ActualLoad          string
 	ActualRPE           string
+	ActualRIR           string
 	Completed           bool
 	Notes               string
 }

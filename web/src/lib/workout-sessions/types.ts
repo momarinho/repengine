@@ -14,6 +14,7 @@ export type WorkoutSetLog = {
 	actual_reps: string;
 	actual_load: string;
 	actual_rpe: string;
+	actual_rir: string;
 	completed: boolean;
 	notes: string;
 	created_at: string;
