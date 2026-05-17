@@ -1,0 +1,122 @@
+# Staging Docker Compose
+# Builds from source; exposes ports directly for easier debugging.
+# Includes pgAdmin for database inspection.
+#
+# Usage:
+#   docker compose -f docker-compose.staging.yml up --build -d
+
+services:
+
+  # ------------------------------------------------------------------
+  # PostgreSQL database
+  # ------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-rep}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rep}
+      POSTGRES_DB:       ${POSTGRES_DB:-repengine}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata_staging:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rep} -d ${POSTGRES_DB:-repengine}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    networks:
+      - repengine
+
+  # ------------------------------------------------------------------
+  # Go Fiber API — built from source
+  # ------------------------------------------------------------------
+  api:
+    build:
+      context: ./api
+      args:
+        APP_VERSION: ${VERSION:-staging}
+        BUILD_TIME:  ${BUILD_TIME:-}
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://rep:rep@db:5432/repengine}
+      JWT_SECRET:   ${JWT_SECRET:-staging-secret-change-me}
+      APP_ENV:      staging
+      LOG_LEVEL:    ${LOG_LEVEL:-debug}
+      PORT:         "8080"
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+    networks:
+      - repengine
+
+  # ------------------------------------------------------------------
+  # SvelteKit frontend — built from source
+  # ------------------------------------------------------------------
+  web:
+    build:
+      context: ./web
+    ports:
+      - "3000:3000"
+    environment:
+      API_URL:        http://api:8080
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8080}
+    depends_on:
+      - api
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+    networks:
+      - repengine
+
+  # ------------------------------------------------------------------
+  # pgAdmin — database GUI (staging only)
+  # ------------------------------------------------------------------
+  db_admin:
+    image: dpage/pgadmin4
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL:    ${PGADMIN_DEFAULT_EMAIL:-admin@repengine.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+    depends_on:
+      - db
+    restart: unless-stopped
+    networks:
+      - repengine
+
+# ------------------------------------------------------------------
+# Named volumes
+# ------------------------------------------------------------------
+volumes:
+  pgdata_staging:
+
+# ------------------------------------------------------------------
+# Networks
+# ------------------------------------------------------------------
+networks:
+  repengine:
+    driver: bridge

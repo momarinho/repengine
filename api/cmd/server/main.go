@@ -10,6 +10,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
+	"github.com/momarinho/rep_engine/internal/config"
 	"github.com/momarinho/rep_engine/internal/db"
 	"github.com/momarinho/rep_engine/internal/handlers"
 	"github.com/momarinho/rep_engine/internal/logger"
@@ -20,10 +21,23 @@ import (
 	workoutsessionsvc "github.com/momarinho/rep_engine/internal/workout_sessions"
 )
 
-var serverStartTime = time.Now()
+// version and buildTime are overridden at build time via -ldflags:
+//
+//	-ldflags "-X main.version=$(git describe --tags) -X main.buildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+var (
+	version         = "dev"
+	buildTime       = "unknown"
+	serverStartTime = time.Now()
+)
 
 func main() {
-	log := logger.Init()
+	cfg, err := config.Load(version, buildTime)
+	if err != nil {
+		slog.Error("failed to load config", "err", err)
+		os.Exit(1)
+	}
+
+	log := logger.New(cfg.LogLevel)
 	slog.SetDefault(log)
 
 	if err := db.Connect(); err != nil {
@@ -86,6 +100,9 @@ func main() {
 		},
 	}))
 	app.Use(middleware.Logging(slog.Default()))
+	app.Use(middleware.Metrics())
+
+	app.Get("/metrics", middleware.MetricsHandler())
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		ctx, cancel := context.WithTimeout(c.Context(), 2*time.Second)
@@ -102,7 +119,8 @@ func main() {
 			"status":  "ok",
 			"db":      dbHealth,
 			"uptime":  uptime,
-			"version": "1.0.0",
+			"version": version,
+			"env":     cfg.AppEnv,
 		})
 	})
 
@@ -142,12 +160,12 @@ func main() {
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 
 	go func() {
-		if err := app.Listen(":8080"); err != nil {
+		if err := app.Listen(":" + cfg.Port); err != nil {
 			slog.Error("server error", "err", err)
 		}
 	}()
 
-	slog.Info("server started", "addr", ":8080")
+	slog.Info("server started", "addr", ":"+cfg.Port, "version", version, "env", cfg.AppEnv)
 
 	<-quit
 	slog.Info("shutting down server...")

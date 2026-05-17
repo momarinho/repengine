@@ -1,0 +1,160 @@
+# Production Docker Compose
+# All secrets must be provided via environment variables or a .env file.
+# No passwords are hardcoded here.
+#
+# Usage:
+#   REGISTRY=ghcr.io/momarinho VERSION=1.2.3 docker compose -f docker-compose.prod.yml up -d
+
+services:
+
+  # ------------------------------------------------------------------
+  # PostgreSQL database
+  # ------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB:       ${POSTGRES_DB}
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    networks:
+      - repengine
+
+  # ------------------------------------------------------------------
+  # Go Fiber API
+  # ------------------------------------------------------------------
+  api:
+    image: ${REGISTRY:-ghcr.io/momarinho}/repengine-api:${VERSION:-latest}
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET:   ${JWT_SECRET}
+      APP_ENV:      production
+      LOG_LEVEL:    info
+      PORT:         "8080"
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    # No ports exposed directly — traffic enters only through nginx
+    networks:
+      - repengine
+
+  # ------------------------------------------------------------------
+  # SvelteKit frontend
+  # ------------------------------------------------------------------
+  web:
+    image: ${REGISTRY:-ghcr.io/momarinho}/repengine-web:${VERSION:-latest}
+    environment:
+      API_URL:        http://api:8080   # server-side fetch (container→container)
+      PUBLIC_API_URL: ${PUBLIC_API_URL} # browser-side fetch (public URL)
+    depends_on:
+      - api
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+    # No ports exposed directly — traffic enters only through nginx
+    networks:
+      - repengine
+
+  # ------------------------------------------------------------------
+  # Nginx reverse proxy (TLS termination)
+  # ------------------------------------------------------------------
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./infra/nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - api
+      - web
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - repengine
+
+  # ------------------------------------------------------------------
+  # Prometheus — metrics collection (internal only)
+  # ------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+    restart: unless-stopped
+    # No port binding — accessible only within the repengine network
+    networks:
+      - repengine
+
+  # ------------------------------------------------------------------
+  # Grafana — dashboards
+  # ------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:11.1.0
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP:     "false"
+      GF_SERVER_ROOT_URL:         ${GRAFANA_ROOT_URL:-http://localhost:3001}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    ports:
+      - "3001:3000"
+    restart: unless-stopped
+    networks:
+      - repengine
+
+# ------------------------------------------------------------------
+# Named volumes
+# ------------------------------------------------------------------
+volumes:
+  pgdata_prod:
+  prometheus_data:
+  grafana_data:
+
+# ------------------------------------------------------------------
+# Networks
+# ------------------------------------------------------------------
+networks:
+  repengine:
+    driver: bridge
