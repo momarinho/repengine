@@ -57,6 +57,14 @@ func Close() {
 }
 
 func RunMigrations(ctx context.Context) error {
+	const migrationLockID int64 = 20260517
+	if _, err := Pool.Exec(ctx, `SELECT pg_advisory_lock($1)`, migrationLockID); err != nil {
+		return err
+	}
+	defer func() {
+		_, _ = Pool.Exec(context.Background(), `SELECT pg_advisory_unlock($1)`, migrationLockID)
+	}()
+
 	queries := []string{
 		`CREATE TABLE IF NOT EXISTS users (
               id SERIAL PRIMARY KEY,
@@ -248,6 +256,44 @@ func RunMigrations(ctx context.Context) error {
 		`ALTER TABLE workout_set_logs ADD COLUMN IF NOT EXISTS actual_rpe VARCHAR(50)`); err != nil {
 		return err
 	}
+	cleanupQueries := []string{
+		`WITH ranked_sessions AS (
+			SELECT id,
+			       ROW_NUMBER() OVER (
+			       	PARTITION BY user_id, workflow_id
+			       	ORDER BY id DESC
+			       ) AS row_num
+			FROM workout_sessions
+			WHERE status = 'active'
+		)
+		UPDATE workout_sessions
+		SET
+			status = 'completed',
+			completed_at = COALESCE(completed_at, NOW()),
+			updated_at = NOW()
+		WHERE id IN (
+			SELECT id FROM ranked_sessions WHERE row_num > 1
+		);`,
+		`WITH ranked_logs AS (
+			SELECT id,
+			       ROW_NUMBER() OVER (
+			       	PARTITION BY session_id, block_client_id, set_index
+			       	ORDER BY id DESC
+			       ) AS row_num
+			FROM workout_set_logs
+			WHERE block_client_id IS NOT NULL
+			  AND block_client_id <> ''
+		)
+		DELETE FROM workout_set_logs
+		WHERE id IN (
+			SELECT id FROM ranked_logs WHERE row_num > 1
+		);`,
+	}
+	for _, q := range cleanupQueries {
+		if _, err := Pool.Exec(ctx, q); err != nil {
+			return err
+		}
+	}
 
 	indexQueries := []string{
 		`CREATE INDEX IF NOT EXISTS idx_workflows_user_id ON workflows(user_id);`,
@@ -259,8 +305,14 @@ func RunMigrations(ctx context.Context) error {
 		`CREATE INDEX IF NOT EXISTS idx_workout_sessions_user_id ON workout_sessions(user_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_workout_sessions_workflow_id ON workout_sessions(workflow_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_workout_sessions_status ON workout_sessions(status);`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_workout_sessions_active_workflow
+			ON workout_sessions(user_id, workflow_id)
+			WHERE status = 'active';`,
 		`CREATE INDEX IF NOT EXISTS idx_workout_set_logs_session_id ON workout_set_logs(session_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_workout_set_logs_workflow_block_id ON workout_set_logs(workflow_block_id);`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_workout_set_logs_session_block_set
+			ON workout_set_logs(session_id, block_client_id, set_index)
+			WHERE block_client_id IS NOT NULL AND block_client_id <> '';`,
 	}
 	for _, q := range indexQueries {
 		if _, err := Pool.Exec(ctx, q); err != nil {
@@ -289,18 +341,18 @@ func SeedNodeTypes(ctx context.Context) error {
 				"exercise_name": "",
 				"active_week": 1,
 				"rest_seconds": 120,
-				"week_1_reps": "",
-				"week_1_intensity": "",
-				"week_1_rpe": "",
-				"week_2_reps": "",
-				"week_2_intensity": "",
-				"week_2_rpe": "",
-				"week_3_reps": "",
-				"week_3_intensity": "",
-				"week_3_rpe": "",
-				"week_4_reps": "",
-				"week_4_intensity": "",
-				"week_4_rpe": "",
+				"week_1_reps": "5/5/5+",
+				"week_1_intensity": "65/70/75",
+				"week_1_rpe": "7/8/9",
+				"week_2_reps": "3/3/3+",
+				"week_2_intensity": "70/75/80",
+				"week_2_rpe": "8/8/9",
+				"week_3_reps": "5/3/1+",
+				"week_3_intensity": "75/80/85",
+				"week_3_rpe": "8/9/9",
+				"week_4_reps": "5/5/5",
+				"week_4_intensity": "40/50/60",
+				"week_4_rpe": "6/6/6",
 				"week_5_reps": "",
 				"week_5_intensity": "",
 				"week_5_rpe": "",
@@ -388,23 +440,46 @@ func hybridWaveBlock(exercise string, restSeconds int) templateBlockSeed {
 			"active_week":      1,
 			"rest_seconds":     restSeconds,
 			"week_1_reps":      "10/10/10",
-			"week_1_intensity": "65/65/65",
-			"week_1_rpe":       "7/7/7",
+			"week_1_intensity": "65/70/75",
+			"week_1_rpe":       "7/7/8",
 			"week_2_reps":      "8/8/8",
-			"week_2_intensity": "75/75/75",
-			"week_2_rpe":       "8/8/8",
+			"week_2_intensity": "70/75/80",
+			"week_2_rpe":       "7/8/8",
 			"week_3_reps":      "5/5/5",
-			"week_3_intensity": "85/85/85",
-			"week_3_rpe":       "9/9/9",
+			"week_3_intensity": "75/80/85",
+			"week_3_rpe":       "8/8/9",
 			"week_4_reps":      "10/10/10",
-			"week_4_intensity": "70/70/70",
-			"week_4_rpe":       "7/7/7",
+			"week_4_intensity": "67.5/72.5/77.5",
+			"week_4_rpe":       "7/7/8",
 			"week_5_reps":      "8/8/8",
-			"week_5_intensity": "80/80/80",
-			"week_5_rpe":       "8/8/8",
+			"week_5_intensity": "72.5/77.5/82.5",
+			"week_5_rpe":       "8/8/9",
 			"week_6_reps":      "5/5/5",
-			"week_6_intensity": "90/90/90",
-			"week_6_rpe":       "9/9/10",
+			"week_6_intensity": "77.5/82.5/87.5",
+			"week_6_rpe":       "8/9/9",
+		},
+	}
+}
+
+func fiveThreeOneWaveBlock(exercise string, restSeconds int) templateBlockSeed {
+	return templateBlockSeed{
+		NodeTypeSlug: "wave",
+		Data: map[string]any{
+			"exercise_name":    exercise,
+			"active_week":      1,
+			"rest_seconds":     restSeconds,
+			"week_1_reps":      "5/5/5+",
+			"week_1_intensity": "65/70/75",
+			"week_1_rpe":       "7/8/9",
+			"week_2_reps":      "3/3/3+",
+			"week_2_intensity": "70/75/80",
+			"week_2_rpe":       "8/8/9",
+			"week_3_reps":      "5/3/1+",
+			"week_3_intensity": "75/80/85",
+			"week_3_rpe":       "8/9/9",
+			"week_4_reps":      "5/5/5",
+			"week_4_intensity": "40/50/60",
+			"week_4_rpe":       "6/6/6",
 		},
 	}
 }
@@ -485,23 +560,7 @@ func SeedTemplates(ctx context.Context) error {
 				},
 				{
 					NodeTypeSlug: "wave",
-					Data: map[string]any{
-						"exercise_name":    "Squat",
-						"active_week":      1,
-						"rest_seconds":     120,
-						"week_1_reps":      "5/5/5+",
-						"week_1_intensity": "65/75/85",
-						"week_1_rpe":       "8/8/9",
-						"week_2_reps":      "3/3/3+",
-						"week_2_intensity": "70/80/90",
-						"week_2_rpe":       "8/8/9",
-						"week_3_reps":      "5/3/1+",
-						"week_3_intensity": "75/85/95",
-						"week_3_rpe":       "8/9/9",
-						"week_4_reps":      "5/5/5",
-						"week_4_intensity": "40/50/60",
-						"week_4_rpe":       "6/6/6",
-					},
+					Data:         fiveThreeOneWaveBlock("Squat", 120).Data,
 				},
 				{
 					NodeTypeSlug: "rest",
@@ -526,16 +585,7 @@ func SeedTemplates(ctx context.Context) error {
 						"collapsed": false,
 					},
 				},
-				{
-					NodeTypeSlug: "wave",
-					Data: map[string]any{
-						"exercise_name":     "Bench Press",
-						"week":              "week_1",
-						"reps":              "5/5/5+",
-						"intensity_percent": "65/75/85",
-						"rpe":               "8-9",
-					},
-				},
+				fiveThreeOneWaveBlock("Bench Press", 120),
 				{
 					NodeTypeSlug: "rest",
 					Data: map[string]any{
@@ -694,7 +744,7 @@ func SeedTemplates(ctx context.Context) error {
 				exerciseBlockWithNotes("Nordic Hamstring Curl", "6", 3, "Eccentric focus with 5-second negative."),
 
 				sectionBlock("Key Principles", "Use fixed sets, protect skill quality, and deload every 7th week.", "section"),
-				exerciseBlockWithNotes("Wave Loading Rules", "Fixed sets", 1, "Wave load only primary compounds: OHP, Ring Dips, Back Squat, Pull-Ups, Deadlift. Weeks 1-6 use 65/75/85 -> 70/80/90%. Week 7 deloads at 50-60%."),
+				exerciseBlockWithNotes("Wave Loading Rules", "Fixed sets", 1, "Wave load only primary compounds: OHP, Ring Dips, Back Squat, Pull-Ups, Deadlift. Each week climbs set by set, e.g. 65/70/75 -> 70/75/80 -> 75/80/85, then repeats slightly heavier before the deload."),
 				exerciseBlockWithNotes("Calisthenics Skill Rules", "Technical quality", 1, "Stop crow pose, pistol, and front lever work when form breaks. No grinding skill reps."),
 				exerciseBlockWithNotes("Push-Up Finisher Principle", "Hypertrophy", 1, "After ring dips, use push-up variation as hypertrophy work without adding another heavy press."),
 			},

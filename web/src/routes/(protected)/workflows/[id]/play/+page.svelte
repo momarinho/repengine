@@ -28,6 +28,9 @@
 		roundByBlock: Record<string, number>;
 		waveSetByBlock: Record<string, number>;
 		notesByBlock: Record<string, string>;
+		actualRepsByBlock: Record<string, string>;
+		actualLoadByBlock: Record<string, string>;
+		actualRPEByBlock: Record<string, string>;
 		sessionElapsedSeconds: number;
 		activeSectionID: string | null;
 		backendSessionID: number | null;
@@ -55,6 +58,9 @@
 	let roundByBlock = $state<Record<string, number>>({});
 	let waveSetByBlock = $state<Record<string, number>>({});
 	let notesByBlock = $state<Record<string, string>>({});
+	let actualRepsByBlock = $state<Record<string, string>>({});
+	let actualLoadByBlock = $state<Record<string, string>>({});
+	let actualRPEByBlock = $state<Record<string, string>>({});
 	let sessionElapsedSeconds = $state(routine?.elapsedSeconds ?? 0);
 	let isTimerRunning = $state(false);
 	let timerRemainingSeconds = $state(routine ? getInitialTimerSeconds(routine.blocks[initialBlockIndex]) : 0);
@@ -198,6 +204,22 @@
 		return notes.join('\n');
 	}
 
+	function readActualInputs(blockID: string): {
+		actualReps: string;
+		actualLoad: string;
+		actualRPE: string;
+	} {
+		const actualReps = actualRepsByBlock[blockID]?.trim() ?? '';
+		const actualLoad = actualLoadByBlock[blockID]?.trim() ?? '';
+		const actualRPE = actualRPEByBlock[blockID]?.trim() ?? '';
+
+		return {
+			actualReps,
+			actualLoad,
+			actualRPE
+		};
+	}
+
 	function typeLabel(block: PlayerBlock): string {
 		switch (block.node_type_slug) {
 			case 'exercise':
@@ -315,15 +337,19 @@
 
 		const session = await parseApiResponse<WorkoutSession>(response);
 		if (!session) return;
+		const restoredSection = getSectionByID(session.section_id);
 
 		if (session.status === 'completed') {
 			completedSessionSummary = session;
 			activePersistedSession = null;
+			activeSection = restoredSection ?? activeSection;
+			isSessionComplete = true;
 			syncSessionHistory(session);
 			return;
 		}
 
 		activePersistedSession = session;
+		activeSection = restoredSection ?? activeSection;
 	}
 
 	async function createPersistedSession(section: PlayerSection | null): Promise<WorkoutSession> {
@@ -348,7 +374,12 @@
 		block: PlayerBlock,
 		setIndex: number,
 		prescribedIntensity: string,
-		prescribedRPE: string
+		prescribedRPE: string,
+		actual: {
+			actualReps: string;
+			actualLoad: string;
+			actualRPE: string;
+		}
 	): Record<string, unknown> {
 		const prescribedLoad =
 			block.load !== undefined
@@ -364,9 +395,9 @@
 			prescribed_load: prescribedLoad,
 			prescribed_intensity: prescribedIntensity,
 			prescribed_rpe: prescribedRPE,
-			actual_reps: block.reps ?? '',
-			actual_load: prescribedLoad,
-			actual_rpe: prescribedRPE,
+			actual_reps: actual.actualReps,
+			actual_load: actual.actualLoad,
+			actual_rpe: actual.actualRPE,
 			completed: true,
 			notes: notesByBlock[block.id] ?? ''
 		};
@@ -459,6 +490,9 @@
 		roundByBlock = {};
 		waveSetByBlock = {};
 		notesByBlock = {};
+		actualRepsByBlock = {};
+		actualLoadByBlock = {};
+		actualRPEByBlock = {};
 		activityEntries = [];
 		sessionElapsedSeconds = 0;
 		isTimerRunning = false;
@@ -552,8 +586,10 @@
 			const session = await createPersistedSession(section);
 			activePersistedSession = session;
 			completedSessionSummary = null;
-			const index = section?.startBlockIndex ?? 0;
-			resetRuntimeState(index, section, false);
+			syncSessionHistory(session);
+			const resolvedSection = getSectionByID(session.section_id) ?? section;
+			const index = resolvedSection?.startBlockIndex ?? 0;
+			resetRuntimeState(index, resolvedSection, false);
 		} catch (error: unknown) {
 			sessionError = error instanceof Error ? error.message : 'Unable to start workout session.';
 		} finally {
@@ -591,12 +627,13 @@
 			case 'exercise':
 			case 'linear_progression': {
 				const currentSet = getCurrentSet(block);
+				const actual = readActualInputs(block.id);
 				isSyncingSession = true;
 				sessionError = null;
 				try {
 					await persistSetLog(
 						block,
-						buildSetLogPayload(block, currentSet, '', '')
+						buildSetLogPayload(block, currentSet, '', '', actual)
 					);
 				} catch (error: unknown) {
 					sessionError = error instanceof Error ? error.message : 'Unable to save set log.';
@@ -608,7 +645,9 @@
 					block,
 					'set',
 					`Set ${currentSet}`,
-					`${block.reps ?? '-'} reps${block.load !== undefined ? ` @ ${block.load} ${block.loadUnit ?? ''}` : ''}`.trim()
+					actual.actualReps || actual.actualLoad || actual.actualRPE
+						? `${actual.actualReps || block.reps || '-'} reps${actual.actualLoad ? ` @ ${actual.actualLoad}` : ''}${actual.actualRPE ? ` • RPE ${actual.actualRPE}` : ''}`.trim()
+						: `${block.reps ?? '-'} reps${block.load !== undefined ? ` @ ${block.load} ${block.loadUnit ?? ''}` : ''}`.trim()
 				);
 				if (currentSet >= (block.sets ?? 1)) {
 					completeCurrentBlock(block, `${block.sets ?? 1} sets logged`);
@@ -643,6 +682,7 @@
 				const currentSet = getCurrentWaveSetIndex(block);
 				const totalSets = block.waveSteps?.[block.activeWaveWeekIndex ?? 0]?.prescriptions.length ?? 1;
 				const prescription = block.waveSteps?.[block.activeWaveWeekIndex ?? 0]?.prescriptions[currentSet];
+				const actual = readActualInputs(block.id);
 				isSyncingSession = true;
 				sessionError = null;
 				try {
@@ -655,9 +695,9 @@
 						prescribed_load: '',
 						prescribed_intensity: prescription?.intensity ?? '',
 						prescribed_rpe: prescription?.rpe ?? '',
-						actual_reps: prescription?.reps ?? '',
-						actual_load: '',
-						actual_rpe: prescription?.rpe ?? '',
+						actual_reps: actual.actualReps,
+						actual_load: actual.actualLoad,
+						actual_rpe: actual.actualRPE,
 						completed: true,
 						notes: notesByBlock[block.id] ?? ''
 					});
@@ -671,7 +711,9 @@
 					block,
 					'set',
 					`Set ${currentSet + 1}`,
-					`${prescription?.reps ?? '-'} reps • ${prescription?.intensity ?? '-'}% • RPE ${prescription?.rpe ?? '-'}`
+					actual.actualReps || actual.actualLoad || actual.actualRPE
+						? `${actual.actualReps || prescription?.reps || '-'} reps${actual.actualLoad ? ` @ ${actual.actualLoad}` : ''}${actual.actualRPE ? ` • RPE ${actual.actualRPE}` : ''}`
+						: `${prescription?.reps ?? '-'} reps • ${prescription?.intensity ?? '-'}% • RPE ${prescription?.rpe ?? '-'}`
 				);
 				if (currentSet + 1 >= totalSets) {
 					completeCurrentBlock(block, `${totalSets} wave sets logged`);
@@ -685,6 +727,7 @@
 			}
 			case 'repeat': {
 				const currentRound = getCurrentRound(block);
+				const actual = readActualInputs(block.id);
 				isSyncingSession = true;
 				sessionError = null;
 				try {
@@ -697,9 +740,9 @@
 						prescribed_load: '',
 						prescribed_intensity: '',
 						prescribed_rpe: '',
-						actual_reps: block.reps ?? '',
-						actual_load: '',
-						actual_rpe: '',
+						actual_reps: actual.actualReps,
+						actual_load: actual.actualLoad,
+						actual_rpe: actual.actualRPE,
 						completed: true,
 						notes: notesByBlock[block.id] ?? ''
 					});
@@ -713,7 +756,9 @@
 					block,
 					'round',
 					`Round ${currentRound}`,
-					`${block.reps ?? 'Circuit round'}`
+					actual.actualReps || actual.actualLoad || actual.actualRPE
+						? `${actual.actualReps || block.reps || 'Circuit round'}${actual.actualLoad ? ` @ ${actual.actualLoad}` : ''}${actual.actualRPE ? ` • RPE ${actual.actualRPE}` : ''}`
+						: `${block.reps ?? 'Circuit round'}`
 				);
 				if (currentRound >= (block.rounds ?? 1)) {
 					completeCurrentBlock(block, `${block.rounds ?? 1} rounds logged`);
@@ -768,10 +813,16 @@
 			return;
 		}
 
+		const recentActiveSession = sessionHistory.find((session) => session.status === 'active') ?? null;
 		const rawState = localStorage.getItem(localSessionKey);
 		if (!rawState) {
 			hasRestoredSession = true;
-			if (!isChoosingSection) {
+			if (recentActiveSession) {
+				activePersistedSession = recentActiveSession;
+				const resumedSection = getSectionByID(recentActiveSession.section_id) ?? initialSection;
+				const index = resumedSection?.startBlockIndex ?? initialBlockIndex;
+				resetRuntimeState(index, resumedSection, false);
+			} else if (!isChoosingSection) {
 				void startSection(initialSection);
 			}
 			return;
@@ -797,6 +848,9 @@
 			roundByBlock = savedState.roundByBlock ?? {};
 			waveSetByBlock = savedState.waveSetByBlock ?? {};
 			notesByBlock = savedState.notesByBlock ?? {};
+			actualRepsByBlock = savedState.actualRepsByBlock ?? {};
+			actualLoadByBlock = savedState.actualLoadByBlock ?? {};
+			actualRPEByBlock = savedState.actualRPEByBlock ?? {};
 			sessionElapsedSeconds = Math.max(savedState.sessionElapsedSeconds ?? 0, 0);
 			activeSection = savedSection;
 			isChoosingSection = Boolean(savedState.isChoosingSection);
@@ -807,6 +861,8 @@
 				void restorePersistedSession(savedBackendSessionID).catch(() => {
 					sessionError = 'Unable to restore workout session.';
 				});
+			} else if (recentActiveSession) {
+				activePersistedSession = recentActiveSession;
 			}
 		} catch {
 			localStorage.removeItem(localSessionKey);
@@ -879,6 +935,9 @@
 			roundByBlock,
 			waveSetByBlock,
 			notesByBlock,
+			actualRepsByBlock,
+			actualLoadByBlock,
+			actualRPEByBlock,
 			sessionElapsedSeconds,
 			activeSectionID: activeSection?.id ?? null,
 			backendSessionID: activePersistedSession?.id ?? completedSessionSummary?.id ?? null,
@@ -1221,6 +1280,54 @@
 								</div>
 							</div>
 						{/if}
+
+						<div class="mt-4 grid gap-4 rounded-xl border border-white/5 bg-surface-container-low p-5 md:grid-cols-3">
+							<div>
+								<label for="actual-reps" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
+								<input
+									id="actual-reps"
+									class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+									placeholder={currentBlock.reps ?? 'e.g. 8'}
+									value={actualRepsByBlock[currentBlock.id] ?? ''}
+									oninput={(event) => {
+										actualRepsByBlock = {
+											...actualRepsByBlock,
+											[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+										};
+									}}
+								/>
+							</div>
+							<div>
+								<label for="actual-load" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual load</label>
+								<input
+									id="actual-load"
+									class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+									placeholder={currentBlock.load !== undefined ? `${currentBlock.load} ${currentBlock.loadUnit ?? ''}` : 'e.g. 80 kg'}
+									value={actualLoadByBlock[currentBlock.id] ?? ''}
+									oninput={(event) => {
+										actualLoadByBlock = {
+											...actualLoadByBlock,
+											[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+										};
+									}}
+								/>
+							</div>
+							<div>
+								<label for="actual-rpe" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RPE</label>
+								<input
+									id="actual-rpe"
+									class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+									placeholder="e.g. 8.5"
+									value={actualRPEByBlock[currentBlock.id] ?? ''}
+									oninput={(event) => {
+										actualRPEByBlock = {
+											...actualRPEByBlock,
+											[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+										};
+									}}
+								/>
+							</div>
+						</div>
 					{:else if currentBlock.node_type_slug === 'rest' || currentBlock.node_type_slug === 'exercise_timed'}
 						<div class="flex flex-col items-center justify-center py-4">
 							<div class="relative flex h-56 w-56 items-center justify-center">
@@ -1310,6 +1417,54 @@
 								</div>
 							{/if}
 
+							<div class="grid gap-4 rounded-xl border border-white/5 bg-surface-container-low p-5 md:grid-cols-3">
+								<div>
+									<label for="wave-actual-reps" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
+									<input
+										id="wave-actual-reps"
+										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+										placeholder={currentWaveSet?.reps ?? 'e.g. 5'}
+										value={actualRepsByBlock[currentBlock.id] ?? ''}
+										oninput={(event) => {
+											actualRepsByBlock = {
+												...actualRepsByBlock,
+												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+											};
+										}}
+									/>
+								</div>
+								<div>
+									<label for="wave-actual-load" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual load</label>
+									<input
+										id="wave-actual-load"
+										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+										placeholder="e.g. 140 kg"
+										value={actualLoadByBlock[currentBlock.id] ?? ''}
+										oninput={(event) => {
+											actualLoadByBlock = {
+												...actualLoadByBlock,
+												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+											};
+										}}
+									/>
+								</div>
+								<div>
+									<label for="wave-actual-rpe" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RPE</label>
+									<input
+										id="wave-actual-rpe"
+										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+										placeholder={currentWaveSet?.rpe ?? 'e.g. 9'}
+										value={actualRPEByBlock[currentBlock.id] ?? ''}
+										oninput={(event) => {
+											actualRPEByBlock = {
+												...actualRPEByBlock,
+												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+											};
+										}}
+									/>
+								</div>
+							</div>
+
 							<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
 								<div class="mb-4 flex items-center justify-between">
 									<span class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Wave progression</span>
@@ -1353,6 +1508,54 @@
 									{#each Array(currentBlock.rounds ?? 0) as _, index}
 										<div class={`h-2 flex-1 rounded-full ${index < currentRepeatRound - 1 ? 'bg-primary' : 'bg-surface-variant'}`}></div>
 									{/each}
+								</div>
+							</div>
+
+							<div class="grid gap-4 rounded-xl border border-white/5 bg-surface-container-low p-5 md:grid-cols-3">
+								<div>
+									<label for="repeat-actual-reps" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
+									<input
+										id="repeat-actual-reps"
+										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+										placeholder={currentBlock.reps ?? 'e.g. 12/12/10'}
+										value={actualRepsByBlock[currentBlock.id] ?? ''}
+										oninput={(event) => {
+											actualRepsByBlock = {
+												...actualRepsByBlock,
+												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+											};
+										}}
+									/>
+								</div>
+								<div>
+									<label for="repeat-actual-load" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual load</label>
+									<input
+										id="repeat-actual-load"
+										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+										placeholder="Optional"
+										value={actualLoadByBlock[currentBlock.id] ?? ''}
+										oninput={(event) => {
+											actualLoadByBlock = {
+												...actualLoadByBlock,
+												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+											};
+										}}
+									/>
+								</div>
+								<div>
+									<label for="repeat-actual-rpe" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RPE</label>
+									<input
+										id="repeat-actual-rpe"
+										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+										placeholder="Optional"
+										value={actualRPEByBlock[currentBlock.id] ?? ''}
+										oninput={(event) => {
+											actualRPEByBlock = {
+												...actualRPEByBlock,
+												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+											};
+										}}
+									/>
 								</div>
 							</div>
 						</div>

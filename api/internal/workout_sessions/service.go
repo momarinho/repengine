@@ -28,6 +28,14 @@ func (s *Service) StartSession(ctx context.Context, in StartSessionInput) (Worko
 		return WorkoutSession{}, apperrors.ErrWorkflowNotFound()
 	}
 
+	activeSession, err := s.repo.GetActiveSessionByWorkflow(ctx, in.UserID, in.WorkflowID)
+	if err == nil {
+		return activeSession, nil
+	}
+	if !IsNotFound(err) {
+		return WorkoutSession{}, apperrors.ErrInternal()
+	}
+
 	session, err := s.repo.StartSession(ctx, StartSessionInput{
 		UserID:       in.UserID,
 		WorkflowID:   in.WorkflowID,

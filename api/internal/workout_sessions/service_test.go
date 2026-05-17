@@ -12,6 +12,7 @@ import (
 
 type fakeRepo struct {
 	startSessionFunc     func(ctx context.Context, in StartSessionInput) (WorkoutSession, error)
+	getActiveSessionFunc func(ctx context.Context, userID, workflowID int) (WorkoutSession, error)
 	insertSetLogFunc     func(ctx context.Context, in InsertSetLogInput) (WorkoutSetLog, error)
 	completeSessionFunc  func(ctx context.Context, sessionID, userID int, notes string) error
 	getSessionFunc       func(ctx context.Context, sessionID, userID int) (WorkoutSession, error)
@@ -25,6 +26,13 @@ func (f *fakeRepo) StartSession(ctx context.Context, in StartSessionInput) (Work
 		panic("unexpected call to StartSession")
 	}
 	return f.startSessionFunc(ctx, in)
+}
+
+func (f *fakeRepo) GetActiveSessionByWorkflow(ctx context.Context, userID, workflowID int) (WorkoutSession, error) {
+	if f.getActiveSessionFunc == nil {
+		panic("unexpected call to GetActiveSessionByWorkflow")
+	}
+	return f.getActiveSessionFunc(ctx, userID, workflowID)
 }
 
 func (f *fakeRepo) InsertSetLog(ctx context.Context, in InsertSetLogInput) (WorkoutSetLog, error) {
@@ -92,6 +100,9 @@ func TestServiceStartSession_Success(t *testing.T) {
 		userOwnsWorkflowFunc: func(ctx context.Context, userID, workflowID int) (bool, error) {
 			return true, nil
 		},
+		getActiveSessionFunc: func(ctx context.Context, userID, workflowID int) (WorkoutSession, error) {
+			return WorkoutSession{}, pgx.ErrNoRows
+		},
 		startSessionFunc: func(ctx context.Context, in StartSessionInput) (WorkoutSession, error) {
 			gotInput = in
 			return WorkoutSession{ID: 15, WorkflowID: in.WorkflowID, UserID: in.UserID, Status: SessionStatusActive}, nil
@@ -118,6 +129,46 @@ func TestServiceStartSession_Success(t *testing.T) {
 	}
 	if gotInput.SectionTitle != "Day 1" {
 		t.Fatalf("expected trimmed section title, got %q", gotInput.SectionTitle)
+	}
+}
+
+func TestServiceStartSession_ReusesExistingActiveSession(t *testing.T) {
+	ctx := context.Background()
+	startCalled := false
+
+	repo := &fakeRepo{
+		userOwnsWorkflowFunc: func(ctx context.Context, userID, workflowID int) (bool, error) {
+			return true, nil
+		},
+		getActiveSessionFunc: func(ctx context.Context, userID, workflowID int) (WorkoutSession, error) {
+			return WorkoutSession{
+				ID:         21,
+				WorkflowID: workflowID,
+				UserID:     userID,
+				Status:     SessionStatusActive,
+			}, nil
+		},
+		startSessionFunc: func(ctx context.Context, in StartSessionInput) (WorkoutSession, error) {
+			startCalled = true
+			return WorkoutSession{}, nil
+		},
+	}
+
+	service := NewService(repo)
+
+	out, err := service.StartSession(ctx, StartSessionInput{
+		UserID:     3,
+		WorkflowID: 9,
+	})
+	if err != nil {
+		t.Fatalf("StartSession returned error: %v", err)
+	}
+
+	if out.ID != 21 {
+		t.Fatalf("expected reused session ID 21, got %d", out.ID)
+	}
+	if startCalled {
+		t.Fatal("expected repo StartSession not to be called when an active session exists")
 	}
 }
 

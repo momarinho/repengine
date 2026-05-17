@@ -1074,6 +1074,7 @@
 														<input
 															id={`wave-week-${week}-reps`}
 															type="text"
+															placeholder="5/5/5+"
 															class="w-full rounded-md border border-outline-variant/20 bg-background px-3 py-2 text-sm text-on-surface outline-none"
 															value={typeof selectedBlock.data[`week_${week}_reps`] === 'string' ? selectedBlock.data[`week_${week}_reps`] : ''}
 															oninput={(event) => updateBlockField(selectedBlock.client_id, `week_${week}_reps`, (event.currentTarget as HTMLInputElement).value)}
@@ -1084,6 +1085,7 @@
 														<input
 															id={`wave-week-${week}-intensity`}
 															type="text"
+															placeholder="65/70/75"
 															class="w-full rounded-md border border-outline-variant/20 bg-background px-3 py-2 text-sm text-on-surface outline-none"
 															value={typeof selectedBlock.data[`week_${week}_intensity`] === 'string' ? selectedBlock.data[`week_${week}_intensity`] : ''}
 															oninput={(event) => updateBlockField(selectedBlock.client_id, `week_${week}_intensity`, (event.currentTarget as HTMLInputElement).value)}
@@ -1094,6 +1096,7 @@
 														<input
 															id={`wave-week-${week}-rpe`}
 															type="text"
+															placeholder="7/8/9"
 															class="w-full rounded-md border border-outline-variant/20 bg-background px-3 py-2 text-sm text-on-surface outline-none"
 															value={typeof selectedBlock.data[`week_${week}_rpe`] === 'string' ? selectedBlock.data[`week_${week}_rpe`] : ''}
 															oninput={(event) => updateBlockField(selectedBlock.client_id, `week_${week}_rpe`, (event.currentTarget as HTMLInputElement).value)}

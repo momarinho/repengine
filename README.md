@@ -8,9 +8,9 @@ The project currently delivers:
 - a block-based workout editor
 - workflow versioning
 - official templates with async clone jobs
-- a local-first workout player for section-based execution
+- a persistent workout player for section-based execution
 
-The workout player is currently `local-only`. It does not create persistent workout sessions in the backend yet.
+The workout player now creates persistent workout sessions and set logs in the backend, while still keeping local browser state for in-progress UX.
 
 ## Stack
 
@@ -32,23 +32,28 @@ The workout player is currently `local-only`. It does not create persistent work
 - Template cloning with clone-job polling
 - Workout player V1
 - Workout player 5.5 local runtime
+- Workout sessions and set logging
+- Session reliability hardening
 
-### Workout player 5.5
+### Workout player 6 / 6.5
 
 The player already supports:
 
 - choosing a section to execute
-- local set / round / block logging
+- persistent workout session creation
+- persistent set / round logging
+- local runtime state for in-progress UX
 - local notes per block
+- actual reps / load / RPE entry
 - timers and intra-set rest
-- simple completion summary
+- session completion summary
+- workout history by workflow
 - browser persistence via `localStorage`
+- session resume / active-session reuse
+- duplicate log protection for repeated clicks / retries
 
 The player does not yet support:
 
-- backend-persisted workout sessions
-- backend-persisted set logs
-- workout history by workflow
 - progression state
 - autoregulation
 
@@ -118,6 +123,14 @@ npm run dev
 - `DELETE /workflows/:id`
 - `POST /workflows/:id/versions`
 - `GET /workflows/:id/versions`
+- `GET /workflows/:id/sessions`
+- `POST /workflows/:id/sessions`
+
+### Workout Sessions
+
+- `GET /workout-sessions/:id`
+- `POST /workout-sessions/:id/logs`
+- `POST /workout-sessions/:id/complete`
 
 ### Templates
 
@@ -149,6 +162,18 @@ From `web/`:
 ```bash
 npm run check
 ```
+
+### Manual validation
+
+Manual validation of the workout session flow is still pending.
+
+Recommended quick pass:
+
+- start a section and confirm a session is created
+- log a few sets and verify they persist
+- reload during the workout and confirm the active session resumes
+- finish the section and confirm the session becomes `completed`
+- verify the session appears in workflow history
 
 ### Workflow update benchmark
 
@@ -188,15 +213,17 @@ Status: `PASS` (`p95 < 200ms`)
 - Sprint 4: block editor frontend
 - Sprint 5: templates and player V1
 - Sprint 5.5: local-first player runtime polish
+- Sprint 6: persistent workout sessions and set logging
+- Sprint 6.5: session reliability and log integrity
 
 ### Not completed yet
 
-- Sprint 6: persistent workout sessions and set logging
 - Sprint 7: autoregulation and progression state
 - Sprint 8: deploy hardening
 
 ## Important Notes
 
 - SQL migration files exist in `api/migrations/`, but the app currently boots schema through `api/internal/db/db.go`.
-- `workout_sessions` and `workout_set_logs` database structures exist in the repo, but there are no exposed handlers or registered routes for them yet.
+- Session hardening currently includes active-session reuse, deduplicated set logging, and migration locking.
+- The repo now contains both the Sprint 6 session API and the Sprint 6.5 hardening migration in `api/migrations/010_harden_workout_sessions_and_logs.sql`.
 - The current Docker setup is development-oriented: `docker-compose.dev.yml`, `api/Dockerfile`, and `web/Dockerfile`.
