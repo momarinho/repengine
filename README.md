@@ -227,16 +227,56 @@ Status: `PASS` (`p95 < 200ms`)
 - Sprint 6: persistent workout sessions and set logging
 - Sprint 6.5: session reliability and log integrity
 - Sprint 7: autoregulation and progression state
+- Sprint 8: deploy hardening
+- Sprint 9: critical hotfix
 
 ### Not completed yet
 
-- Sprint 8: deploy hardening
+Features present in the backend but with no UI surface:
+
+- workout history / analytics view (sessions exist in the DB, no browse/chart page)
+- version restore (endpoint does not exist yet)
+- set log editing or deletion after the fact
+- session abandonment (an active session cannot be discarded from the UI)
+
+Features not yet started:
+
+- password reset / forgot-password flow
+- account settings (change email/password, delete account)
+- exercise autocomplete / search
+- undo/redo in the block editor
+- filter workflows by category (UI exists, backend field does not)
+- PWA / offline support / background sync for set logs
+- dark/light mode toggle (CSS tokens defined, toggle not wired)
+- complex autoregulation (training-max logic, readiness modeling)
+- analytics and charts
+
+## Roadmap
+
+| Sprint | Theme | Scope |
+|--------|-------|-------|
+| **10** | **Security** | Cookie `Secure` flag, logout token invalidation, CORS middleware, auth rate limiting, register input validation, JWT issuer/audience claims |
+| **11** | **Schema Hardening** | CHECK constraints on status/enum columns, missing FK constraints, missing indexes, convert numeric columns from `VARCHAR` to `NUMERIC`, soft deletes on workflows/users |
+| **12** | **API Quality & Tests** | Handler-level tests with `fiber.Test()`, auth service/repository pattern, fix service singleton injection, fix silent progression error swallowing, `CreateVersion` race condition |
+| **13** | **Frontend Bug Fixes** | Fix dashboard filter, fix auth guard token validation, versions proxy GET handler, per-user localStorage key, PersistedState migration, player timer, autosave UI state |
+| **14** | **Account & History** | Password reset, account settings page, workout history, basic volume analytics, session abandonment, set log editing, version restore |
+| **15** | **CI/CD** | GitHub Actions (lint, test, build, push), migration testing on fresh DB, branch protection, `CONTRIBUTING.md`, `LICENSE`, OpenAPI spec |
+| **16** | **Observability** | Prometheus alerting rules, `node_exporter`, `postgres_exporter`, Grafana dashboard JSON, nginx rate limiting, CSP header, TLS certificate automation |
+| **17** | **Accessibility & PWA** | ARIA roles/labels, modal focus trap, keyboard drag-and-drop, undo/redo, Service Worker offline support, background sync |
+
+## Tech Debt
+
+Known issues that don't block current functionality but need to be addressed before scaling:
+
+- **Fitness data stored as `VARCHAR`.** Columns like `actual_reps`, `actual_load`, `actual_rpe`, and `current_load` are `VARCHAR(50)` in the schema. This prevents any database-level aggregation or analytics queries. Sprint 11 converts these to `NUMERIC`.
+- **No CI pipeline.** There are no automated build or test workflows. Broken changes can reach production silently. Sprint 15 addresses this.
+- **Auth handler bypasses the service/repository pattern.** Every other domain has a clean service/repo interface; auth talks directly to `db.Pool`. Addressed in Sprint 12.
+- **Global service singletons.** Services are injected via package-level setter functions (`SetWorkflowService`, etc.), which prevents parallel test execution. Addressed in Sprint 12.
 
 ## Important Notes
 
-- SQL migration files exist in `api/migrations/`, but the app currently boots schema through `api/internal/db/db.go`.
-- Session hardening currently includes active-session reuse, deduplicated set logging, and migration locking.
+- SQL migration files live in `api/migrations/`. At startup, `internal/db/migrations.go` reads and applies them in order using an embedded FS (`//go:embed *.sql`). Applied versions are tracked in a `schema_migrations` table with a Postgres advisory lock to prevent concurrent execution. Migration files may include a `-- Down` section for documentation; the runner automatically strips everything from that marker onwards so rollback SQL is never executed during boot.
+- Session hardening includes active-session reuse, deduplicated set logging, and migration locking.
 - Sprint 7 progression is intentionally simple: it is based on completed logs plus `RPE/RIR`, not on advanced readiness modeling.
-- The repo now contains both the Sprint 6 session API and the Sprint 6.5 hardening migration in `api/migrations/010_harden_workout_sessions_and_logs.sql`.
-- The repo now also contains the Sprint 7 progression schema in `api/migrations/011_create_progression_states.sql`.
-- The current Docker setup is development-oriented: `docker-compose.dev.yml`, `api/Dockerfile`, and `web/Dockerfile`.
+- Sprint 8 introduced production Docker hardening: multi-stage Dockerfiles with non-root users, `docker-compose.prod.yml` and `docker-compose.staging.yml`, Nginx with TLS termination, Prometheus + Grafana, and operational scripts under `scripts/`.
+- The progression state `block_key` format is `sectionTitle::nodeTypeSlug::exerciseName::occurrence`. Renaming a section will orphan its progression history — this is a known limitation tracked in the roadmap.

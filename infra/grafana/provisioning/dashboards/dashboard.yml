@@ -1,14 +1,14 @@
 apiVersion: 1
 
 providers:
-  - name:                  Default
-    orgId:                 1
-    folder:                ""
-    folderUid:             ""
-    type:                  file
-    disableDeletion:       false
+  - name: Default
+    orgId: 1
+    folder: ""
+    folderUid: ""
+    type: file
+    disableDeletion: false
     updateIntervalSeconds: 30
-    allowUiUpdates:        true
+    allowUiUpdates: true
     options:
-      path:                      /var/lib/grafana/dashboards
+      path: /var/lib/grafana/dashboards
       foldersFromFilesStructure: false

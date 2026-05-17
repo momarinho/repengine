@@ -84,16 +84,10 @@ func (r *Repository) InsertSetLog(ctx context.Context, in InsertSetLogInput) (Wo
 			session_id,
 			workflow_block_id,
 			block_client_id,
-			block_position,
 			node_type_slug,
-			set_number,
 			set_index,
-			target_reps,
 			prescribed_reps,
-			target_load,
 			prescribed_load,
-			load_unit,
-			target_rpe,
 			prescribed_intensity,
 			prescribed_rpe,
 			actual_reps,
@@ -104,30 +98,30 @@ func (r *Repository) InsertSetLog(ctx context.Context, in InsertSetLogInput) (Wo
 			notes
 		)
 		SELECT
-			$1, $2, $3, $4, $5, $6, $7, $8,
-			$9, $10, $11, $12, $13, $14, $15,
-			$16, $17, $18, $19, $20, $21
+			$1, $2, $3, $4, $5,
+			$6, $7, $8, $9,
+			$10, $11, $12, $13, $14, $15
 		WHERE EXISTS (
 			SELECT 1 FROM workout_sessions
 			WHERE id = $1
-			  AND user_id = $22
-			  AND status = $23
+			  AND user_id = $16
+			  AND status = $17
 		)
 		ON CONFLICT (session_id, block_client_id, set_index)
 		WHERE block_client_id IS NOT NULL AND block_client_id <> ''
 		DO UPDATE SET
-			workflow_block_id = EXCLUDED.workflow_block_id,
-			node_type_slug = EXCLUDED.node_type_slug,
-			prescribed_reps = EXCLUDED.prescribed_reps,
-			prescribed_load = EXCLUDED.prescribed_load,
+			workflow_block_id    = EXCLUDED.workflow_block_id,
+			node_type_slug       = EXCLUDED.node_type_slug,
+			prescribed_reps      = EXCLUDED.prescribed_reps,
+			prescribed_load      = EXCLUDED.prescribed_load,
 			prescribed_intensity = EXCLUDED.prescribed_intensity,
-			prescribed_rpe = EXCLUDED.prescribed_rpe,
-			actual_reps = EXCLUDED.actual_reps,
-			actual_load = EXCLUDED.actual_load,
-			actual_rpe = EXCLUDED.actual_rpe,
-			actual_rir = EXCLUDED.actual_rir,
-			completed = EXCLUDED.completed,
-			notes = EXCLUDED.notes
+			prescribed_rpe       = EXCLUDED.prescribed_rpe,
+			actual_reps          = EXCLUDED.actual_reps,
+			actual_load          = EXCLUDED.actual_load,
+			actual_rpe           = EXCLUDED.actual_rpe,
+			actual_rir           = EXCLUDED.actual_rir,
+			completed            = EXCLUDED.completed,
+			notes                = EXCLUDED.notes
 		RETURNING id, session_id, workflow_block_id, block_client_id, node_type_slug,
 		          set_index, COALESCE(prescribed_reps, ''), COALESCE(prescribed_load, ''),
 		          COALESCE(prescribed_intensity, ''), COALESCE(prescribed_rpe, ''),
@@ -135,29 +129,23 @@ func (r *Repository) InsertSetLog(ctx context.Context, in InsertSetLogInput) (Wo
 		          COALESCE(actual_rir, ''),
 		          completed, COALESCE(notes, ''), created_at
 	`,
-		in.SessionID,
-		in.WorkflowBlockID,
-		in.BlockClientID,
-		0,
-		in.NodeTypeSlug,
-		in.SetIndex,
-		in.SetIndex,
-		in.PrescribedReps,
-		in.PrescribedReps,
-		nil,
-		in.PrescribedLoad,
-		nil,
-		in.PrescribedRPE,
-		in.PrescribedIntensity,
-		in.PrescribedRPE,
-		in.ActualReps,
-		in.ActualLoad,
-		in.ActualRPE,
-		in.ActualRIR,
-		in.Completed,
-		in.Notes,
-		in.UserID,
-		SessionStatusActive,
+		in.SessionID,           // $1
+		in.WorkflowBlockID,     // $2
+		in.BlockClientID,       // $3
+		in.NodeTypeSlug,        // $4
+		in.SetIndex,            // $5
+		in.PrescribedReps,      // $6
+		in.PrescribedLoad,      // $7
+		in.PrescribedIntensity, // $8
+		in.PrescribedRPE,       // $9
+		in.ActualReps,          // $10
+		in.ActualLoad,          // $11
+		in.ActualRPE,           // $12
+		in.ActualRIR,           // $13
+		in.Completed,           // $14
+		in.Notes,               // $15
+		in.UserID,              // $16
+		SessionStatusActive,    // $17
 	)
 
 	return scanWorkoutSetLog(row)

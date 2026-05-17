@@ -25,21 +25,6 @@ ALTER TABLE workout_set_logs
 ALTER TABLE workout_set_logs
   ADD COLUMN IF NOT EXISTS prescribed_rpe VARCHAR(50);
 
-ALTER TABLE workout_set_logs
-  ALTER COLUMN block_position SET DEFAULT 0;
-
-ALTER TABLE workout_set_logs
-  ALTER COLUMN set_number SET DEFAULT 1;
-
-ALTER TABLE workout_set_logs
-  ALTER COLUMN actual_reps TYPE VARCHAR(50) USING actual_reps::TEXT;
-
-ALTER TABLE workout_set_logs
-  ALTER COLUMN actual_load TYPE VARCHAR(50) USING actual_load::TEXT;
-
-ALTER TABLE workout_set_logs
-  ALTER COLUMN actual_rpe TYPE VARCHAR(50) USING actual_rpe::TEXT;
-
 WITH ranked_sessions AS (
   SELECT id,
          ROW_NUMBER() OVER (

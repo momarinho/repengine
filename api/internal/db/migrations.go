@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -67,10 +68,15 @@ func RunMigrations(ctx context.Context) error {
 			continue // already applied — skip
 		}
 
-		content, err := migrationfiles.FS.ReadFile(filename)
+		raw, err := migrationfiles.FS.ReadFile(filename)
 		if err != nil {
 			return fmt.Errorf("migrations: read file %s: %w", filename, err)
 		}
+
+		// Strip the "-- Down" section so rollback SQL is never executed as
+		// part of the up-migration. The separator is matched case-insensitively
+		// and handles both "-- Down" and "-- down" conventions.
+		content := upOnly(string(raw))
 
 		// Apply inside a transaction so a partial failure is rolled back.
 		tx, err := Pool.Begin(ctx)
@@ -78,7 +84,7 @@ func RunMigrations(ctx context.Context) error {
 			return fmt.Errorf("migrations: begin tx for %s: %w", version, err)
 		}
 
-		if _, err := tx.Exec(ctx, string(content)); err != nil {
+		if _, err := tx.Exec(ctx, content); err != nil {
 			_ = tx.Rollback(ctx)
 			return fmt.Errorf("migrations: execute %s: %w", version, err)
 		}
@@ -99,4 +105,19 @@ func RunMigrations(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// downSectionRe matches "-- Down" (and variants like "-- down", "-- DOWN")
+// appearing at the start of a line, optionally preceded by whitespace.
+var downSectionRe = regexp.MustCompile(`(?im)^\s*--\s*down\b.*`)
+
+// upOnly returns only the "up" portion of a migration file, stripping
+// everything from the first "-- Down" marker to the end of the file.
+// This prevents rollback SQL from being executed during forward migrations.
+func upOnly(sql string) string {
+	loc := downSectionRe.FindStringIndex(sql)
+	if loc == nil {
+		return sql
+	}
+	return strings.TrimRight(sql[:loc[0]], " \t\n\r")
 }

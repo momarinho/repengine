@@ -10,6 +10,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
+	fiberrecover "github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/momarinho/rep_engine/internal/config"
 	"github.com/momarinho/rep_engine/internal/db"
 	"github.com/momarinho/rep_engine/internal/handlers"
@@ -85,6 +86,9 @@ func main() {
 
 	app := fiber.New()
 
+	app.Use(fiberrecover.New(fiberrecover.Config{
+		EnableStackTrace: true,
+	}))
 	app.Use(middleware.RequestID())
 	app.Use(middleware.TimeoutMiddleware(10 * time.Second))
 	app.Use(limiter.New(limiter.Config{

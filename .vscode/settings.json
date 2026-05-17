@@ -1,0 +1,7 @@
+{
+  "yaml.schemas": {
+    "./.vscode/any.schema.json": [
+      "infra/grafana/provisioning/**/*.yml"
+    ]
+  }
+}
