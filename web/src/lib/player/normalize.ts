@@ -231,6 +231,7 @@ function mapPlayerBlock(block: WorkflowBlockApi, index: number, section: Section
 
 	return {
 		id: String(block.id ?? `${block.node_type_slug}-${index}`),
+		workflowBlockID: typeof block.id === 'number' ? block.id : undefined,
 		node_type_slug: type,
 		title: blockTitle(type, data, index),
 		subtitle: blockSubtitle(type, data),

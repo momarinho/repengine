@@ -134,11 +134,13 @@ func RunMigrations(ctx context.Context) error {
                 id SERIAL PRIMARY KEY,
                 workflow_id INTEGER NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                section_id VARCHAR(100),
                 section_title VARCHAR(255),
                 section_position INTEGER,
-                status VARCHAR(20) NOT NULL DEFAULT 'in_progress',
+                status VARCHAR(20) NOT NULL DEFAULT 'active',
                 started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                 completed_at TIMESTAMP WITH TIME ZONE,
+                notes TEXT,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
             );`,
@@ -147,17 +149,23 @@ func RunMigrations(ctx context.Context) error {
                 id SERIAL PRIMARY KEY,
                 session_id INTEGER NOT NULL REFERENCES workout_sessions(id) ON DELETE CASCADE,
                 workflow_block_id INTEGER REFERENCES workflow_blocks(id) ON DELETE SET NULL,
-                block_position INTEGER NOT NULL,
+                block_client_id VARCHAR(100),
+                block_position INTEGER NOT NULL DEFAULT 0,
                 node_type_slug VARCHAR(50) NOT NULL REFERENCES node_types(slug),
-                set_number INTEGER NOT NULL,
+                set_index INTEGER NOT NULL DEFAULT 1,
+                set_number INTEGER NOT NULL DEFAULT 1,
                 target_reps VARCHAR(50),
-                actual_reps INTEGER,
+                prescribed_reps VARCHAR(50),
+                actual_reps VARCHAR(50),
                 target_load NUMERIC,
-                actual_load NUMERIC,
+                prescribed_load VARCHAR(50),
+                actual_load VARCHAR(50),
                 load_unit VARCHAR(10),
                 target_rpe VARCHAR(20),
-                actual_rpe NUMERIC,
-                completed BOOLEAN NOT NULL DEFAULT FALSE,
+                prescribed_intensity VARCHAR(50),
+                prescribed_rpe VARCHAR(50),
+                actual_rpe VARCHAR(50),
+                completed BOOLEAN NOT NULL DEFAULT TRUE,
                 notes TEXT,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
             );`,
@@ -170,6 +178,74 @@ func RunMigrations(ctx context.Context) error {
 
 	if _, err := Pool.Exec(ctx,
 		`ALTER TABLE workflow_blocks ADD COLUMN IF NOT EXISTS id SERIAL`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE workout_sessions ADD COLUMN IF NOT EXISTS section_id VARCHAR(100)`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE workout_sessions ADD COLUMN IF NOT EXISTS notes TEXT`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE workout_sessions ALTER COLUMN status SET DEFAULT 'active'`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE workout_set_logs ADD COLUMN IF NOT EXISTS block_client_id VARCHAR(100)`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE workout_set_logs ADD COLUMN IF NOT EXISTS set_index INTEGER DEFAULT 1`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE workout_set_logs ALTER COLUMN block_position SET DEFAULT 0`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE workout_set_logs ALTER COLUMN set_number SET DEFAULT 1`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE workout_set_logs ALTER COLUMN actual_reps TYPE VARCHAR(50) USING actual_reps::TEXT`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE workout_set_logs ALTER COLUMN actual_load TYPE VARCHAR(50) USING actual_load::TEXT`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE workout_set_logs ALTER COLUMN actual_rpe TYPE VARCHAR(50) USING actual_rpe::TEXT`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE workout_set_logs ADD COLUMN IF NOT EXISTS prescribed_reps VARCHAR(50)`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE workout_set_logs ADD COLUMN IF NOT EXISTS prescribed_load VARCHAR(50)`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE workout_set_logs ADD COLUMN IF NOT EXISTS prescribed_intensity VARCHAR(50)`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE workout_set_logs ADD COLUMN IF NOT EXISTS prescribed_rpe VARCHAR(50)`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE workout_set_logs ADD COLUMN IF NOT EXISTS actual_reps VARCHAR(50)`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE workout_set_logs ADD COLUMN IF NOT EXISTS actual_load VARCHAR(50)`); err != nil {
+		return err
+	}
+	if _, err := Pool.Exec(ctx,
+		`ALTER TABLE workout_set_logs ADD COLUMN IF NOT EXISTS actual_rpe VARCHAR(50)`); err != nil {
 		return err
 	}
 

@@ -17,6 +17,7 @@ type WorkoutSession struct {
 	StartedAt    time.Time       `json:"started_at"`
 	CompletedAt  *time.Time      `json:"completed_at"`
 	Notes        string          `json:"notes"`
+	LogCount     int             `json:"log_count"`
 	Logs         []WorkoutSetLog `json:"logs,omitempty"`
 }
 

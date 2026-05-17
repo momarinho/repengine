@@ -2,6 +2,7 @@ package workoutsessions
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -41,7 +42,7 @@ func (r *Repository) StartSession(ctx context.Context, in StartSessionInput) (Wo
   			WHERE id = $1 AND user_id = $2
   		)
   		RETURNING id, workflow_id, user_id, section_id, section_title, status,
-  		          started_at, completed_at, notes
+  		          started_at, completed_at, notes, 0
 		`, in.WorkflowID, in.UserID, in.SectionID, in.SectionTitle, SessionStatusActive)
 
 	return scanWorkoutSession(row)
@@ -53,10 +54,16 @@ func (r *Repository) InsertSetLog(ctx context.Context, in InsertSetLogInput) (Wo
 			session_id,
 			workflow_block_id,
 			block_client_id,
+			block_position,
 			node_type_slug,
+			set_number,
 			set_index,
+			target_reps,
 			prescribed_reps,
+			target_load,
 			prescribed_load,
+			load_unit,
+			target_rpe,
 			prescribed_intensity,
 			prescribed_rpe,
 			actual_reps,
@@ -67,12 +74,13 @@ func (r *Repository) InsertSetLog(ctx context.Context, in InsertSetLogInput) (Wo
 		)
 		SELECT
 			$1, $2, $3, $4, $5, $6, $7, $8,
-			$9, $10, $11, $12, $13, $14
+			$9, $10, $11, $12, $13, $14, $15,
+			$16, $17, $18, $19, $20
 		WHERE EXISTS (
 			SELECT 1 FROM workout_sessions
 			WHERE id = $1
-			  AND user_id = $15
-			  AND status = $16
+			  AND user_id = $21
+			  AND status = $22
 		)
 		RETURNING id, session_id, workflow_block_id, block_client_id, node_type_slug,
 		          set_index, prescribed_reps, prescribed_load, prescribed_intensity,
@@ -82,10 +90,16 @@ func (r *Repository) InsertSetLog(ctx context.Context, in InsertSetLogInput) (Wo
 		in.SessionID,
 		in.WorkflowBlockID,
 		in.BlockClientID,
+		0,
 		in.NodeTypeSlug,
 		in.SetIndex,
+		in.SetIndex,
 		in.PrescribedReps,
+		in.PrescribedReps,
+		nil,
 		in.PrescribedLoad,
+		nil,
+		in.PrescribedRPE,
 		in.PrescribedIntensity,
 		in.PrescribedRPE,
 		in.ActualReps,
@@ -124,7 +138,8 @@ func (r *Repository) CompleteSession(ctx context.Context, sessionID, userID int,
 func (r *Repository) GetSession(ctx context.Context, sessionID, userID int) (WorkoutSession, error) {
 	row := r.pool.QueryRow(ctx, `
 		SELECT id, workflow_id, user_id, section_id, section_title, status,
-		       started_at, completed_at, notes
+		       started_at, completed_at, notes,
+		       (SELECT COUNT(*) FROM workout_set_logs WHERE session_id = workout_sessions.id) AS log_count
 		FROM workout_sessions
 		WHERE id = $1 AND user_id = $2
 	`, sessionID, userID)
@@ -182,7 +197,8 @@ func (r *Repository) ListSessions(
 ) (PaginatedWorkoutSessions, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, workflow_id, user_id, section_id, section_title, status,
-		       started_at, completed_at, notes
+		       started_at, completed_at, notes,
+		       (SELECT COUNT(*) FROM workout_set_logs WHERE session_id = workout_sessions.id) AS log_count
 		FROM workout_sessions
 		WHERE user_id = $1
 		  AND ($2 = 0 OR workflow_id = $2)
@@ -235,6 +251,7 @@ func scanWorkoutSession(row pgx.Row) (WorkoutSession, error) {
 		&session.StartedAt,
 		&session.CompletedAt,
 		&session.Notes,
+		&session.LogCount,
 	)
 	if err != nil {
 		return WorkoutSession{}, err
@@ -268,4 +285,8 @@ func scanWorkoutSetLog(row pgx.Row) (WorkoutSetLog, error) {
 	}
 
 	return log, nil
+}
+
+func IsNotFound(err error) bool {
+	return errors.Is(err, pgx.ErrNoRows)
 }

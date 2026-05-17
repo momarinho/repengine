@@ -80,6 +80,16 @@ func ErrWorkflowNotFound() *AppError {
 	return New(http.StatusNotFound, "WORKFLOW_NOT_FOUND", "Workflow not found")
 }
 
+// ErrWorkoutSessionNotFound returns a 404 Not Found AppError for missing workout sessions.
+func ErrWorkoutSessionNotFound() *AppError {
+	return New(http.StatusNotFound, "WORKOUT_SESSION_NOT_FOUND", "Workout session not found")
+}
+
+// ErrWorkoutSessionInactive returns a 409 Conflict AppError when a workout session is no longer active.
+func ErrWorkoutSessionInactive() *AppError {
+	return New(http.StatusConflict, "WORKOUT_SESSION_INACTIVE", "Workout session is not active")
+}
+
 // ErrBlockInvalid returns 422 Unprocessable Entity for invalid workflow block.
 // The provided message should describe the validation failure.
 func ErrBlockInvalid(msg string) *AppError {

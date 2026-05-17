@@ -29,6 +29,7 @@ export type WaveWeek = WaveStep & {
 
 export type PlayerBlock = {
 	id: string;
+	workflowBlockID?: number;
 	node_type_slug: PlayerBlockType;
 	title: string;
 	subtitle: string;

@@ -4,6 +4,7 @@
 	import { onMount, untrack } from 'svelte';
 	import type { PageData } from './$types';
 	import type { PlayerBlock, PlayerRoutine, PlayerSection } from '$lib/player/types';
+	import type { WorkoutSession, WorkoutSetLog } from '$lib/workout-sessions/types';
 
 	type SessionActivityKind = 'set' | 'round' | 'block' | 'timer';
 
@@ -29,6 +30,7 @@
 		notesByBlock: Record<string, string>;
 		sessionElapsedSeconds: number;
 		activeSectionID: string | null;
+		backendSessionID: number | null;
 		isChoosingSection: boolean;
 		isSessionComplete: boolean;
 		activityEntries: SessionActivity[];
@@ -68,6 +70,11 @@
 	let isSessionComplete = $state(false);
 	let activityEntries = $state<SessionActivity[]>([]);
 	let hasRestoredSession = $state(false);
+	let sessionHistory = $state<WorkoutSession[]>(initialData.sessionHistory ?? []);
+	let activePersistedSession = $state<WorkoutSession | null>(null);
+	let completedSessionSummary = $state<WorkoutSession | null>(null);
+	let isSyncingSession = $state(false);
+	let sessionError = $state<string | null>(null);
 
 	const currentBlock = $derived(routine?.blocks[currentBlockIndex] ?? null);
 	const activeSectionEndIndex = $derived(
@@ -112,6 +119,8 @@
 		Object.values(notesByBlock).filter((value) => value.trim().length > 0).length
 	);
 	const recentActivity = $derived(activityEntries.slice(-5).reverse());
+	const recentSessionHistory = $derived(sessionHistory.slice(0, 5));
+	const summarySetCount = $derived(completedSessionSummary?.log_count ?? loggedSetCount);
 
 	function getInitialTimerSeconds(block: PlayerBlock): number {
 		if (block.node_type_slug === 'rest' || block.node_type_slug === 'exercise_timed') {
@@ -153,6 +162,40 @@
 			hour: '2-digit',
 			minute: '2-digit'
 		});
+	}
+
+	function formatSessionDate(timestamp: string): string {
+		return new Date(timestamp).toLocaleString([], {
+			day: '2-digit',
+			month: 'short',
+			hour: '2-digit',
+			minute: '2-digit'
+		});
+	}
+
+	function formatSessionDuration(session: WorkoutSession): string {
+		if (!session.completed_at) return 'In progress';
+		const startedAt = new Date(session.started_at).getTime();
+		const completedAt = new Date(session.completed_at).getTime();
+		return formatClock(Math.max(Math.round((completedAt - startedAt) / 1000), 0));
+	}
+
+	function getPersistedSessionLabel(session: WorkoutSession | null): string {
+		if (!session) return 'Not started';
+		return `#${session.id} • ${session.status}`;
+	}
+
+	function buildSessionNotes(): string {
+		const notes = Object.entries(notesByBlock)
+			.map(([blockID, note]) => {
+				const trimmed = note.trim();
+				if (!trimmed) return null;
+				const blockTitle = routine?.blocks.find((block) => block.id === blockID)?.title ?? 'Block';
+				return `${blockTitle}: ${trimmed}`;
+			})
+			.filter((entry): entry is string => entry !== null);
+
+		return notes.join('\n');
 	}
 
 	function typeLabel(block: PlayerBlock): string {
@@ -250,6 +293,141 @@
 		}
 	}
 
+	async function parseApiResponse<T>(response: Response): Promise<T | null> {
+		try {
+			return (await response.json()) as T;
+		} catch {
+			return null;
+		}
+	}
+
+	function syncSessionHistory(session: WorkoutSession): void {
+		sessionHistory = [session, ...sessionHistory.filter((entry) => entry.id !== session.id)];
+	}
+
+	async function restorePersistedSession(sessionID: number): Promise<void> {
+		const response = await fetch(`/api/workout-sessions/${sessionID}`);
+		if (!response.ok) {
+			activePersistedSession = null;
+			completedSessionSummary = null;
+			return;
+		}
+
+		const session = await parseApiResponse<WorkoutSession>(response);
+		if (!session) return;
+
+		if (session.status === 'completed') {
+			completedSessionSummary = session;
+			activePersistedSession = null;
+			syncSessionHistory(session);
+			return;
+		}
+
+		activePersistedSession = session;
+	}
+
+	async function createPersistedSession(section: PlayerSection | null): Promise<WorkoutSession> {
+		const response = await fetch(`/api/workflows/${routine?.id}/sessions`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				section_id: section?.id ?? '',
+				section_title: section?.title ?? ''
+			})
+		});
+
+		const session = await parseApiResponse<WorkoutSession>(response);
+		if (!response.ok || !session) {
+			throw new Error('Unable to start workout session.');
+		}
+
+		return session;
+	}
+
+	function buildSetLogPayload(
+		block: PlayerBlock,
+		setIndex: number,
+		prescribedIntensity: string,
+		prescribedRPE: string
+	): Record<string, unknown> {
+		const prescribedLoad =
+			block.load !== undefined
+				? `${block.load}${block.loadUnit ? ` ${block.loadUnit}` : ''}`
+				: '';
+
+		return {
+			workflow_block_id: block.workflowBlockID ?? null,
+			block_client_id: block.id,
+			node_type_slug: block.node_type_slug,
+			set_index: setIndex,
+			prescribed_reps: block.reps ?? '',
+			prescribed_load: prescribedLoad,
+			prescribed_intensity: prescribedIntensity,
+			prescribed_rpe: prescribedRPE,
+			actual_reps: block.reps ?? '',
+			actual_load: prescribedLoad,
+			actual_rpe: prescribedRPE,
+			completed: true,
+			notes: notesByBlock[block.id] ?? ''
+		};
+	}
+
+	async function persistSetLog(block: PlayerBlock, payload: Record<string, unknown>): Promise<WorkoutSetLog> {
+		if (!activePersistedSession) {
+			throw new Error('No active workout session.');
+		}
+
+		const response = await fetch(`/api/workout-sessions/${activePersistedSession.id}/logs`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(payload)
+		});
+		const log = await parseApiResponse<WorkoutSetLog>(response);
+		if (!response.ok || !log) {
+			throw new Error('Unable to save set log.');
+		}
+
+		activePersistedSession = {
+			...activePersistedSession,
+			log_count: activePersistedSession.log_count + 1
+		};
+
+		return log;
+	}
+
+	async function completePersistedSession(): Promise<void> {
+		if (!activePersistedSession) return;
+
+		const response = await fetch(`/api/workout-sessions/${activePersistedSession.id}/complete`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				notes: buildSessionNotes()
+			})
+		});
+		const session = await parseApiResponse<WorkoutSession>(response);
+		if (!response.ok || !session) {
+			throw new Error('Unable to finalize workout session.');
+		}
+
+		completedSessionSummary = session;
+		activePersistedSession = null;
+		syncSessionHistory(session);
+	}
+
+	async function retryCompleteSession(): Promise<void> {
+		if (!activePersistedSession || isSyncingSession) return;
+		isSyncingSession = true;
+		sessionError = null;
+		try {
+			await completePersistedSession();
+		} catch (error: unknown) {
+			sessionError = error instanceof Error ? error.message : 'Unable to finalize workout session.';
+		} finally {
+			isSyncingSession = false;
+		}
+	}
+
 	function appendActivity(block: PlayerBlock, kind: SessionActivityKind, label: string, detail: string): void {
 		const note = notesByBlock[block.id]?.trim();
 		activityEntries = [
@@ -290,6 +468,8 @@
 		mobileQueueOpen = false;
 		isChoosingSection = chooserOpen;
 		isSessionComplete = false;
+		completedSessionSummary = null;
+		sessionError = null;
 	}
 
 	function clearLocalSession(): void {
@@ -297,7 +477,15 @@
 			localStorage.removeItem(localSessionKey);
 		}
 
-		resetRuntimeState(initialBlockIndex, initialSection, Boolean(routine?.sections.length) && !hasSectionQuery);
+		activePersistedSession = null;
+		completedSessionSummary = null;
+		sessionError = null;
+		const chooserOpen = Boolean(routine?.sections.length) && !hasSectionQuery;
+		const nextSection = activeSection ?? initialSection;
+		resetRuntimeState(initialBlockIndex, initialSection, chooserOpen);
+		if (!chooserOpen) {
+			void startSection(nextSection);
+		}
 	}
 
 	function markBlockCompleted(index: number): void {
@@ -328,6 +516,16 @@
 			isSessionComplete = true;
 			isTimerRunning = false;
 			clearIntraSetRest();
+			if (activePersistedSession) {
+				isSyncingSession = true;
+				void completePersistedSession()
+					.catch((error: unknown) => {
+						sessionError = error instanceof Error ? error.message : 'Unable to finalize workout session.';
+					})
+					.finally(() => {
+						isSyncingSession = false;
+					});
+			}
 			return;
 		}
 
@@ -345,9 +543,22 @@
 		goToBlock(currentBlockIndex - 1);
 	}
 
-	function startSection(section: PlayerSection | null): void {
-		const index = section?.startBlockIndex ?? 0;
-		resetRuntimeState(index, section, false);
+	async function startSection(section: PlayerSection | null): Promise<void> {
+		if (!routine || isSyncingSession) return;
+		isSyncingSession = true;
+		sessionError = null;
+
+		try {
+			const session = await createPersistedSession(section);
+			activePersistedSession = session;
+			completedSessionSummary = null;
+			const index = section?.startBlockIndex ?? 0;
+			resetRuntimeState(index, section, false);
+		} catch (error: unknown) {
+			sessionError = error instanceof Error ? error.message : 'Unable to start workout session.';
+		} finally {
+			isSyncingSession = false;
+		}
 	}
 
 	function startIntraSetRest(block: PlayerBlock, nextLabel: string): void {
@@ -367,8 +578,8 @@
 		isIntraSetRestRunning = false;
 	}
 
-	function runPrimaryAction(): void {
-		if (!currentBlock) return;
+	async function runPrimaryAction(): Promise<void> {
+		if (!currentBlock || isSyncingSession) return;
 		const block = currentBlock;
 
 		if (isRestingBetweenSets) {
@@ -380,6 +591,19 @@
 			case 'exercise':
 			case 'linear_progression': {
 				const currentSet = getCurrentSet(block);
+				isSyncingSession = true;
+				sessionError = null;
+				try {
+					await persistSetLog(
+						block,
+						buildSetLogPayload(block, currentSet, '', '')
+					);
+				} catch (error: unknown) {
+					sessionError = error instanceof Error ? error.message : 'Unable to save set log.';
+					isSyncingSession = false;
+					return;
+				}
+				isSyncingSession = false;
 				appendActivity(
 					block,
 					'set',
@@ -419,6 +643,30 @@
 				const currentSet = getCurrentWaveSetIndex(block);
 				const totalSets = block.waveSteps?.[block.activeWaveWeekIndex ?? 0]?.prescriptions.length ?? 1;
 				const prescription = block.waveSteps?.[block.activeWaveWeekIndex ?? 0]?.prescriptions[currentSet];
+				isSyncingSession = true;
+				sessionError = null;
+				try {
+					await persistSetLog(block, {
+						workflow_block_id: block.workflowBlockID ?? null,
+						block_client_id: block.id,
+						node_type_slug: block.node_type_slug,
+						set_index: currentSet + 1,
+						prescribed_reps: prescription?.reps ?? '',
+						prescribed_load: '',
+						prescribed_intensity: prescription?.intensity ?? '',
+						prescribed_rpe: prescription?.rpe ?? '',
+						actual_reps: prescription?.reps ?? '',
+						actual_load: '',
+						actual_rpe: prescription?.rpe ?? '',
+						completed: true,
+						notes: notesByBlock[block.id] ?? ''
+					});
+				} catch (error: unknown) {
+					sessionError = error instanceof Error ? error.message : 'Unable to save set log.';
+					isSyncingSession = false;
+					return;
+				}
+				isSyncingSession = false;
 				appendActivity(
 					block,
 					'set',
@@ -437,6 +685,30 @@
 			}
 			case 'repeat': {
 				const currentRound = getCurrentRound(block);
+				isSyncingSession = true;
+				sessionError = null;
+				try {
+					await persistSetLog(block, {
+						workflow_block_id: block.workflowBlockID ?? null,
+						block_client_id: block.id,
+						node_type_slug: block.node_type_slug,
+						set_index: currentRound,
+						prescribed_reps: block.reps ?? '',
+						prescribed_load: '',
+						prescribed_intensity: '',
+						prescribed_rpe: '',
+						actual_reps: block.reps ?? '',
+						actual_load: '',
+						actual_rpe: '',
+						completed: true,
+						notes: notesByBlock[block.id] ?? ''
+					});
+				} catch (error: unknown) {
+					sessionError = error instanceof Error ? error.message : 'Unable to save set log.';
+					isSyncingSession = false;
+					return;
+				}
+				isSyncingSession = false;
 				appendActivity(
 					block,
 					'round',
@@ -459,7 +731,7 @@
 	}
 
 	function runSecondaryAction(): void {
-		if (!currentBlock) return;
+		if (!currentBlock || isSyncingSession) return;
 		const block = currentBlock;
 
 		if (isRestingBetweenSets) {
@@ -499,12 +771,16 @@
 		const rawState = localStorage.getItem(localSessionKey);
 		if (!rawState) {
 			hasRestoredSession = true;
+			if (!isChoosingSection) {
+				void startSection(initialSection);
+			}
 			return;
 		}
 
 		try {
 			const savedState = JSON.parse(rawState) as PersistedPlayerState;
 			const savedSection = getSectionByID(savedState.activeSectionID);
+			const savedBackendSessionID = savedState.backendSessionID ?? null;
 			const blockIDs = new Set(routine.blocks.map((block) => block.id));
 			const sectionStart = savedSection?.startBlockIndex ?? 0;
 			const sectionEnd = savedSection
@@ -527,6 +803,11 @@
 			isSessionComplete = Boolean(savedState.isSessionComplete);
 			activityEntries = (savedState.activityEntries ?? []).filter((entry) => blockIDs.has(entry.blockID));
 			timerRemainingSeconds = getInitialTimerSeconds(routine.blocks[normalizedIndex]);
+			if (savedBackendSessionID) {
+				void restorePersistedSession(savedBackendSessionID).catch(() => {
+					sessionError = 'Unable to restore workout session.';
+				});
+			}
 		} catch {
 			localStorage.removeItem(localSessionKey);
 		}
@@ -600,6 +881,7 @@
 			notesByBlock,
 			sessionElapsedSeconds,
 			activeSectionID: activeSection?.id ?? null,
+			backendSessionID: activePersistedSession?.id ?? completedSessionSummary?.id ?? null,
 			isChoosingSection,
 			isSessionComplete,
 			activityEntries
@@ -640,18 +922,25 @@
 					<button
 						type="button"
 						class="rounded-md border border-outline-variant/20 bg-surface-container px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
-						onclick={() => startSection(null)}
+						onclick={() => void startSection(null)}
+						disabled={isSyncingSession}
 					>
-						Start from beginning
+						{isSyncingSession ? 'Starting...' : 'Start from beginning'}
 					</button>
 				</div>
+				{#if sessionError}
+					<div class="mb-6 rounded-xl border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
+						{sessionError}
+					</div>
+				{/if}
 
 				<div class="grid gap-4 md:grid-cols-2">
 					{#each routine.sections as section}
 						<button
 							type="button"
 							class="rounded-xl border border-outline-variant/20 bg-surface-container p-5 text-left transition-colors hover:border-primary/40 hover:bg-surface-container-high"
-							onclick={() => startSection(section)}
+							onclick={() => void startSection(section)}
+							disabled={isSyncingSession}
 						>
 							<div class="mb-5 flex items-start justify-between gap-4">
 								<div>
@@ -691,7 +980,7 @@
 					</div>
 					<div class="rounded-xl border border-white/5 bg-surface-container-low p-4 text-center">
 						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Sets</p>
-						<p class="mt-2 text-2xl font-bold text-on-surface">{loggedSetCount}</p>
+						<p class="mt-2 text-2xl font-bold text-on-surface">{summarySetCount}</p>
 					</div>
 					<div class="rounded-xl border border-white/5 bg-surface-container-low p-4 text-center">
 						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Notes</p>
@@ -702,7 +991,9 @@
 					<div class="mt-8 rounded-xl border border-white/5 bg-surface-container-low p-5">
 						<div class="flex items-center justify-between gap-4">
 							<h2 class="text-sm font-bold uppercase tracking-[0.18em] text-on-surface-variant">Recent activity</h2>
-							<span class="text-xs text-on-surface-variant">Local only</span>
+							<span class="text-xs text-on-surface-variant">
+								{completedSessionSummary ? getPersistedSessionLabel(completedSessionSummary) : 'Pending sync'}
+							</span>
 						</div>
 						<div class="mt-4 space-y-3">
 							{#each recentActivity as entry}
@@ -721,11 +1012,31 @@
 						</div>
 					</div>
 				{/if}
+				{#if completedSessionSummary}
+					<div class="mt-8 rounded-xl border border-white/5 bg-surface-container-low p-5">
+						<div class="flex flex-wrap items-center justify-between gap-4">
+							<div>
+								<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Persisted session</p>
+								<p class="mt-2 text-lg font-semibold text-on-surface">{getPersistedSessionLabel(completedSessionSummary)}</p>
+							</div>
+							<div class="text-right text-sm text-on-surface-variant">
+								<p>{formatSessionDate(completedSessionSummary.started_at)}</p>
+								<p>{formatSessionDuration(completedSessionSummary)}</p>
+							</div>
+						</div>
+					</div>
+				{/if}
+				{#if sessionError}
+					<div class="mt-8 rounded-xl border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
+						{sessionError}
+					</div>
+				{/if}
 				<div class="mt-8 flex flex-wrap justify-center gap-3">
 					<button
 						type="button"
 						class="rounded-md border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/15"
-						onclick={() => startSection(activeSection)}
+						onclick={() => void startSection(activeSection)}
+						disabled={isSyncingSession}
 					>
 						Restart section
 					</button>
@@ -733,9 +1044,20 @@
 						type="button"
 						class="rounded-md border border-outline-variant/20 bg-surface-container-high px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-highest"
 						onclick={() => (isChoosingSection = true)}
+						disabled={isSyncingSession}
 					>
 						Choose another section
 					</button>
+					{#if activePersistedSession && sessionError}
+						<button
+							type="button"
+							class="rounded-md border border-secondary/20 bg-secondary/10 px-4 py-2 text-sm font-semibold text-secondary transition-colors hover:bg-secondary/15"
+							onclick={() => void retryCompleteSession()}
+							disabled={isSyncingSession}
+						>
+							Retry session sync
+						</button>
+					{/if}
 					<button
 						type="button"
 						class="rounded-md border border-outline-variant/20 px-4 py-2 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
@@ -806,7 +1128,20 @@
 					{#if currentBlock.sectionSubtitle}
 						<p class="mt-1 text-xs text-on-surface-variant">{currentBlock.sectionSubtitle}</p>
 					{/if}
+					<div class="mt-3 flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em]">
+						<span class="rounded bg-surface-container-high px-2 py-1 text-on-surface-variant">
+							{activePersistedSession ? getPersistedSessionLabel(activePersistedSession) : 'No active backend session'}
+						</span>
+						{#if isSyncingSession}
+							<span class="rounded bg-primary/10 px-2 py-1 text-primary">Syncing</span>
+						{/if}
+					</div>
 				</div>
+				{#if sessionError}
+					<div class="mb-6 rounded-xl border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
+						{sessionError}
+					</div>
+				{/if}
 
 				<div class="rounded-2xl border border-white/5 bg-surface-container p-6 shadow-xl md:p-8">
 					<div class="mb-8 flex items-start justify-between gap-4">
@@ -1124,7 +1459,7 @@
 				</div>
 				<div class="mt-5 rounded-xl border border-white/5 bg-surface-container-low p-4">
 					<div class="flex items-center justify-between gap-3">
-						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Local mode</p>
+						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Session sync</p>
 						<button
 							type="button"
 							class="text-[10px] font-bold uppercase tracking-[0.18em] text-tertiary transition-colors hover:text-primary"
@@ -1134,7 +1469,13 @@
 						</button>
 					</div>
 					<p class="mt-2 text-xs text-on-surface-variant">
-						This run stays in the browser for now. No backend session has been created yet.
+						{#if activePersistedSession}
+							Persisted session {getPersistedSessionLabel(activePersistedSession)} is receiving new logs.
+						{:else if completedSessionSummary}
+							Last completed session {getPersistedSessionLabel(completedSessionSummary)} has been saved.
+						{:else}
+							Start a section to create a persisted workout session.
+						{/if}
 					</p>
 				</div>
 				{#if recentActivity.length > 0}
@@ -1154,6 +1495,30 @@
 						</div>
 					</div>
 				{/if}
+				<div class="mt-5">
+					<h4 class="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Recent sessions</h4>
+					<div class="space-y-3">
+						{#if recentSessionHistory.length === 0}
+							<div class="rounded-xl border border-white/5 bg-surface-container-low/50 p-3 text-xs text-on-surface-variant">
+								No persisted sessions for this workflow yet.
+							</div>
+						{:else}
+							{#each recentSessionHistory as session}
+								<div class="rounded-xl border border-white/5 bg-surface-container-low/50 p-3">
+									<div class="flex items-center justify-between gap-3">
+										<p class="truncate text-xs font-bold text-on-surface">{session.section_title || routine.name}</p>
+										<span class="text-[9px] uppercase tracking-[0.16em] text-on-surface-variant">{session.status}</span>
+									</div>
+									<p class="mt-1 text-[11px] text-on-surface-variant">{formatSessionDate(session.started_at)}</p>
+									<div class="mt-2 flex items-center justify-between gap-3 text-[11px] text-on-surface-variant">
+										<span>{session.log_count} logs</span>
+										<span>{formatSessionDuration(session)}</span>
+									</div>
+								</div>
+							{/each}
+						{/if}
+					</div>
+				</div>
 			</div>
 		</aside>
 	</main>
@@ -1164,7 +1529,7 @@
 				type="button"
 				class="flex h-12 w-12 items-center justify-center rounded-xl bg-surface-variant/20 text-on-surface-variant transition-all hover:bg-surface-variant/40 disabled:opacity-40"
 				onclick={goToPreviousBlock}
-				disabled={isFirstBlock}
+				disabled={isFirstBlock || isSyncingSession}
 			>
 				<span class="material-symbols-outlined">skip_previous</span>
 			</button>
@@ -1183,6 +1548,7 @@
 					type="button"
 					class="h-14 flex-1 rounded-2xl border border-white/10 bg-surface-bright/20 px-4 text-sm font-bold text-on-background transition-all hover:bg-surface-bright/40"
 					onclick={runSecondaryAction}
+					disabled={isSyncingSession}
 				>
 					{secondaryActionLabel}
 				</button>
@@ -1191,8 +1557,9 @@
 				type="button"
 				class="h-14 flex-[1.35] rounded-2xl bg-primary px-4 text-sm font-bold text-on-primary-fixed shadow-lg shadow-primary/10 transition-all hover:brightness-110 active:scale-[0.99]"
 				onclick={runPrimaryAction}
+				disabled={isSyncingSession}
 			>
-				{primaryActionLabel}
+				{isSyncingSession ? 'Saving...' : primaryActionLabel}
 			</button>
 		</div>
 
@@ -1201,6 +1568,7 @@
 				type="button"
 				class="flex h-12 w-12 items-center justify-center rounded-xl bg-surface-variant/20 text-on-surface-variant transition-all hover:bg-surface-variant/40 disabled:opacity-40"
 				onclick={goToNextBlock}
+				disabled={isSyncingSession}
 			>
 				<span class="material-symbols-outlined">skip_next</span>
 			</button>

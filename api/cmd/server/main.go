@@ -16,6 +16,7 @@ import (
 	"github.com/momarinho/rep_engine/internal/middleware"
 	templatesvc "github.com/momarinho/rep_engine/internal/templates"
 	workflowsvc "github.com/momarinho/rep_engine/internal/workflows"
+	workoutsessionsvc "github.com/momarinho/rep_engine/internal/workout_sessions"
 )
 
 var serverStartTime = time.Now()
@@ -58,6 +59,10 @@ func main() {
 	templateWorker := templatesvc.NewCloneWorker(templateRepo)
 	templateService := templatesvc.NewService(templateRepo, templateWorker)
 	handlers.SetTemplateService(templateService)
+
+	workoutSessionRepo := workoutsessionsvc.NewRepository(db.Pool)
+	workoutSessionService := workoutsessionsvc.NewService(workoutSessionRepo)
+	handlers.SetWorkoutSessionService(workoutSessionService)
 
 	app := fiber.New()
 
@@ -111,6 +116,8 @@ func main() {
 	workflows.Delete("/:id", handlers.DeleteWorkflow)
 	workflows.Post("/:id/versions", handlers.CreateVersion)
 	workflows.Get("/:id/versions", handlers.ListVersions)
+	workflows.Get("/:id/sessions", handlers.ListWorkoutSessions)
+	workflows.Post("/:id/sessions", handlers.StartWorkoutSession)
 
 	templates := app.Group("/templates", middleware.RequireAuth)
 	templates.Get("/", handlers.ListTemplates)
@@ -119,6 +126,11 @@ func main() {
 
 	cloneJobs := app.Group("/clone-jobs", middleware.RequireAuth)
 	cloneJobs.Get("/:id", handlers.GetCloneJob)
+
+	workoutSessions := app.Group("/workout-sessions", middleware.RequireAuth)
+	workoutSessions.Get("/:id", handlers.GetWorkoutSession)
+	workoutSessions.Post("/:id/logs", handlers.CreateWorkoutSetLog)
+	workoutSessions.Post("/:id/complete", handlers.CompleteWorkoutSession)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
