@@ -33,6 +33,8 @@
 
 	let activeTab = $state<'editor' | 'preview' | 'history'>('editor');
 	let showAddBlock = $state(false);
+	let addBlockInsertIndex = $state(0);
+	let addBlockPlacementLabel = $state('');
 	let title = $state('');
 	let description = $state('');
 	let isPublic = $state(false);
@@ -58,11 +60,25 @@
 	const waveWeeks = [1, 2, 3, 4, 5, 6] as const;
 
 	function initializeFromWorkflow(next: Workflow): void {
+		const previousSelectedIndex =
+			selectedBlockId === null ? -1 : blocks.findIndex((block) => block.client_id === selectedBlockId);
+		const shouldPreserveAddBlockContext = showAddBlock;
+		const previousInsertIndex = addBlockInsertIndex;
+		const previousPlacementLabel = addBlockPlacementLabel;
+		const nextBlocks = (next.blocks ?? []).map((block, index) => toDraftBlock(block, index));
+
 		title = next.name;
 		description = next.description;
 		isPublic = next.is_public;
-		blocks = (next.blocks ?? []).map((block, index) => toDraftBlock(block, index));
-		selectedBlockId = blocks[0]?.client_id ?? null;
+		blocks = nextBlocks;
+		selectedBlockId =
+			previousSelectedIndex >= 0 && previousSelectedIndex < nextBlocks.length
+				? nextBlocks[previousSelectedIndex]?.client_id ?? null
+				: nextBlocks[0]?.client_id ?? null;
+		addBlockInsertIndex = shouldPreserveAddBlockContext
+			? Math.max(0, Math.min(previousInsertIndex, nextBlocks.length))
+			: nextBlocks.length;
+		addBlockPlacementLabel = shouldPreserveAddBlockContext ? previousPlacementLabel : '';
 		updatedAt = next.updated_at;
 		lastSavedFingerprint = saveFingerprint();
 	}
@@ -116,11 +132,71 @@
 		});
 	}
 
-	function addBlock(nodeType: NodeType): void {
-		const newBlock = defaultBlockForNodeType(nodeType, blocks.length);
-		blocks = [...blocks, newBlock].map((block, index) => ({ ...block, position: index }));
-		selectedBlockId = newBlock.client_id;
+	function normalizeInsertIndex(index: number): number {
+		return Math.max(0, Math.min(index, blocks.length));
+	}
+
+	function closeAddBlockModal(): void {
 		showAddBlock = false;
+		addBlockInsertIndex = blocks.length;
+		addBlockPlacementLabel = '';
+	}
+
+	function blockInsertLabel(block: DraftBlock): string {
+		if (block.node_type_slug === 'section') {
+			const title =
+				typeof block.data.title === 'string' && block.data.title.trim() !== ''
+					? block.data.title.trim()
+					: typeof block.data.label === 'string' && block.data.label.trim() !== ''
+						? block.data.label.trim()
+						: '';
+			return title || 'this section';
+		}
+
+		if (typeof block.data.exercise_name === 'string' && block.data.exercise_name.trim() !== '') {
+			return block.data.exercise_name.trim();
+		}
+
+		return nodeTypeMap.get(block.node_type_slug)?.name ?? blockLabel(block.node_type_slug);
+	}
+
+	function openAddBlockModal(index: number, placementLabel: string): void {
+		addBlockInsertIndex = normalizeInsertIndex(index);
+		addBlockPlacementLabel = placementLabel;
+		showAddBlock = true;
+	}
+
+	function openAddAtStart(): void {
+		openAddBlockModal(0, 'Insert at the start of this routine');
+	}
+
+	function openAddAfterBlock(clientId: string): void {
+		const index = blocks.findIndex((block) => block.client_id === clientId);
+		if (index < 0) {
+			openAddBlockModal(blocks.length, 'Insert at the end of this routine');
+			return;
+		}
+
+		openAddBlockModal(index + 1, `Insert after ${blockInsertLabel(blocks[index])}`);
+	}
+
+	function openAddFromToolbar(): void {
+		if (!selectedBlockId) {
+			openAddBlockModal(blocks.length, 'Insert at the end of this routine');
+			return;
+		}
+
+		openAddAfterBlock(selectedBlockId);
+	}
+
+	function addBlock(nodeType: NodeType): void {
+		const insertIndex = normalizeInsertIndex(addBlockInsertIndex);
+		const newBlock = defaultBlockForNodeType(nodeType, insertIndex);
+		const nextBlocks = [...blocks];
+		nextBlocks.splice(insertIndex, 0, newBlock);
+		blocks = nextBlocks.map((block, index) => ({ ...block, position: index }));
+		selectedBlockId = newBlock.client_id;
+		closeAddBlockModal();
 	}
 
 	function removeSelectedBlock(): void {
@@ -459,10 +535,10 @@
 						<button
 							type="button"
 							class="inline-flex items-center gap-2 rounded-md border border-outline-variant/20 bg-surface-container px-3 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
-							onclick={() => (showAddBlock = true)}
+							onclick={openAddFromToolbar}
 						>
 							<span class="material-symbols-outlined text-base">add</span>
-							Add Block
+							{selectedBlock ? 'Add After Selected' : 'Add Block'}
 						</button>
 					</div>
 
@@ -473,7 +549,7 @@
 							<button
 								type="button"
 								class="mt-6 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-on-primary-fixed transition-opacity hover:opacity-90"
-								onclick={() => (showAddBlock = true)}
+								onclick={openAddAtStart}
 							>
 								<span class="material-symbols-outlined text-base">add</span>
 								Add first block
@@ -481,6 +557,15 @@
 						</div>
 					{:else}
 						<div class="space-y-4">
+							<button
+								type="button"
+								class="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface-variant transition-colors hover:border-primary/40 hover:bg-surface-container hover:text-on-surface"
+								onclick={openAddAtStart}
+							>
+								<span class="material-symbols-outlined text-base">add</span>
+								Add block at the start
+							</button>
+
 							{#each blockGroups as group (group.id)}
 								<div class="rounded-md border border-outline-variant/20 bg-surface-container-low p-3">
 									{#if group.section}
@@ -529,7 +614,18 @@
 													</button>
 												</div>
 
-												<button type="button" class="min-w-0 flex-1 text-left" onclick={() => selectBlock(block.client_id)}>
+												<div
+													role="button"
+													tabindex="0"
+													class="min-w-0 flex-1 cursor-pointer text-left"
+													onclick={() => selectBlock(block.client_id)}
+													onkeydown={(event) => {
+														if (event.key === 'Enter' || event.key === ' ') {
+															event.preventDefault();
+															selectBlock(block.client_id);
+														}
+													}}
+												>
 													<div class="mb-3 flex items-center justify-between gap-4">
 														<div class="flex items-center gap-3">
 															<div class="flex h-10 w-10 items-center justify-center rounded-md bg-surface-container-high text-primary">
@@ -544,12 +640,25 @@
 																</p>
 															</div>
 														</div>
-														<span class="rounded bg-surface-container-high px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-															#{index + 1}
-														</span>
+														<div class="flex items-center gap-2">
+															<span class="rounded bg-surface-container-high px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
+																#{index + 1}
+															</span>
+															<button
+																type="button"
+																class="inline-flex items-center gap-1 rounded-md border border-outline-variant/20 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+																onclick={(event) => {
+																	event.stopPropagation();
+																	openAddAfterBlock(block.client_id);
+																}}
+															>
+																<span class="material-symbols-outlined text-sm">add</span>
+																Below
+															</button>
+														</div>
 													</div>
 													<BlockRenderer block={block} nodeType={nodeTypeMap.get(block.node_type_slug)} />
-												</button>
+												</div>
 
 												<button
 													type="button"
@@ -617,7 +726,18 @@
 															</button>
 														</div>
 
-														<button type="button" class="min-w-0 flex-1 text-left" onclick={() => selectBlock(block.client_id)}>
+														<div
+															role="button"
+															tabindex="0"
+															class="min-w-0 flex-1 cursor-pointer text-left"
+															onclick={() => selectBlock(block.client_id)}
+															onkeydown={(event) => {
+																if (event.key === 'Enter' || event.key === ' ') {
+																	event.preventDefault();
+																	selectBlock(block.client_id);
+																}
+															}}
+														>
 															<div class="mb-3 flex items-center justify-between gap-4">
 																<div class="flex items-center gap-3">
 																	<div class="flex h-10 w-10 items-center justify-center rounded-md bg-surface-container-high text-primary">
@@ -634,12 +754,25 @@
 																		</p>
 																	</div>
 																</div>
-																<span class="rounded bg-surface-container-high px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-																	#{index + 1}
-																</span>
+																<div class="flex items-center gap-2">
+																	<span class="rounded bg-surface-container-high px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
+																		#{index + 1}
+																	</span>
+																	<button
+																		type="button"
+																		class="inline-flex items-center gap-1 rounded-md border border-outline-variant/20 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+																		onclick={(event) => {
+																			event.stopPropagation();
+																			openAddAfterBlock(block.client_id);
+																		}}
+																	>
+																		<span class="material-symbols-outlined text-sm">add</span>
+																		Below
+																	</button>
+																</div>
 															</div>
 															<BlockRenderer block={block} nodeType={nodeTypeMap.get(block.node_type_slug)} />
-														</button>
+														</div>
 													</div>
 												</li>
 											{/each}
@@ -1163,6 +1296,12 @@
 			</aside>
 		</div>
 
-		<AddBlockModal open={showAddBlock} {nodeTypes} onclose={() => (showAddBlock = false)} onselect={addBlock} />
+		<AddBlockModal
+			open={showAddBlock}
+			{nodeTypes}
+			placementLabel={addBlockPlacementLabel}
+			onclose={closeAddBlockModal}
+			onselect={addBlock}
+		/>
 	</div>
 {/if}

@@ -6,11 +6,12 @@
 	type Props = {
 		open: boolean;
 		nodeTypes: NodeType[];
+		placementLabel?: string;
 		onclose: () => void;
 		onselect: (nodeType: NodeType) => void;
 	};
 
-	let { open, nodeTypes, onclose, onselect }: Props = $props();
+	let { open, nodeTypes, placementLabel = '', onclose, onselect }: Props = $props();
 
 	function handleBackdrop(event: MouseEvent): void {
 		if (event.target === event.currentTarget) {
@@ -33,7 +34,9 @@
 			<div class="flex items-center justify-between border-b border-outline-variant/20 px-6 py-4">
 				<div>
 					<h2 class="font-headline text-xl font-semibold text-on-surface">Add Block</h2>
-					<p class="text-sm text-on-surface-variant">All available node types are loaded from the API.</p>
+					<p class="text-sm text-on-surface-variant">
+						{placementLabel ? `${placementLabel}. ` : ''}All available node types are loaded from the API.
+					</p>
 				</div>
 				<button
 					type="button"

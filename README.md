@@ -29,6 +29,7 @@ The workout player now creates persistent workout sessions and set logs in the b
 - Workflow CRUD
 - Workflow version history
 - Block editor with `section`, `exercise`, `linear_progression`, `wave`, `repeat`, `rest`, and `exercise_timed`
+- Contextual block insertion in the editor (start of routine, after selected, below any block)
 - Templates catalog
 - Template cloning with clone-job polling
 - Workout player V1
@@ -229,6 +230,7 @@ Status: `PASS` (`p95 < 200ms`)
 - Sprint 7: autoregulation and progression state
 - Sprint 8: deploy hardening
 - Sprint 9: critical hotfix
+- Sprint 9.5: block editor insertion UX
 
 ### Not completed yet
 
@@ -279,4 +281,5 @@ Known issues that don't block current functionality but need to be addressed bef
 - Session hardening includes active-session reuse, deduplicated set logging, and migration locking.
 - Sprint 7 progression is intentionally simple: it is based on completed logs plus `RPE/RIR`, not on advanced readiness modeling.
 - Sprint 8 introduced production Docker hardening: multi-stage Dockerfiles with non-root users, `docker-compose.prod.yml` and `docker-compose.staging.yml`, Nginx with TLS termination, Prometheus + Grafana, and operational scripts under `scripts/`.
+- Sprint 9.5 improved block editor UX: new blocks can be inserted at the start of the routine, after the selected block, or directly below any existing block instead of always appending to the end.
 - The progression state `block_key` format is `sectionTitle::nodeTypeSlug::exerciseName::occurrence`. Renaming a section will orphan its progression history — this is a known limitation tracked in the roadmap.
