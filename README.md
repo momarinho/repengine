@@ -9,7 +9,8 @@ The project currently delivers:
 - workflow versioning
 - official templates with async clone jobs
 - a persistent workout player for section-based execution
- - basic progression state and autoregulation suggestions
+- basic progression state and autoregulation suggestions
+- schema hardening for workout/session/progression data
 
 The workout player now creates persistent workout sessions and set logs in the backend, keeps local browser state for in-progress UX, and derives simple next-session progression suggestions from real logs.
 
@@ -37,7 +38,8 @@ The workout player now creates persistent workout sessions and set logs in the b
 - Workout player 5.5 local runtime
 - Workout sessions and set logging
 - Session reliability hardening
- - Progression states and simple autoregulation
+- Progression states and simple autoregulation
+- Schema hardening with constraints, FK cleanup, and canonical numeric metrics
 
 ### Workout player 6 / 6.5 / 7
 
@@ -163,6 +165,12 @@ From `api/`:
 go test ./...
 ```
 
+If your local Go toolchain defaults to `cgo` and no C compiler is installed, run:
+
+```bash
+CGO_ENABLED=0 go test ./...
+```
+
 Integration tests require a reachable PostgreSQL database.
 If `DATABASE_URL` is not exported, the tests attempt to load `api/.env`.
 
@@ -233,6 +241,7 @@ Status: `PASS` (`p95 < 200ms`)
 - Sprint 9: critical hotfix
 - Sprint 9.5: block editor insertion UX
 - Sprint 10: security hardening
+- Sprint 11: schema hardening
 
 ### Not completed yet
 
@@ -259,7 +268,6 @@ Features not yet started:
 
 | Sprint | Theme | Scope |
 |--------|-------|-------|
-| **11** | **Schema Hardening** | CHECK constraints on status/enum columns, missing FK constraints, missing indexes, convert numeric columns from `VARCHAR` to `NUMERIC`, soft deletes on workflows/users |
 | **12** | **API Quality & Tests** | Handler-level tests with `fiber.Test()`, auth service/repository pattern, fix service singleton injection, fix silent progression error swallowing, `CreateVersion` race condition |
 | **13** | **Frontend Bug Fixes** | Fix dashboard filter, fix auth guard token validation, versions proxy GET handler, per-user localStorage key, PersistedState migration, player timer, autosave UI state |
 | **14** | **Account & History** | Password reset, account settings page, workout history, basic volume analytics, session abandonment, set log editing, version restore |
@@ -271,7 +279,7 @@ Features not yet started:
 
 Known issues that don't block current functionality but need to be addressed before scaling:
 
-- **Fitness data stored as `VARCHAR`.** Columns like `actual_reps`, `actual_load`, `actual_rpe`, and `current_load` are `VARCHAR(50)` in the schema. This prevents any database-level aggregation or analytics queries. Sprint 11 converts these to `NUMERIC`.
+- **Raw fitness fields remain text-first.** User-facing fields like `actual_load`, `actual_rpe`, and `current_load` remain `VARCHAR(50)` to preserve entries such as `100 kg`, ranges, and mixed notation. Sprint 11 added canonical numeric companion columns for analytics, but a future pass may still normalize the wider data model.
 - **No CI pipeline.** There are no automated build or test workflows. Broken changes can reach production silently. Sprint 15 addresses this.
 - **Auth handler bypasses the service/repository pattern.** Every other domain has a clean service/repo interface; auth talks directly to `db.Pool`. Addressed in Sprint 12.
 - **Global service singletons.** Services are injected via package-level setter functions (`SetWorkflowService`, etc.), which prevents parallel test execution. Addressed in Sprint 12.
@@ -284,4 +292,5 @@ Known issues that don't block current functionality but need to be addressed bef
 - Sprint 8 introduced production Docker hardening: multi-stage Dockerfiles with non-root users, `docker-compose.prod.yml` and `docker-compose.staging.yml`, Nginx with TLS termination, Prometheus + Grafana, and operational scripts under `scripts/`.
 - Sprint 9.5 improved block editor UX: new blocks can be inserted at the start of the routine, after the selected block, or directly below any existing block instead of always appending to the end.
 - Sprint 10 hardened auth and API security with environment-aware secure cookies, logout-driven token invalidation, CORS policy enforcement, auth endpoint rate limiting, register input validation, and JWT issuer/audience claims.
+- Sprint 11 hardened the schema with status/outcome/state `CHECK` constraints, missing FKs, targeted indexes, and canonical numeric columns alongside the existing raw text fitness fields.
 - The progression state `block_key` format is `sectionTitle::nodeTypeSlug::exerciseName::occurrence`. Renaming a section will orphan its progression history — this is a known limitation tracked in the roadmap.

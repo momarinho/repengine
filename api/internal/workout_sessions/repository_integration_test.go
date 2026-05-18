@@ -148,3 +148,47 @@ func TestRepositoryInsertSetLog_AcceptsNilWorkflowBlockID(t *testing.T) {
 		t.Fatalf("expected nil workflow_block_id, got %+v", log.WorkflowBlockID)
 	}
 }
+
+func TestRepositoryInsertSetLog_PopulatesCanonicalNumericColumns(t *testing.T) {
+	repo, pool := newIntegrationWorkoutSessionRepo(t)
+	userID, _, workflowBlockID, sessionID := createWorkoutSessionFixture(t, pool)
+
+	log, err := repo.InsertSetLog(context.Background(), InsertSetLogInput{
+		UserID:              userID,
+		SessionID:           sessionID,
+		WorkflowBlockID:     &workflowBlockID,
+		BlockClientID:       "canonical-metrics",
+		NodeTypeSlug:        "wave",
+		SetIndex:            1,
+		PrescribedReps:      "5",
+		PrescribedIntensity: "65",
+		PrescribedRPE:       "7",
+		ActualReps:          "5",
+		ActualLoad:          "100 kg",
+		ActualRPE:           "8.5",
+		ActualRIR:           "1.5",
+		Completed:           true,
+	})
+	if err != nil {
+		t.Fatalf("InsertSetLog failed: %v", err)
+	}
+
+	var actualLoadValue, actualRPEValue, actualRIRValue float64
+	if err := pool.QueryRow(context.Background(), `
+		SELECT actual_load_value, actual_rpe_value, actual_rir_value
+		FROM workout_set_logs
+		WHERE id = $1
+	`, log.ID).Scan(&actualLoadValue, &actualRPEValue, &actualRIRValue); err != nil {
+		t.Fatalf("query canonical log values: %v", err)
+	}
+
+	if actualLoadValue != 100 {
+		t.Fatalf("expected actual_load_value 100, got %v", actualLoadValue)
+	}
+	if actualRPEValue != 8.5 {
+		t.Fatalf("expected actual_rpe_value 8.5, got %v", actualRPEValue)
+	}
+	if actualRIRValue != 1.5 {
+		t.Fatalf("expected actual_rir_value 1.5, got %v", actualRIRValue)
+	}
+}

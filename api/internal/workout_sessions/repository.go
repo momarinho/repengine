@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/momarinho/rep_engine/internal/fitness"
 )
 
 type Repository struct {
@@ -79,6 +80,10 @@ func (r *Repository) GetActiveSessionByWorkflow(ctx context.Context, userID, wor
 }
 
 func (r *Repository) InsertSetLog(ctx context.Context, in InsertSetLogInput) (WorkoutSetLog, error) {
+	actualLoadValue := fitness.OptionalFirstNumberString(in.ActualLoad)
+	actualRPEValue := fitness.OptionalFirstNumberString(in.ActualRPE)
+	actualRIRValue := fitness.OptionalFirstNumberString(in.ActualRIR)
+
 	row := r.pool.QueryRow(ctx, `
 		INSERT INTO workout_set_logs (
 			session_id,
@@ -94,18 +99,23 @@ func (r *Repository) InsertSetLog(ctx context.Context, in InsertSetLogInput) (Wo
 			actual_load,
 			actual_rpe,
 			actual_rir,
+			actual_load_value,
+			actual_rpe_value,
+			actual_rir_value,
 			completed,
 			notes
 		)
 		SELECT
 			$1, $2, $3, $4, $5,
 			$6, $7, $8, $9,
-			$10, $11, $12, $13, $14, $15
+			$10, $11, $12, $13,
+			$14, $15, $16,
+			$17, $18
 		WHERE EXISTS (
 			SELECT 1 FROM workout_sessions
 			WHERE id = $1
-			  AND user_id = $16
-			  AND status = $17
+			  AND user_id = $19
+			  AND status = $20
 		)
 		ON CONFLICT (session_id, block_client_id, set_index)
 		WHERE block_client_id IS NOT NULL AND block_client_id <> ''
@@ -120,6 +130,9 @@ func (r *Repository) InsertSetLog(ctx context.Context, in InsertSetLogInput) (Wo
 			actual_load          = EXCLUDED.actual_load,
 			actual_rpe           = EXCLUDED.actual_rpe,
 			actual_rir           = EXCLUDED.actual_rir,
+			actual_load_value    = EXCLUDED.actual_load_value,
+			actual_rpe_value     = EXCLUDED.actual_rpe_value,
+			actual_rir_value     = EXCLUDED.actual_rir_value,
 			completed            = EXCLUDED.completed,
 			notes                = EXCLUDED.notes
 		RETURNING id, session_id, workflow_block_id, block_client_id, node_type_slug,
@@ -142,10 +155,13 @@ func (r *Repository) InsertSetLog(ctx context.Context, in InsertSetLogInput) (Wo
 		in.ActualLoad,          // $11
 		in.ActualRPE,           // $12
 		in.ActualRIR,           // $13
-		in.Completed,           // $14
-		in.Notes,               // $15
-		in.UserID,              // $16
-		SessionStatusActive,    // $17
+		actualLoadValue,        // $14
+		actualRPEValue,         // $15
+		actualRIRValue,         // $16
+		in.Completed,           // $17
+		in.Notes,               // $18
+		in.UserID,              // $19
+		SessionStatusActive,    // $20
 	)
 
 	return scanWorkoutSetLog(row)

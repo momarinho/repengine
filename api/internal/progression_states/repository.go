@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/momarinho/rep_engine/internal/fitness"
 )
 
 type Repository struct {
@@ -103,6 +104,12 @@ func (r *Repository) UpsertProgressionState(ctx context.Context, in UpsertProgre
 		return ProgressionState{}, err
 	}
 
+	currentLoadValue := fitness.OptionalFirstNumberString(in.CurrentLoad)
+	suggestedLoadValue := fitness.OptionalFirstNumberString(in.SuggestedLoad)
+	suggestedIntensityOffsetValue := fitness.OptionalFirstNumberString(in.SuggestedIntensityOffset)
+	avgActualRPEValue := fitness.OptionalFirstNumberString(in.AvgActualRPE)
+	avgActualRIRValue := fitness.OptionalFirstNumberString(in.AvgActualRIR)
+
 	row := r.pool.QueryRow(ctx, `
 		INSERT INTO progression_states (
 			user_id,
@@ -118,8 +125,13 @@ func (r *Repository) UpsertProgressionState(ctx context.Context, in UpsertProgre
 			current_week,
 			suggested_week,
 			suggested_intensity_offset,
+			current_load_value,
+			suggested_load_value,
+			suggested_intensity_offset_value,
 			avg_actual_rpe,
 			avg_actual_rir,
+			avg_actual_rpe_value,
+			avg_actual_rir_value,
 			last_session_id,
 			last_log_count,
 			summary,
@@ -127,8 +139,8 @@ func (r *Repository) UpsertProgressionState(ctx context.Context, in UpsertProgre
 		)
 		VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-			NULLIF($11, 0), NULLIF($12, 0), $13, $14, $15, NULLIF($16, 0),
-			$17, $18, $19
+			NULLIF($11, 0), NULLIF($12, 0), $13, $14, $15, $16, $17, $18, $19, $20,
+			NULLIF($21, 0), $22, $23, $24
 		)
 		ON CONFLICT (user_id, workflow_id, block_key)
 		DO UPDATE SET
@@ -142,8 +154,13 @@ func (r *Repository) UpsertProgressionState(ctx context.Context, in UpsertProgre
 			current_week = EXCLUDED.current_week,
 			suggested_week = EXCLUDED.suggested_week,
 			suggested_intensity_offset = EXCLUDED.suggested_intensity_offset,
+			current_load_value = EXCLUDED.current_load_value,
+			suggested_load_value = EXCLUDED.suggested_load_value,
+			suggested_intensity_offset_value = EXCLUDED.suggested_intensity_offset_value,
 			avg_actual_rpe = EXCLUDED.avg_actual_rpe,
 			avg_actual_rir = EXCLUDED.avg_actual_rir,
+			avg_actual_rpe_value = EXCLUDED.avg_actual_rpe_value,
+			avg_actual_rir_value = EXCLUDED.avg_actual_rir_value,
 			last_session_id = EXCLUDED.last_session_id,
 			last_log_count = EXCLUDED.last_log_count,
 			summary = EXCLUDED.summary,
@@ -158,8 +175,9 @@ func (r *Repository) UpsertProgressionState(ctx context.Context, in UpsertProgre
 		          last_log_count, COALESCE(summary, ''), metadata, created_at, updated_at
 	`, in.UserID, in.WorkflowID, in.WorkflowBlockID, in.BlockKey, in.NodeTypeSlug, in.StateType,
 		in.ExerciseName, in.Outcome, in.CurrentLoad, in.SuggestedLoad, in.CurrentWeek,
-		in.SuggestedWeek, in.SuggestedIntensityOffset, in.AvgActualRPE, in.AvgActualRIR,
-		in.LastSessionID, in.LastLogCount, in.Summary, metadataJSON)
+		in.SuggestedWeek, in.SuggestedIntensityOffset, currentLoadValue, suggestedLoadValue,
+		suggestedIntensityOffsetValue, in.AvgActualRPE, in.AvgActualRIR, avgActualRPEValue,
+		avgActualRIRValue, in.LastSessionID, in.LastLogCount, in.Summary, metadataJSON)
 
 	return scanProgressionState(row)
 }
