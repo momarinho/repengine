@@ -1,11 +1,11 @@
 package middleware
 
 import (
-	"os"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/momarinho/rep_engine/internal/authn"
+	"github.com/momarinho/rep_engine/internal/db"
 	apperrors "github.com/momarinho/rep_engine/internal/errors"
 )
 
@@ -27,26 +27,24 @@ func RequireAuth(c *fiber.Ctx) error {
 		return apperrors.WriteAppError(c, apperrors.ErrUnauthorized())
 	}
 
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, apperrors.ErrUnauthorized()
-		}
-		return []byte(os.Getenv("JWT_SECRET")), nil
-	})
-	if err != nil || !token.Valid {
+	claims, err := authn.ParseToken(tokenString)
+	if err != nil {
 		return apperrors.WriteAppError(c, apperrors.ErrUnauthorized())
 	}
 
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
+	var tokenVersion int
+	err = db.Pool.QueryRow(c.Context(),
+		`SELECT token_version FROM users WHERE id = $1`,
+		claims.UserID,
+	).Scan(&tokenVersion)
+	if err != nil {
+		return apperrors.WriteAppError(c, apperrors.ErrUnauthorized())
+	}
+	if tokenVersion != claims.TokenVersion {
 		return apperrors.WriteAppError(c, apperrors.ErrUnauthorized())
 	}
 
-	userIDValue, ok := claims["user_id"].(float64)
-	if !ok {
-		return apperrors.WriteAppError(c, apperrors.ErrUnauthorized())
-	}
-
-	c.Locals("user_id", int(userIDValue))
+	c.Locals("user_id", claims.UserID)
+	c.Locals("token_version", claims.TokenVersion)
 	return c.Next()
 }

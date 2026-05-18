@@ -16,7 +16,7 @@ type Config struct {
 	Port        string // default "8080"
 	AppEnv      string // default "development"
 	LogLevel    string // default "info"
-	CORSOrigins string // default "*"
+	CORSOrigins string // default development localhost origins
 	Version     string // injected at build time via ldflags
 	BuildTime   string // injected at build time via ldflags
 }
@@ -68,7 +68,7 @@ func Load(version, buildTime string) (*Config, error) {
 
 	corsOrigins := os.Getenv("CORS_ORIGINS")
 	if corsOrigins == "" {
-		corsOrigins = "*"
+		corsOrigins = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173"
 	}
 
 	return &Config{

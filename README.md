@@ -25,6 +25,7 @@ The workout player now creates persistent workout sessions and set logs in the b
 ### Implemented
 
 - Auth: register, login, logout
+- Auth security hardening: secure cookies by environment, logout token invalidation, CORS, auth rate limiting, register validation, JWT issuer/audience claims
 - Node types API
 - Workflow CRUD
 - Workflow version history
@@ -231,6 +232,7 @@ Status: `PASS` (`p95 < 200ms`)
 - Sprint 8: deploy hardening
 - Sprint 9: critical hotfix
 - Sprint 9.5: block editor insertion UX
+- Sprint 10: security hardening
 
 ### Not completed yet
 
@@ -257,7 +259,6 @@ Features not yet started:
 
 | Sprint | Theme | Scope |
 |--------|-------|-------|
-| **10** | **Security** | Cookie `Secure` flag, logout token invalidation, CORS middleware, auth rate limiting, register input validation, JWT issuer/audience claims |
 | **11** | **Schema Hardening** | CHECK constraints on status/enum columns, missing FK constraints, missing indexes, convert numeric columns from `VARCHAR` to `NUMERIC`, soft deletes on workflows/users |
 | **12** | **API Quality & Tests** | Handler-level tests with `fiber.Test()`, auth service/repository pattern, fix service singleton injection, fix silent progression error swallowing, `CreateVersion` race condition |
 | **13** | **Frontend Bug Fixes** | Fix dashboard filter, fix auth guard token validation, versions proxy GET handler, per-user localStorage key, PersistedState migration, player timer, autosave UI state |
@@ -282,4 +283,5 @@ Known issues that don't block current functionality but need to be addressed bef
 - Sprint 7 progression is intentionally simple: it is based on completed logs plus `RPE/RIR`, not on advanced readiness modeling.
 - Sprint 8 introduced production Docker hardening: multi-stage Dockerfiles with non-root users, `docker-compose.prod.yml` and `docker-compose.staging.yml`, Nginx with TLS termination, Prometheus + Grafana, and operational scripts under `scripts/`.
 - Sprint 9.5 improved block editor UX: new blocks can be inserted at the start of the routine, after the selected block, or directly below any existing block instead of always appending to the end.
+- Sprint 10 hardened auth and API security with environment-aware secure cookies, logout-driven token invalidation, CORS policy enforcement, auth endpoint rate limiting, register input validation, and JWT issuer/audience claims.
 - The progression state `block_key` format is `sectionTitle::nodeTypeSlug::exerciseName::occurrence`. Renaming a section will orphan its progression history — this is a known limitation tracked in the roadmap.

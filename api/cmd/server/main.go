@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 	fiberrecover "github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/momarinho/rep_engine/internal/config"
@@ -89,6 +90,12 @@ func main() {
 	app.Use(fiberrecover.New(fiberrecover.Config{
 		EnableStackTrace: true,
 	}))
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     cfg.CORSOrigins,
+		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
+		AllowHeaders:     "Origin,Content-Type,Accept,Authorization",
+		AllowCredentials: true,
+	}))
 	app.Use(middleware.RequestID())
 	app.Use(middleware.TimeoutMiddleware(10 * time.Second))
 	app.Use(limiter.New(limiter.Config{
@@ -129,9 +136,9 @@ func main() {
 	})
 
 	auth := app.Group("/auth")
-	auth.Post("/register", handlers.Register)
-	auth.Post("/login", handlers.Login)
-	auth.Post("/logout", handlers.Logout)
+	auth.Post("/register", middleware.AuthRateLimit(5, time.Minute), handlers.Register)
+	auth.Post("/login", middleware.AuthRateLimit(10, time.Minute), handlers.Login)
+	auth.Post("/logout", middleware.RequireAuth, handlers.Logout)
 	app.Get("/node-types", handlers.GetNodeTypes)
 	app.Get("/node-types/:slug", handlers.GetNodeTypeBySlug)
 
