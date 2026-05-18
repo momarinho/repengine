@@ -184,7 +184,7 @@ npm run check
 
 ### Manual validation
 
-Recommended Sprint 7 validation:
+Recommended Sprint 12 validation:
 
 - start a section and confirm a session is created
 - log a few sets with `actual reps`, `actual load`, `actual RPE`, and `actual RIR`
@@ -195,6 +195,8 @@ Recommended Sprint 7 validation:
 - for `linear_progression`, confirm the suggested next load changes after an easy vs hard session
 - for `wave`, confirm the suggested week or intensity offset changes after an easy vs hard session
 - for skill-like blocks, confirm the suggestion can stay / advance / regress based on logged effort and reps
+- confirm auth register/login/logout still work and logout invalidates the previous token
+- create workflow versions back-to-back and confirm version numbers remain sequential
 
 ### Workflow update benchmark
 
@@ -242,6 +244,7 @@ Status: `PASS` (`p95 < 200ms`)
 - Sprint 9.5: block editor insertion UX
 - Sprint 10: security hardening
 - Sprint 11: schema hardening
+- Sprint 12: API quality and tests
 
 ### Not completed yet
 
@@ -263,15 +266,16 @@ Features not yet started:
 - dark/light mode toggle (CSS tokens defined, toggle not wired)
 - complex autoregulation (training-max logic, readiness modeling)
 - analytics and charts
+- external database hosting for staging/production (for example OCI VM or managed PostgreSQL)
 
 ## Roadmap
 
 | Sprint | Theme | Scope |
 |--------|-------|-------|
-| **12** | **API Quality & Tests** | Handler-level tests with `fiber.Test()`, auth service/repository pattern, fix service singleton injection, fix silent progression error swallowing, `CreateVersion` race condition |
 | **13** | **Frontend Bug Fixes** | Fix dashboard filter, fix auth guard token validation, versions proxy GET handler, per-user localStorage key, PersistedState migration, player timer, autosave UI state |
 | **14** | **Account & History** | Password reset, account settings page, workout history, basic volume analytics, session abandonment, set log editing, version restore |
 | **15** | **CI/CD** | GitHub Actions (lint, test, build, push), migration testing on fresh DB, branch protection, `CONTRIBUTING.md`, `LICENSE`, OpenAPI spec |
+| **15.5** | **Cloud Infrastructure** | External PostgreSQL host for staging/production (for example OCI VM or managed PostgreSQL), private networking, backup/restore, secret management, migration runbook |
 | **16** | **Observability** | Prometheus alerting rules, `node_exporter`, `postgres_exporter`, Grafana dashboard JSON, nginx rate limiting, CSP header, TLS certificate automation |
 | **17** | **Accessibility & PWA** | ARIA roles/labels, modal focus trap, keyboard drag-and-drop, undo/redo, Service Worker offline support, background sync |
 
@@ -281,8 +285,7 @@ Known issues that don't block current functionality but need to be addressed bef
 
 - **Raw fitness fields remain text-first.** User-facing fields like `actual_load`, `actual_rpe`, and `current_load` remain `VARCHAR(50)` to preserve entries such as `100 kg`, ranges, and mixed notation. Sprint 11 added canonical numeric companion columns for analytics, but a future pass may still normalize the wider data model.
 - **No CI pipeline.** There are no automated build or test workflows. Broken changes can reach production silently. Sprint 15 addresses this.
-- **Auth handler bypasses the service/repository pattern.** Every other domain has a clean service/repo interface; auth talks directly to `db.Pool`. Addressed in Sprint 12.
-- **Global service singletons.** Services are injected via package-level setter functions (`SetWorkflowService`, etc.), which prevents parallel test execution. Addressed in Sprint 12.
+- **Node types are still loaded as process-local cache.** This is fine for current scale, but cache invalidation and runtime refresh are still manual.
 
 ## Important Notes
 
@@ -293,4 +296,6 @@ Known issues that don't block current functionality but need to be addressed bef
 - Sprint 9.5 improved block editor UX: new blocks can be inserted at the start of the routine, after the selected block, or directly below any existing block instead of always appending to the end.
 - Sprint 10 hardened auth and API security with environment-aware secure cookies, logout-driven token invalidation, CORS policy enforcement, auth endpoint rate limiting, register input validation, and JWT issuer/audience claims.
 - Sprint 11 hardened the schema with status/outcome/state `CHECK` constraints, missing FKs, targeted indexes, and canonical numeric columns alongside the existing raw text fitness fields.
+- Sprint 12 moved auth into a dedicated service/repository layer, replaced handler package singletons with explicit dependency wiring, added handler-level Fiber tests, surfaced progression failures on session completion, and serialized workflow version creation to avoid duplicate version numbers.
+- Planned infrastructure work keeps local development on Docker Compose while moving staging/production database hosting to dedicated cloud infrastructure such as an OCI VM or managed PostgreSQL.
 - The progression state `block_key` format is `sectionTitle::nodeTypeSlug::exerciseName::occurrence`. Renaming a section will orphan its progression history — this is a known limitation tracked in the roadmap.

@@ -12,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 	fiberrecover "github.com/gofiber/fiber/v2/middleware/recover"
+	authnsvc "github.com/momarinho/rep_engine/internal/authn"
 	"github.com/momarinho/rep_engine/internal/config"
 	"github.com/momarinho/rep_engine/internal/db"
 	"github.com/momarinho/rep_engine/internal/handlers"
@@ -63,27 +64,37 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := handlers.LoadNodeTypesCache(context.Background()); err != nil {
+	nodeTypesCache, err := handlers.LoadNodeTypesCache(context.Background(), db.Pool)
+	if err != nil {
 		slog.Error("failed to load node types cache", "err", err)
 		os.Exit(1)
 	}
 
+	authRepo := authnsvc.NewRepository(db.Pool)
+	authService := authnsvc.NewService(authRepo)
+
 	workflowRepo := workflowsvc.NewRepository(db.Pool)
 	workflowService := workflowsvc.NewService(workflowRepo)
-	handlers.SetWorkflowService(workflowService)
 
 	templateRepo := templatesvc.NewRepository(db.Pool)
 	templateWorker := templatesvc.NewCloneWorker(templateRepo)
 	templateService := templatesvc.NewService(templateRepo, templateWorker)
-	handlers.SetTemplateService(templateService)
 
 	progressionStateRepo := progressionstatesvc.NewRepository(db.Pool)
 	progressionStateService := progressionstatesvc.NewService(progressionStateRepo)
-	handlers.SetProgressionStateService(progressionStateService)
 
 	workoutSessionRepo := workoutsessionsvc.NewRepository(db.Pool)
 	workoutSessionService := workoutsessionsvc.NewService(workoutSessionRepo, progressionStateService)
-	handlers.SetWorkoutSessionService(workoutSessionService)
+
+	h := handlers.NewApp(handlers.Dependencies{
+		Auth:            authService,
+		Workflows:       workflowService,
+		Templates:       templateService,
+		Progression:     progressionStateService,
+		WorkoutSessions: workoutSessionService,
+		NodeTypes:       nodeTypesCache,
+	})
+	requireAuth := middleware.RequireAuth(authService)
 
 	app := fiber.New()
 
@@ -136,36 +147,36 @@ func main() {
 	})
 
 	auth := app.Group("/auth")
-	auth.Post("/register", middleware.AuthRateLimit(5, time.Minute), handlers.Register)
-	auth.Post("/login", middleware.AuthRateLimit(10, time.Minute), handlers.Login)
-	auth.Post("/logout", middleware.RequireAuth, handlers.Logout)
-	app.Get("/node-types", handlers.GetNodeTypes)
-	app.Get("/node-types/:slug", handlers.GetNodeTypeBySlug)
+	auth.Post("/register", middleware.AuthRateLimit(5, time.Minute), h.Register)
+	auth.Post("/login", middleware.AuthRateLimit(10, time.Minute), h.Login)
+	auth.Post("/logout", requireAuth, h.Logout)
+	app.Get("/node-types", h.GetNodeTypes)
+	app.Get("/node-types/:slug", h.GetNodeTypeBySlug)
 
-	workflows := app.Group("/workflows", middleware.RequireAuth)
-	workflows.Get("/", handlers.ListWorkflows)
-	workflows.Post("/", handlers.CreateWorkflow)
-	workflows.Get("/:id", handlers.GetWorkflow)
-	workflows.Put("/:id", handlers.UpdateWorkflow)
-	workflows.Delete("/:id", handlers.DeleteWorkflow)
-	workflows.Post("/:id/versions", handlers.CreateVersion)
-	workflows.Get("/:id/versions", handlers.ListVersions)
-	workflows.Get("/:id/sessions", handlers.ListWorkoutSessions)
-	workflows.Post("/:id/sessions", handlers.StartWorkoutSession)
-	workflows.Get("/:id/progression-states", handlers.ListProgressionStates)
+	workflows := app.Group("/workflows", requireAuth)
+	workflows.Get("/", h.ListWorkflows)
+	workflows.Post("/", h.CreateWorkflow)
+	workflows.Get("/:id", h.GetWorkflow)
+	workflows.Put("/:id", h.UpdateWorkflow)
+	workflows.Delete("/:id", h.DeleteWorkflow)
+	workflows.Post("/:id/versions", h.CreateVersion)
+	workflows.Get("/:id/versions", h.ListVersions)
+	workflows.Get("/:id/sessions", h.ListWorkoutSessions)
+	workflows.Post("/:id/sessions", h.StartWorkoutSession)
+	workflows.Get("/:id/progression-states", h.ListProgressionStates)
 
-	templates := app.Group("/templates", middleware.RequireAuth)
-	templates.Get("/", handlers.ListTemplates)
-	templates.Get("/:id", handlers.GetTemplate)
-	templates.Post("/:id/clone", handlers.CloneTemplate)
+	templates := app.Group("/templates", requireAuth)
+	templates.Get("/", h.ListTemplates)
+	templates.Get("/:id", h.GetTemplate)
+	templates.Post("/:id/clone", h.CloneTemplate)
 
-	cloneJobs := app.Group("/clone-jobs", middleware.RequireAuth)
-	cloneJobs.Get("/:id", handlers.GetCloneJob)
+	cloneJobs := app.Group("/clone-jobs", requireAuth)
+	cloneJobs.Get("/:id", h.GetCloneJob)
 
-	workoutSessions := app.Group("/workout-sessions", middleware.RequireAuth)
-	workoutSessions.Get("/:id", handlers.GetWorkoutSession)
-	workoutSessions.Post("/:id/logs", handlers.CreateWorkoutSetLog)
-	workoutSessions.Post("/:id/complete", handlers.CompleteWorkoutSession)
+	workoutSessions := app.Group("/workout-sessions", requireAuth)
+	workoutSessions.Get("/:id", h.GetWorkoutSession)
+	workoutSessions.Post("/:id/logs", h.CreateWorkoutSetLog)
+	workoutSessions.Post("/:id/complete", h.CompleteWorkoutSession)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)

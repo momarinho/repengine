@@ -15,12 +15,6 @@ type TemplateBlock = templatesvc.TemplateBlock
 type CloneJob = templatesvc.CloneJob
 type PaginatedTemplates = templatesvc.PaginatedTemplates
 
-var templateService *templatesvc.Service
-
-func SetTemplateService(s *templatesvc.Service) {
-	templateService = s
-}
-
 func parseTemplateID(c *fiber.Ctx) (int, error) {
 	templateID := c.Params("id")
 	id, err := strconv.Atoi(templateID)
@@ -39,11 +33,11 @@ func parseCloneJobID(c *fiber.Ctx) (int, error) {
 	return id, nil
 }
 
-func ListTemplates(c *fiber.Ctx) error {
+func (a *App) ListTemplates(c *fiber.Ctx) error {
 	ctx, cancel := withTimeout(c.UserContext())
 	defer cancel()
 
-	if templateService == nil {
+	if a.templates == nil {
 		return apperrors.WriteAppError(c, apperrors.ErrInternal())
 	}
 
@@ -55,18 +49,18 @@ func ListTemplates(c *fiber.Ctx) error {
 		Limit:    c.QueryInt("limit", 20),
 	}
 
-	out, err := templateService.ListTemplates(ctx, in)
+	out, err := a.templates.ListTemplates(ctx, in)
 	if err != nil {
 		return apperrors.WriteAppError(c, err)
 	}
 	return c.JSON(out)
 }
 
-func GetTemplate(c *fiber.Ctx) error {
+func (a *App) GetTemplate(c *fiber.Ctx) error {
 	ctx, cancel := withTimeout(c.UserContext())
 	defer cancel()
 
-	if templateService == nil {
+	if a.templates == nil {
 		return apperrors.WriteAppError(c, apperrors.ErrInternal())
 	}
 
@@ -81,7 +75,7 @@ func GetTemplate(c *fiber.Ctx) error {
 		TemplateID: templateID,
 	}
 
-	out, err := templateService.GetTemplate(ctx, in)
+	out, err := a.templates.GetTemplate(ctx, in)
 	if err != nil {
 		return apperrors.WriteAppError(c, err)
 	}
@@ -89,11 +83,11 @@ func GetTemplate(c *fiber.Ctx) error {
 	return c.JSON(out)
 }
 
-func CloneTemplate(c *fiber.Ctx) error {
+func (a *App) CloneTemplate(c *fiber.Ctx) error {
 	ctx, cancel := withTimeout(c.UserContext())
 	defer cancel()
 
-	if templateService == nil {
+	if a.templates == nil {
 		return apperrors.WriteAppError(c, apperrors.ErrInternal())
 	}
 
@@ -114,7 +108,7 @@ func CloneTemplate(c *fiber.Ctx) error {
 		IdempotencyKey: key,
 	}
 
-	job, err := templateService.CloneTemplate(ctx, in)
+	job, err := a.templates.CloneTemplate(ctx, in)
 	if err != nil {
 		return apperrors.WriteAppError(c, err)
 	}
@@ -125,11 +119,11 @@ func CloneTemplate(c *fiber.Ctx) error {
 	})
 }
 
-func GetCloneJob(c *fiber.Ctx) error {
+func (a *App) GetCloneJob(c *fiber.Ctx) error {
 	ctx, cancel := withTimeout(c.UserContext())
 	defer cancel()
 
-	if templateService == nil {
+	if a.templates == nil {
 		return apperrors.WriteAppError(c, apperrors.ErrInternal())
 	}
 
@@ -144,7 +138,7 @@ func GetCloneJob(c *fiber.Ctx) error {
 		JobID:  jobID,
 	}
 
-	out, err := templateService.GetCloneJob(ctx, in)
+	out, err := a.templates.GetCloneJob(ctx, in)
 	if err != nil {
 		return apperrors.WriteAppError(c, err)
 	}

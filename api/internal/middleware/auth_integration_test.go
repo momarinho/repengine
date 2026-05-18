@@ -85,9 +85,15 @@ func TestLogoutInvalidatesBearerToken(t *testing.T) {
 		t.Fatalf("SignToken returned error: %v", err)
 	}
 
+	authService := authn.NewService(authn.NewRepository(db.Pool))
+	h := handlers.NewApp(handlers.Dependencies{
+		Auth: authService,
+	})
+	requireAuth := RequireAuth(authService)
+
 	app := fiber.New()
-	app.Post("/auth/logout", RequireAuth, handlers.Logout)
-	app.Get("/protected", RequireAuth, func(c *fiber.Ctx) error {
+	app.Post("/auth/logout", requireAuth, h.Logout)
+	app.Get("/protected", requireAuth, func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"ok": true})
 	})
 

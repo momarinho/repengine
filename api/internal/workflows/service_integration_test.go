@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -198,6 +200,65 @@ func fetchWorkflowBlocks(t *testing.T, pool *pgxpool.Pool, workflowID int) []Wor
 	}
 
 	return blocks
+}
+
+func TestRepositoryCreateVersion_AssignsUniqueSequentialNumbersConcurrently(t *testing.T) {
+	ctx := context.Background()
+	_, pool := newIntegrationService(t)
+	repo := NewRepository(pool)
+
+	userID := createTestUser(t, pool, "version-race")
+	workflowID, _ := createWorkflowFixture(t, pool, userID)
+
+	const totalVersions = 6
+
+	var wg sync.WaitGroup
+	errCh := make(chan error, totalVersions)
+	versionCh := make(chan int, totalVersions)
+
+	for i := range totalVersions {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			version, err := repo.CreateVersion(ctx, workflowID, fmt.Sprintf("commit-%d", i), map[string]any{
+				"name": fmt.Sprintf("snapshot-%d", i),
+			})
+			if err != nil {
+				errCh <- err
+				return
+			}
+
+			versionCh <- version.VersionNumber
+		}(i)
+	}
+
+	wg.Wait()
+	close(errCh)
+	close(versionCh)
+
+	for err := range errCh {
+		if err != nil {
+			t.Fatalf("CreateVersion returned error: %v", err)
+		}
+	}
+
+	versionNumbers := make([]int, 0, totalVersions)
+	for number := range versionCh {
+		versionNumbers = append(versionNumbers, number)
+	}
+
+	if len(versionNumbers) != totalVersions {
+		t.Fatalf("expected %d versions, got %d", totalVersions, len(versionNumbers))
+	}
+
+	sort.Ints(versionNumbers)
+	for i, number := range versionNumbers {
+		expected := i + 1
+		if number != expected {
+			t.Fatalf("expected version number %d at index %d, got %d", expected, i, number)
+		}
+	}
 }
 
 func TestServiceCreateWorkflow_RollsBackWhenInsertBlocksFails(t *testing.T) {

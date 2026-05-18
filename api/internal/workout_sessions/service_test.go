@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	apperrors "github.com/momarinho/rep_engine/internal/errors"
+	progressionstates "github.com/momarinho/rep_engine/internal/progression_states"
 )
 
 type fakeRepo struct {
@@ -19,6 +20,17 @@ type fakeRepo struct {
 	listSessionLogsFunc  func(ctx context.Context, sessionID int) ([]WorkoutSetLog, error)
 	listSessionsFunc     func(ctx context.Context, userID, workflowID int, cursor int64, limit int) (PaginatedWorkoutSessions, error)
 	userOwnsWorkflowFunc func(ctx context.Context, userID, workflowID int) (bool, error)
+}
+
+type fakeProgressionApplier struct {
+	applyFunc func(ctx context.Context, in progressionstates.ApplySessionProgressionInput) error
+}
+
+func (f *fakeProgressionApplier) ApplySessionProgression(ctx context.Context, in progressionstates.ApplySessionProgressionInput) error {
+	if f.applyFunc == nil {
+		panic("unexpected call to ApplySessionProgression")
+	}
+	return f.applyFunc(ctx, in)
 }
 
 func (f *fakeRepo) StartSession(ctx context.Context, in StartSessionInput) (WorkoutSession, error) {
@@ -247,6 +259,49 @@ func TestServiceCompleteSession_ReturnsUpdatedSession(t *testing.T) {
 	}
 	if out.LogCount != 4 {
 		t.Fatalf("expected log count 4, got %d", out.LogCount)
+	}
+}
+
+func TestServiceCompleteSession_ReturnsErrorWhenProgressionFails(t *testing.T) {
+	ctx := context.Background()
+
+	repo := &fakeRepo{
+		completeSessionFunc: func(ctx context.Context, sessionID, userID int, notes string) error {
+			return nil
+		},
+		getSessionFunc: func(ctx context.Context, sessionID, userID int) (WorkoutSession, error) {
+			return WorkoutSession{
+				ID:         sessionID,
+				UserID:     userID,
+				WorkflowID: 17,
+				Status:     SessionStatusCompleted,
+				Logs: []WorkoutSetLog{
+					{
+						ID:           1,
+						NodeTypeSlug: "linear_progression",
+						SetIndex:     1,
+						Completed:    true,
+					},
+				},
+			}, nil
+		},
+	}
+
+	service := NewService(repo, &fakeProgressionApplier{
+		applyFunc: func(ctx context.Context, in progressionstates.ApplySessionProgressionInput) error {
+			return errors.New("boom")
+		},
+	})
+
+	_, err := service.CompleteSession(ctx, CompleteSessionInput{
+		UserID:    7,
+		SessionID: 11,
+		Notes:     "done",
+	})
+
+	appErr := requireAppError(t, err)
+	if appErr.Code != "INTERNAL_ERROR" {
+		t.Fatalf("expected INTERNAL_ERROR, got %s", appErr.Code)
 	}
 }
 

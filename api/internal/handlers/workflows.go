@@ -37,12 +37,6 @@ type CreateVersionRequest struct {
 	Snapshot      map[string]any `json:"snapshot"`
 }
 
-var workflowService *workflowsvc.Service
-
-func SetWorkflowService(s *workflowsvc.Service) {
-	workflowService = s
-}
-
 func withTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, 3*time.Second)
 }
@@ -56,11 +50,11 @@ func parseWorkflowID(c *fiber.Ctx) (int, error) {
 	return id, nil
 }
 
-func ListWorkflows(c *fiber.Ctx) error {
+func (a *App) ListWorkflows(c *fiber.Ctx) error {
 	ctx, cancel := withTimeout(c.UserContext())
 	defer cancel()
 
-	if workflowService == nil {
+	if a.workflows == nil {
 		return apperrors.WriteAppError(c, apperrors.ErrInternal())
 	}
 
@@ -71,7 +65,7 @@ func ListWorkflows(c *fiber.Ctx) error {
 		Limit:  c.QueryInt("limit", 20),
 	}
 
-	out, err := workflowService.ListWorkflows(ctx, in)
+	out, err := a.workflows.ListWorkflows(ctx, in)
 	if err != nil {
 		return apperrors.WriteAppError(c, err)
 	}
@@ -79,11 +73,11 @@ func ListWorkflows(c *fiber.Ctx) error {
 	return c.JSON(out)
 }
 
-func CreateWorkflow(c *fiber.Ctx) error {
+func (a *App) CreateWorkflow(c *fiber.Ctx) error {
 	ctx, cancel := withTimeout(c.UserContext())
 	defer cancel()
 
-	if workflowService == nil {
+	if a.workflows == nil {
 		return apperrors.WriteAppError(c, apperrors.ErrInternal())
 	}
 
@@ -102,7 +96,7 @@ func CreateWorkflow(c *fiber.Ctx) error {
 		Blocks:      req.Blocks,
 	}
 
-	out, err := workflowService.CreateWorkflow(ctx, in)
+	out, err := a.workflows.CreateWorkflow(ctx, in)
 	if err != nil {
 		return apperrors.WriteAppError(c, err)
 	}
@@ -110,11 +104,11 @@ func CreateWorkflow(c *fiber.Ctx) error {
 	return c.Status(201).JSON(out)
 }
 
-func GetWorkflow(c *fiber.Ctx) error {
+func (a *App) GetWorkflow(c *fiber.Ctx) error {
 	ctx, cancel := withTimeout(c.UserContext())
 	defer cancel()
 
-	if workflowService == nil {
+	if a.workflows == nil {
 		return apperrors.WriteAppError(c, apperrors.ErrInternal())
 	}
 
@@ -129,7 +123,7 @@ func GetWorkflow(c *fiber.Ctx) error {
 		WorkflowID: workflowID,
 	}
 
-	out, err := workflowService.GetWorkflow(ctx, in)
+	out, err := a.workflows.GetWorkflow(ctx, in)
 	if err != nil {
 		return apperrors.WriteAppError(c, err)
 	}
@@ -137,11 +131,11 @@ func GetWorkflow(c *fiber.Ctx) error {
 	return c.JSON(out)
 }
 
-func UpdateWorkflow(c *fiber.Ctx) error {
+func (a *App) UpdateWorkflow(c *fiber.Ctx) error {
 	ctx, cancel := withTimeout(c.UserContext())
 	defer cancel()
 
-	if workflowService == nil {
+	if a.workflows == nil {
 		return apperrors.WriteAppError(c, apperrors.ErrInternal())
 	}
 
@@ -171,7 +165,7 @@ func UpdateWorkflow(c *fiber.Ctx) error {
 		Blocks:      req.Blocks,
 	}
 
-	out, err := workflowService.UpdateWorkflow(ctx, in)
+	out, err := a.workflows.UpdateWorkflow(ctx, in)
 	if err != nil {
 		return apperrors.WriteAppError(c, err)
 	}
@@ -179,11 +173,11 @@ func UpdateWorkflow(c *fiber.Ctx) error {
 	return c.JSON(out)
 }
 
-func DeleteWorkflow(c *fiber.Ctx) error {
+func (a *App) DeleteWorkflow(c *fiber.Ctx) error {
 	ctx, cancel := withTimeout(c.UserContext())
 	defer cancel()
 
-	if workflowService == nil {
+	if a.workflows == nil {
 		return apperrors.WriteAppError(c, apperrors.ErrInternal())
 	}
 
@@ -198,18 +192,18 @@ func DeleteWorkflow(c *fiber.Ctx) error {
 		WorkflowID: workflowID,
 	}
 
-	if err := workflowService.DeleteWorkflow(ctx, in); err != nil {
+	if err := a.workflows.DeleteWorkflow(ctx, in); err != nil {
 		return apperrors.WriteAppError(c, err)
 	}
 
 	return c.SendStatus(204)
 }
 
-func CreateVersion(c *fiber.Ctx) error {
+func (a *App) CreateVersion(c *fiber.Ctx) error {
 	ctx, cancel := withTimeout(c.UserContext())
 	defer cancel()
 
-	if workflowService == nil {
+	if a.workflows == nil {
 		return apperrors.WriteAppError(c, apperrors.ErrInternal())
 	}
 
@@ -231,7 +225,7 @@ func CreateVersion(c *fiber.Ctx) error {
 		Snapshot:      req.Snapshot,
 	}
 
-	out, err := workflowService.CreateVersion(ctx, in)
+	out, err := a.workflows.CreateVersion(ctx, in)
 	if err != nil {
 		return apperrors.WriteAppError(c, err)
 	}
@@ -239,11 +233,11 @@ func CreateVersion(c *fiber.Ctx) error {
 	return c.Status(201).JSON(out)
 }
 
-func ListVersions(c *fiber.Ctx) error {
+func (a *App) ListVersions(c *fiber.Ctx) error {
 	ctx, cancel := withTimeout(c.UserContext())
 	defer cancel()
 
-	if workflowService == nil {
+	if a.workflows == nil {
 		return apperrors.WriteAppError(c, apperrors.ErrInternal())
 	}
 
@@ -260,7 +254,7 @@ func ListVersions(c *fiber.Ctx) error {
 		Limit:      c.QueryInt("limit", 20),
 	}
 
-	out, err := workflowService.ListVersions(ctx, in)
+	out, err := a.workflows.ListVersions(ctx, in)
 	if err != nil {
 		return apperrors.WriteAppError(c, err)
 	}

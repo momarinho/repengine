@@ -6,7 +6,7 @@ import (
 	"sort"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/momarinho/rep_engine/internal/db"
+	"github.com/jackc/pgx/v5"
 	apperrors "github.com/momarinho/rep_engine/internal/errors"
 )
 
@@ -19,33 +19,40 @@ type NodeType struct {
 	Schema      map[string]any `json:"schema"`
 }
 
-var nodeTypesCache map[string]NodeType
+type nodeTypeQueryer interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}
 
-func LoadNodeTypesCache(ctx context.Context) error {
-	rows, err := db.Pool.Query(ctx, `SELECT id, slug, name, description, icon, schema FROM node_types`)
+func LoadNodeTypesCache(ctx context.Context, q nodeTypeQueryer) (map[string]NodeType, error) {
+	rows, err := q.Query(ctx, `SELECT id, slug, name, description, icon, schema FROM node_types`)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer rows.Close()
 
-	nodeTypesCache = make(map[string]NodeType)
+	nodeTypes := make(map[string]NodeType)
 	for rows.Next() {
 		var nt NodeType
 		var schemaJSON []byte
 		if err := rows.Scan(&nt.ID, &nt.Slug, &nt.Name, &nt.Description, &nt.Icon, &schemaJSON); err != nil {
-			return err
+			return nil, err
 		}
 		if err := json.Unmarshal(schemaJSON, &nt.Schema); err != nil {
-			return err
+			return nil, err
 		}
-		nodeTypesCache[nt.Slug] = nt
+		nodeTypes[nt.Slug] = nt
 	}
-	return nil
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return nodeTypes, nil
 }
 
-func GetNodeTypes(c *fiber.Ctx) error {
-	types := make([]NodeType, 0, len(nodeTypesCache))
-	for _, nt := range nodeTypesCache {
+func (a *App) GetNodeTypes(c *fiber.Ctx) error {
+	types := make([]NodeType, 0, len(a.nodeTypes))
+	for _, nt := range a.nodeTypes {
 		types = append(types, nt)
 	}
 
@@ -56,9 +63,9 @@ func GetNodeTypes(c *fiber.Ctx) error {
 	return c.JSON(types)
 }
 
-func GetNodeTypeBySlug(c *fiber.Ctx) error {
+func (a *App) GetNodeTypeBySlug(c *fiber.Ctx) error {
 	slug := c.Params("slug")
-	nt, ok := nodeTypesCache[slug]
+	nt, ok := a.nodeTypes[slug]
 	if !ok {
 		return apperrors.WriteAppError(c, apperrors.New(fiber.StatusNotFound, "NOT_FOUND", "Node type not found"))
 	}

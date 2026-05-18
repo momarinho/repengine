@@ -144,12 +144,14 @@ func (s *Service) CompleteSession(ctx context.Context, in CompleteSessionInput) 
 				Notes:               log.Notes,
 			})
 		}
-		_ = s.progression.ApplySessionProgression(ctx, progressionstates.ApplySessionProgressionInput{
+		if err := s.progression.ApplySessionProgression(ctx, progressionstates.ApplySessionProgressionInput{
 			UserID:     in.UserID,
 			WorkflowID: session.WorkflowID,
 			SessionID:  session.ID,
 			Logs:       logs,
-		})
+		}); err != nil {
+			return WorkoutSession{}, apperrors.ErrInternal()
+		}
 	}
 
 	return session, nil

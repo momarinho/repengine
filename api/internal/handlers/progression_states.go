@@ -8,17 +8,11 @@ import (
 
 type ProgressionState = progressionstatesvc.ProgressionState
 
-var progressionStateService *progressionstatesvc.Service
-
-func SetProgressionStateService(s *progressionstatesvc.Service) {
-	progressionStateService = s
-}
-
-func ListProgressionStates(c *fiber.Ctx) error {
+func (a *App) ListProgressionStates(c *fiber.Ctx) error {
 	ctx, cancel := withTimeout(c.UserContext())
 	defer cancel()
 
-	if progressionStateService == nil {
+	if a.progression == nil {
 		return apperrors.WriteAppError(c, apperrors.ErrInternal())
 	}
 
@@ -28,7 +22,7 @@ func ListProgressionStates(c *fiber.Ctx) error {
 		return apperrors.WriteAppError(c, apperrors.ErrBadRequest(err.Error()))
 	}
 
-	out, serviceErr := progressionStateService.ListProgressionStates(ctx, progressionstatesvc.ListProgressionStatesInput{
+	out, serviceErr := a.progression.ListProgressionStates(ctx, progressionstatesvc.ListProgressionStatesInput{
 		UserID:     userID,
 		WorkflowID: workflowID,
 	})

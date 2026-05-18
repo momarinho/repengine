@@ -39,12 +39,6 @@ type CompleteWorkoutSessionRequest struct {
 	Notes string `json:"notes"`
 }
 
-var workoutSessionService *workoutsessionsvc.Service
-
-func SetWorkoutSessionService(s *workoutsessionsvc.Service) {
-	workoutSessionService = s
-}
-
 func parseWorkoutSessionID(c *fiber.Ctx) (int, error) {
 	sessionID := c.Params("id")
 	id, err := strconv.Atoi(sessionID)
@@ -54,11 +48,11 @@ func parseWorkoutSessionID(c *fiber.Ctx) (int, error) {
 	return id, nil
 }
 
-func ListWorkoutSessions(c *fiber.Ctx) error {
+func (a *App) ListWorkoutSessions(c *fiber.Ctx) error {
 	ctx, cancel := withTimeout(c.UserContext())
 	defer cancel()
 
-	if workoutSessionService == nil {
+	if a.workoutSessions == nil {
 		return apperrors.WriteAppError(c, apperrors.ErrInternal())
 	}
 
@@ -68,7 +62,7 @@ func ListWorkoutSessions(c *fiber.Ctx) error {
 		return apperrors.WriteAppError(c, apperrors.ErrBadRequest(err.Error()))
 	}
 
-	out, serviceErr := workoutSessionService.ListSessions(ctx, workoutsessionsvc.ListSessionsInput{
+	out, serviceErr := a.workoutSessions.ListSessions(ctx, workoutsessionsvc.ListSessionsInput{
 		UserID:     userID,
 		WorkflowID: workflowID,
 		Cursor:     int64(c.QueryInt("cursor", 0)),
@@ -81,11 +75,11 @@ func ListWorkoutSessions(c *fiber.Ctx) error {
 	return c.JSON(out)
 }
 
-func StartWorkoutSession(c *fiber.Ctx) error {
+func (a *App) StartWorkoutSession(c *fiber.Ctx) error {
 	ctx, cancel := withTimeout(c.UserContext())
 	defer cancel()
 
-	if workoutSessionService == nil {
+	if a.workoutSessions == nil {
 		return apperrors.WriteAppError(c, apperrors.ErrInternal())
 	}
 
@@ -100,7 +94,7 @@ func StartWorkoutSession(c *fiber.Ctx) error {
 		return apperrors.WriteAppError(c, apperrors.ErrBadRequest("invalid request body"))
 	}
 
-	out, serviceErr := workoutSessionService.StartSession(ctx, workoutsessionsvc.StartSessionInput{
+	out, serviceErr := a.workoutSessions.StartSession(ctx, workoutsessionsvc.StartSessionInput{
 		UserID:       userID,
 		WorkflowID:   workflowID,
 		SectionID:    req.SectionID,
@@ -113,11 +107,11 @@ func StartWorkoutSession(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(out)
 }
 
-func GetWorkoutSession(c *fiber.Ctx) error {
+func (a *App) GetWorkoutSession(c *fiber.Ctx) error {
 	ctx, cancel := withTimeout(c.UserContext())
 	defer cancel()
 
-	if workoutSessionService == nil {
+	if a.workoutSessions == nil {
 		return apperrors.WriteAppError(c, apperrors.ErrInternal())
 	}
 
@@ -127,7 +121,7 @@ func GetWorkoutSession(c *fiber.Ctx) error {
 		return apperrors.WriteAppError(c, apperrors.ErrBadRequest(err.Error()))
 	}
 
-	out, serviceErr := workoutSessionService.GetSession(ctx, workoutsessionsvc.GetSessionInput{
+	out, serviceErr := a.workoutSessions.GetSession(ctx, workoutsessionsvc.GetSessionInput{
 		UserID:    userID,
 		SessionID: sessionID,
 	})
@@ -138,11 +132,11 @@ func GetWorkoutSession(c *fiber.Ctx) error {
 	return c.JSON(out)
 }
 
-func CreateWorkoutSetLog(c *fiber.Ctx) error {
+func (a *App) CreateWorkoutSetLog(c *fiber.Ctx) error {
 	ctx, cancel := withTimeout(c.UserContext())
 	defer cancel()
 
-	if workoutSessionService == nil {
+	if a.workoutSessions == nil {
 		return apperrors.WriteAppError(c, apperrors.ErrInternal())
 	}
 
@@ -157,7 +151,7 @@ func CreateWorkoutSetLog(c *fiber.Ctx) error {
 		return apperrors.WriteAppError(c, apperrors.ErrBadRequest("invalid request body"))
 	}
 
-	out, serviceErr := workoutSessionService.InsertSetLog(ctx, workoutsessionsvc.InsertSetLogInput{
+	out, serviceErr := a.workoutSessions.InsertSetLog(ctx, workoutsessionsvc.InsertSetLogInput{
 		UserID:              userID,
 		SessionID:           sessionID,
 		WorkflowBlockID:     req.WorkflowBlockID,
@@ -182,11 +176,11 @@ func CreateWorkoutSetLog(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(out)
 }
 
-func CompleteWorkoutSession(c *fiber.Ctx) error {
+func (a *App) CompleteWorkoutSession(c *fiber.Ctx) error {
 	ctx, cancel := withTimeout(c.UserContext())
 	defer cancel()
 
-	if workoutSessionService == nil {
+	if a.workoutSessions == nil {
 		return apperrors.WriteAppError(c, apperrors.ErrInternal())
 	}
 
@@ -201,7 +195,7 @@ func CompleteWorkoutSession(c *fiber.Ctx) error {
 		return apperrors.WriteAppError(c, apperrors.ErrBadRequest("invalid request body"))
 	}
 
-	out, serviceErr := workoutSessionService.CompleteSession(ctx, workoutsessionsvc.CompleteSessionInput{
+	out, serviceErr := a.workoutSessions.CompleteSession(ctx, workoutsessionsvc.CompleteSessionInput{
 		UserID:    userID,
 		SessionID: sessionID,
 		Notes:     req.Notes,

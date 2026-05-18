@@ -250,8 +250,23 @@ func (r *Repository) CreateVersion(ctx context.Context, workflowID int, commitMe
 		return WorkflowVersion{}, err
 	}
 
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return WorkflowVersion{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	if err := tx.QueryRow(ctx, `
+		SELECT id
+		FROM workflows
+		WHERE id = $1
+		FOR UPDATE
+	`, workflowID).Scan(new(int)); err != nil {
+		return WorkflowVersion{}, err
+	}
+
 	var version WorkflowVersion
-	err = r.pool.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		INSERT INTO workflow_versions (workflow_id, version_number, snapshot, commit_message)
 		SELECT $1, COALESCE(MAX(version_number), 0) + 1, $2, $3
 		FROM workflow_versions
@@ -269,6 +284,9 @@ func (r *Repository) CreateVersion(ctx context.Context, workflowID int, commitMe
 		return WorkflowVersion{}, err
 	}
 	if err := json.Unmarshal(snapshotJSON, &version.Snapshot); err != nil {
+		return WorkflowVersion{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return WorkflowVersion{}, err
 	}
 
