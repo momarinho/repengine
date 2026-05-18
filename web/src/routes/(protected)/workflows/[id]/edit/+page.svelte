@@ -327,6 +327,11 @@
 	}
 
 	async function persist(source: 'autosave' | 'manual', createVersion = false): Promise<void> {
+		if (debounceHandle) {
+			clearTimeout(debounceHandle);
+			debounceHandle = null;
+		}
+
 		if (saveInFlight) {
 			queuedSave = { source, createVersion: queuedSave?.createVersion || createVersion };
 			return;
@@ -354,6 +359,10 @@
 
 		const fingerprint = saveFingerprint();
 		if (fingerprint === lastSavedFingerprint) {
+			if (saveState === 'dirty') {
+				saveState = 'idle';
+				statusMessage = '';
+			}
 			return;
 		}
 
@@ -361,8 +370,8 @@
 			clearTimeout(debounceHandle);
 		}
 
-		saveState = 'saving';
-		statusMessage = 'Saving...';
+		saveState = 'dirty';
+		statusMessage = 'Unsaved changes';
 
 		debounceHandle = setTimeout(() => {
 			void persist('autosave');
@@ -397,6 +406,8 @@
 		switch (state) {
 			case 'saved':
 				return 'text-tertiary';
+			case 'dirty':
+				return 'text-secondary';
 			case 'saving':
 				return 'text-primary';
 			case 'conflict':
@@ -503,13 +514,15 @@
 		<div class="mx-auto grid max-w-[1600px] gap-6 px-6 py-6 xl:grid-cols-[minmax(0,1fr)_380px]">
 			<section class="space-y-4">
 				{#if statusMessage}
-					<div class={`rounded-md border px-4 py-3 text-sm ${
-						saveState === 'error'
-							? 'border-error/40 bg-error/10 text-error'
+						<div class={`rounded-md border px-4 py-3 text-sm ${
+							saveState === 'error'
+								? 'border-error/40 bg-error/10 text-error'
 							: saveState === 'conflict'
 								? 'border-secondary/30 bg-secondary/10 text-secondary'
-							: 'border-outline-variant/20 bg-surface-container-low text-on-surface-variant'
-					}`}>
+								: saveState === 'dirty'
+									? 'border-outline-variant/25 bg-surface-container text-on-surface'
+								: 'border-outline-variant/20 bg-surface-container-low text-on-surface-variant'
+						}`}>
 						<div class="flex items-center justify-between gap-4">
 							<p>{statusMessage}</p>
 

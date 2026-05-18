@@ -184,7 +184,7 @@ npm run check
 
 ### Manual validation
 
-Recommended Sprint 12 validation:
+Recommended Sprint 13 validation:
 
 - start a section and confirm a session is created
 - log a few sets with `actual reps`, `actual load`, `actual RPE`, and `actual RIR`
@@ -197,6 +197,11 @@ Recommended Sprint 12 validation:
 - for skill-like blocks, confirm the suggestion can stay / advance / regress based on logged effort and reps
 - confirm auth register/login/logout still work and logout invalidates the previous token
 - create workflow versions back-to-back and confirm version numbers remain sequential
+- manually expire or revoke the auth token and confirm protected pages redirect back to `/login`
+- verify the dashboard `All / Private / Public` filter changes the visible routines
+- open the editor, make a change, confirm the UI shows unsaved state before autosave completes, and confirm manual save flushes immediately
+- resume a player session after reload and confirm timer/rest state resumes from persisted state
+- log in as a second user on the same browser profile and confirm player local persistence does not leak across users
 
 ### Workflow update benchmark
 
@@ -245,6 +250,7 @@ Status: `PASS` (`p95 < 200ms`)
 - Sprint 10: security hardening
 - Sprint 11: schema hardening
 - Sprint 12: API quality and tests
+- Sprint 13: frontend bug fixes
 
 ### Not completed yet
 
@@ -272,7 +278,6 @@ Features not yet started:
 
 | Sprint | Theme | Scope |
 |--------|-------|-------|
-| **13** | **Frontend Bug Fixes** | Fix dashboard filter, fix auth guard token validation, versions proxy GET handler, per-user localStorage key, PersistedState migration, player timer, autosave UI state |
 | **14** | **Account & History** | Password reset, account settings page, workout history, basic volume analytics, session abandonment, set log editing, version restore |
 | **15** | **CI/CD** | GitHub Actions (lint, test, build, push), migration testing on fresh DB, branch protection, `CONTRIBUTING.md`, `LICENSE`, OpenAPI spec |
 | **15.5** | **Cloud Infrastructure** | External PostgreSQL host for staging/production (for example OCI VM or managed PostgreSQL), private networking, backup/restore, secret management, migration runbook |
@@ -297,5 +302,6 @@ Known issues that don't block current functionality but need to be addressed bef
 - Sprint 10 hardened auth and API security with environment-aware secure cookies, logout-driven token invalidation, CORS policy enforcement, auth endpoint rate limiting, register input validation, and JWT issuer/audience claims.
 - Sprint 11 hardened the schema with status/outcome/state `CHECK` constraints, missing FKs, targeted indexes, and canonical numeric columns alongside the existing raw text fitness fields.
 - Sprint 12 moved auth into a dedicated service/repository layer, replaced handler package singletons with explicit dependency wiring, added handler-level Fiber tests, surfaced progression failures on session completion, and serialized workflow version creation to avoid duplicate version numbers.
+- Sprint 13 fixed protected-route token validation in SvelteKit, restored the workflow versions GET proxy, corrected the dashboard filter, scoped player local persistence by user with migration from the legacy key, resumed persisted timer/rest state correctly, and improved autosave UI semantics in the editor.
 - Planned infrastructure work keeps local development on Docker Compose while moving staging/production database hosting to dedicated cloud infrastructure such as an OCI VM or managed PostgreSQL.
 - The progression state `block_key` format is `sectionTitle::nodeTypeSlug::exerciseName::occurrence`. Renaming a section will orphan its progression history — this is a known limitation tracked in the roadmap.

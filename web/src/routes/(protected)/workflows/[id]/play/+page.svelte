@@ -22,7 +22,7 @@
 	};
 
 	type PersistedPlayerState = {
-		version: 2;
+		version: 3;
 		currentBlockIndex: number;
 		completedBlockIds: string[];
 		currentSetByBlock: Record<string, number>;
@@ -39,6 +39,14 @@
 		isChoosingSection: boolean;
 		isSessionComplete: boolean;
 		activityEntries: SessionActivity[];
+		timerRemainingSeconds: number;
+		isTimerRunning: boolean;
+		intraSetRest: {
+			blockID: string;
+			remainingSeconds: number;
+			nextLabel: string;
+		} | null;
+		isIntraSetRestRunning: boolean;
 	};
 
 	const { data }: { data: PageData } = $props();
@@ -46,7 +54,9 @@
 	const routine: PlayerRoutine | null = initialData.routine;
 	const initialBlockIndex = routine?.initialBlockIndex ?? 0;
 	const hasSectionQuery = page.url.searchParams.has('section');
-	const localSessionKey = routine ? `repengine:player:${routine.id}` : null;
+	const legacyLocalSessionKey = routine ? `repengine:player:${routine.id}` : null;
+	const localSessionKey =
+		routine ? `repengine:player:${page.data.sessionUserID ?? 'unknown'}:${routine.id}` : null;
 	const initialSection =
 		routine?.sections.find(
 			(section) =>
@@ -169,6 +179,19 @@
 			.padStart(2, '0');
 
 		return `${minutes}:${seconds}`;
+	}
+
+	function sanitizeSavedRestState(
+		value: PersistedPlayerState['intraSetRest'] | null | undefined,
+		blockIDs: Set<string>
+	): PersistedPlayerState['intraSetRest'] {
+		if (!value || !blockIDs.has(value.blockID)) return null;
+
+		return {
+			blockID: value.blockID,
+			remainingSeconds: Math.max(value.remainingSeconds, 0),
+			nextLabel: value.nextLabel
+		};
 	}
 
 	function formatActivityTime(timestamp: number): string {
@@ -923,7 +946,12 @@
 		}
 
 		const recentActiveSession = sessionHistory.find((session) => session.status === 'active') ?? null;
-		const rawState = localStorage.getItem(localSessionKey);
+		const nextScopedState = localStorage.getItem(localSessionKey);
+		const legacyState =
+			legacyLocalSessionKey && legacyLocalSessionKey !== localSessionKey
+				? localStorage.getItem(legacyLocalSessionKey)
+				: null;
+		const rawState = nextScopedState ?? legacyState;
 		if (!rawState) {
 			hasRestoredSession = true;
 			if (recentActiveSession) {
@@ -939,6 +967,10 @@
 
 		try {
 			const savedState = JSON.parse(rawState) as PersistedPlayerState;
+			if (!nextScopedState && legacyState && localSessionKey) {
+				localStorage.setItem(localSessionKey, legacyState);
+				localStorage.removeItem(legacyLocalSessionKey!);
+			}
 			const savedSection = getSectionByID(savedState.activeSectionID);
 			const savedBackendSessionID = savedState.backendSessionID ?? null;
 			const blockIDs = new Set(routine.blocks.map((block) => block.id));
@@ -966,7 +998,13 @@
 			isChoosingSection = Boolean(savedState.isChoosingSection);
 			isSessionComplete = Boolean(savedState.isSessionComplete);
 			activityEntries = (savedState.activityEntries ?? []).filter((entry) => blockIDs.has(entry.blockID));
-			timerRemainingSeconds = getInitialTimerSeconds(routine.blocks[normalizedIndex]);
+			timerRemainingSeconds =
+				typeof savedState.timerRemainingSeconds === 'number'
+					? Math.max(savedState.timerRemainingSeconds, 0)
+					: getInitialTimerSeconds(routine.blocks[normalizedIndex]);
+			isTimerRunning = Boolean(savedState.isTimerRunning) && timerRemainingSeconds > 0;
+			intraSetRest = sanitizeSavedRestState(savedState.intraSetRest, blockIDs);
+			isIntraSetRestRunning = Boolean(savedState.isIntraSetRestRunning) && Boolean(intraSetRest);
 			if (savedBackendSessionID) {
 				void restorePersistedSession(savedBackendSessionID).catch(() => {
 					sessionError = 'Unable to restore workout session.';
@@ -982,7 +1020,8 @@
 	});
 
 	$effect(() => {
-		if (!routine) return;
+		if (!routine || !hasRestoredSession) return;
+		if (!activePersistedSession || isSessionComplete || isChoosingSection) return;
 		const sessionInterval = setInterval(() => {
 			sessionElapsedSeconds += 1;
 		}, 1000);
@@ -1038,7 +1077,7 @@
 		if (!browser || !routine || !localSessionKey || !hasRestoredSession) return;
 
 		const state: PersistedPlayerState = {
-			version: 2,
+			version: 3,
 			currentBlockIndex,
 			completedBlockIds,
 			currentSetByBlock,
@@ -1054,7 +1093,11 @@
 			backendSessionID: activePersistedSession?.id ?? completedSessionSummary?.id ?? null,
 			isChoosingSection,
 			isSessionComplete,
-			activityEntries
+			activityEntries,
+			timerRemainingSeconds,
+			isTimerRunning,
+			intraSetRest,
+			isIntraSetRestRunning
 		};
 
 		localStorage.setItem(localSessionKey, JSON.stringify(state));

@@ -5,19 +5,23 @@
 	let { data }: { data: PageData } = $props();
 	const initialWorkflows = untrack(() => [...data.workflows]);
 
-	let filter = $state('all');
+	let filter = $state<'all' | 'private' | 'public'>('all');
 	let workflows = $state(initialWorkflows);
 	let deletingWorkflowID = $state<number | null>(null);
 	let deleteError = $state('');
 
 	const filters = [
 		{ key: 'all', label: 'All Routines' },
-		{ key: 'hypertrophy', label: 'Hypertrophy' },
-		{ key: 'strength', label: 'Strength' }
-	];
+		{ key: 'private', label: 'Private' },
+		{ key: 'public', label: 'Public' }
+	] as const;
 
 	const filteredWorkflows = $derived(
-		filter === 'all' ? workflows : workflows
+		filter === 'all'
+			? workflows
+			: workflows.filter((workflow) =>
+					filter === 'public' ? workflow.is_public : !workflow.is_public
+				)
 	);
 
 	async function deleteWorkflow(id: number, name: string): Promise<void> {

@@ -50,7 +50,7 @@ export type DraftBlock = {
 	data: Record<string, unknown>;
 };
 
-export type SaveState = 'idle' | 'saving' | 'saved' | 'conflict' | 'error';
+export type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'conflict' | 'error';
 
 export function toDraftBlock(block: WorkflowBlockApi, index: number): DraftBlock {
 	return {
