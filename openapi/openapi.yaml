@@ -1,0 +1,1308 @@
+openapi: 3.0.3
+info:
+  title: RepEngine API
+  version: 0.15.3
+  description: |
+    Initial OpenAPI contract for the RepEngine Go API.
+
+    This spec tracks the HTTP surface currently exposed by the backend and is
+    intended to evolve alongside handler-level behavior.
+servers:
+  - url: http://localhost:8080
+    description: Local development
+tags:
+  - name: Health
+  - name: Auth
+  - name: Node Types
+  - name: Workflows
+  - name: Workout Sessions
+  - name: Progression
+  - name: Templates
+  - name: Clone Jobs
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: API healthcheck
+      responses:
+        '200':
+          description: Service is running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in and receive a bearer token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Invalidate the current session token
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current account
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+    put:
+      tags: [Auth]
+      summary: Update email or password
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAccountRequest'
+      responses:
+        '200':
+          description: Account updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateAccountResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Auth]
+      summary: Delete current account
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteAccountRequest'
+      responses:
+        '200':
+          description: Account deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+  /auth/password-reset/request:
+    post:
+      tags: [Auth]
+      summary: Create a password reset token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+      responses:
+        '200':
+          description: Reset token created or hidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasswordResetRequestResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+  /auth/password-reset/confirm:
+    post:
+      tags: [Auth]
+      summary: Reset password with token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetConfirmRequest'
+      responses:
+        '200':
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+  /node-types:
+    get:
+      tags: [Node Types]
+      summary: List node types
+      responses:
+        '200':
+          description: Node types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NodeType'
+  /node-types/{slug}:
+    get:
+      tags: [Node Types]
+      summary: Get node type by slug
+      parameters:
+        - $ref: '#/components/parameters/SlugParam'
+      responses:
+        '200':
+          description: Node type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeType'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+  /workflows:
+    get:
+      tags: [Workflows]
+      summary: List workflows for current user
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Paginated workflows
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedWorkflows'
+    post:
+      tags: [Workflows]
+      summary: Create workflow
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkflowRequest'
+      responses:
+        '201':
+          description: Workflow created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workflow'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ErrorResponse'
+  /workflows/{id}:
+    get:
+      tags: [Workflows]
+      summary: Get workflow
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IDParam'
+      responses:
+        '200':
+          description: Workflow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workflow'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    put:
+      tags: [Workflows]
+      summary: Update workflow
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IDParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWorkflowRequest'
+      responses:
+        '200':
+          description: Workflow updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workflow'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Workflows]
+      summary: Delete workflow
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IDParam'
+      responses:
+        '204':
+          description: Workflow deleted
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+  /workflows/{id}/versions:
+    get:
+      tags: [Workflows]
+      summary: List workflow versions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IDParam'
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Paginated versions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedVersions'
+    post:
+      tags: [Workflows]
+      summary: Create workflow version
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IDParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVersionRequest'
+      responses:
+        '201':
+          description: Version created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowVersion'
+  /workflows/{id}/versions/{versionId}/restore:
+    post:
+      tags: [Workflows]
+      summary: Restore workflow from a saved version
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IDParam'
+        - $ref: '#/components/parameters/VersionIDParam'
+      responses:
+        '200':
+          description: Workflow restored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workflow'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ErrorResponse'
+  /workflows/{id}/sessions:
+    get:
+      tags: [Workout Sessions]
+      summary: List workflow sessions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IDParam'
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Paginated sessions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedWorkoutSessions'
+    post:
+      tags: [Workout Sessions]
+      summary: Start or reuse active workout session
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IDParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartWorkoutSessionRequest'
+      responses:
+        '201':
+          description: Session created or reused
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkoutSession'
+  /workflows/{id}/progression-states:
+    get:
+      tags: [Progression]
+      summary: List progression states for a workflow
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IDParam'
+      responses:
+        '200':
+          description: Progression states
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProgressionState'
+  /workflows/{id}/analytics:
+    get:
+      tags: [Workout Sessions]
+      summary: Basic workflow analytics
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IDParam'
+      responses:
+        '200':
+          description: Workflow analytics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkoutAnalytics'
+  /workout-sessions/{id}:
+    get:
+      tags: [Workout Sessions]
+      summary: Get workout session with logs
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IDParam'
+      responses:
+        '200':
+          description: Workout session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkoutSession'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+  /workout-sessions/{id}/logs:
+    post:
+      tags: [Workout Sessions]
+      summary: Create or upsert a set log
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IDParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetLogRequest'
+      responses:
+        '201':
+          description: Set log stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkoutSetLog'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+  /workout-sessions/{id}/logs/{logId}:
+    put:
+      tags: [Workout Sessions]
+      summary: Update a persisted set log
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IDParam'
+        - $ref: '#/components/parameters/LogIDParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetLogRequest'
+      responses:
+        '200':
+          description: Set log updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkoutSetLog'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+  /workout-sessions/{id}/complete:
+    post:
+      tags: [Workout Sessions]
+      summary: Complete a workout session
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IDParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionNotesRequest'
+      responses:
+        '200':
+          description: Session completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkoutSession'
+  /workout-sessions/{id}/abandon:
+    post:
+      tags: [Workout Sessions]
+      summary: Abandon an active workout session
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IDParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionNotesRequest'
+      responses:
+        '200':
+          description: Session abandoned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkoutSession'
+  /templates:
+    get:
+      tags: [Templates]
+      summary: List templates
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated templates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTemplates'
+  /templates/{id}:
+    get:
+      tags: [Templates]
+      summary: Get template
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IDParam'
+      responses:
+        '200':
+          description: Template
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Template'
+  /templates/{id}/clone:
+    post:
+      tags: [Templates]
+      summary: Start template clone job
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IDParam'
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Clone job accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CloneTemplateResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+  /clone-jobs/{id}:
+    get:
+      tags: [Clone Jobs]
+      summary: Get clone job
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IDParam'
+      responses:
+        '200':
+          description: Clone job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CloneJob'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    IDParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    VersionIDParam:
+      name: versionId
+      in: path
+      required: true
+      schema:
+        type: integer
+    LogIDParam:
+      name: logId
+      in: path
+      required: true
+      schema:
+        type: integer
+    SlugParam:
+      name: slug
+      in: path
+      required: true
+      schema:
+        type: string
+    CursorParam:
+      name: cursor
+      in: query
+      schema:
+        type: integer
+        default: 0
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 20
+  responses:
+    ErrorResponse:
+      description: Application error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status, db, uptime, version, env]
+      properties:
+        status:
+          type: string
+        db:
+          type: string
+        uptime:
+          type: string
+        version:
+          type: string
+        env:
+          type: string
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        current_updated_at:
+          type: string
+          format: date-time
+    MessageResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    RegisterResponse:
+      type: object
+      required: [message, user_id]
+      properties:
+        message:
+          type: string
+        user_id:
+          type: integer
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    LoginResponse:
+      type: object
+      required: [message, user_id, token]
+      properties:
+        message:
+          type: string
+        user_id:
+          type: integer
+        token:
+          type: string
+    Account:
+      type: object
+      required: [user_id, email, created_at, updated_at]
+      properties:
+        user_id:
+          type: integer
+        email:
+          type: string
+          format: email
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    UpdateAccountRequest:
+      type: object
+      required: [current_password]
+      properties:
+        email:
+          type: string
+          format: email
+        current_password:
+          type: string
+        new_password:
+          type: string
+    UpdateAccountResponse:
+      type: object
+      required: [account]
+      properties:
+        account:
+          $ref: '#/components/schemas/Account'
+    DeleteAccountRequest:
+      type: object
+      required: [current_password]
+      properties:
+        current_password:
+          type: string
+    PasswordResetRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+    PasswordResetRequestResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+        reset_token:
+          type: string
+    PasswordResetConfirmRequest:
+      type: object
+      required: [token, new_password]
+      properties:
+        token:
+          type: string
+        new_password:
+          type: string
+    NodeType:
+      type: object
+      required: [id, slug, name, description, icon, schema]
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        icon:
+          type: string
+        schema:
+          type: object
+          additionalProperties: true
+    WorkflowBlock:
+      type: object
+      required: [node_type_slug, position]
+      properties:
+        id:
+          type: integer
+        workflow_id:
+          type: integer
+        node_type_slug:
+          type: string
+        position:
+          type: integer
+        data:
+          type: object
+          additionalProperties: true
+    Workflow:
+      type: object
+      required: [id, user_id, name, description, is_public, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        is_public:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        blocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowBlock'
+    CreateWorkflowRequest:
+      type: object
+      required: [name, description, is_public, blocks]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        is_public:
+          type: boolean
+        blocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowBlock'
+    UpdateWorkflowRequest:
+      type: object
+      required: [name, description, updated_at, blocks]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        is_public:
+          type: boolean
+        updated_at:
+          type: string
+          format: date-time
+        blocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowBlock'
+    PaginatedWorkflows:
+      type: object
+      required: [data, has_more]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Workflow'
+        next_cursor:
+          type: integer
+          nullable: true
+        has_more:
+          type: boolean
+    CreateVersionRequest:
+      type: object
+      required: [commit_message, snapshot]
+      properties:
+        commit_message:
+          type: string
+        snapshot:
+          type: object
+          additionalProperties: true
+    WorkflowVersion:
+      type: object
+      required: [id, workflow_id, version_number, snapshot, commit_message, created_at]
+      properties:
+        id:
+          type: integer
+        workflow_id:
+          type: integer
+        version_number:
+          type: integer
+        snapshot:
+          type: object
+          additionalProperties: true
+        commit_message:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    PaginatedVersions:
+      type: object
+      required: [data, has_more]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowVersion'
+        next_cursor:
+          type: integer
+          nullable: true
+        has_more:
+          type: boolean
+    WorkoutSetLog:
+      type: object
+      required:
+        - id
+        - session_id
+        - block_client_id
+        - node_type_slug
+        - set_index
+        - prescribed_reps
+        - prescribed_load
+        - prescribed_intensity
+        - prescribed_rpe
+        - actual_reps
+        - actual_load
+        - actual_rpe
+        - actual_rir
+        - completed
+        - notes
+        - created_at
+      properties:
+        id:
+          type: integer
+        session_id:
+          type: integer
+        workflow_block_id:
+          type: integer
+          nullable: true
+        block_client_id:
+          type: string
+        node_type_slug:
+          type: string
+        set_index:
+          type: integer
+        prescribed_reps:
+          type: string
+        prescribed_load:
+          type: string
+        prescribed_intensity:
+          type: string
+        prescribed_rpe:
+          type: string
+        actual_reps:
+          type: string
+        actual_load:
+          type: string
+        actual_rpe:
+          type: string
+        actual_rir:
+          type: string
+        completed:
+          type: boolean
+        notes:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    WorkoutSession:
+      type: object
+      required:
+        - id
+        - workflow_id
+        - user_id
+        - section_id
+        - section_title
+        - status
+        - started_at
+        - notes
+        - log_count
+      properties:
+        id:
+          type: integer
+        workflow_id:
+          type: integer
+        user_id:
+          type: integer
+        section_id:
+          type: string
+        section_title:
+          type: string
+        status:
+          type: string
+          enum: [active, completed, abandoned]
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+        log_count:
+          type: integer
+        logs:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkoutSetLog'
+    PaginatedWorkoutSessions:
+      type: object
+      required: [data, has_more]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkoutSession'
+        next_cursor:
+          type: integer
+          nullable: true
+        has_more:
+          type: boolean
+    WorkoutAnalytics:
+      type: object
+      required:
+        - workflow_id
+        - completed_sessions
+        - abandoned_sessions
+        - total_logged_sets
+        - total_volume
+      properties:
+        workflow_id:
+          type: integer
+        completed_sessions:
+          type: integer
+        abandoned_sessions:
+          type: integer
+        total_logged_sets:
+          type: integer
+        total_volume:
+          type: number
+          format: double
+        average_rpe:
+          type: number
+          format: double
+          nullable: true
+        average_rir:
+          type: number
+          format: double
+          nullable: true
+        last_completed_at:
+          type: string
+          format: date-time
+          nullable: true
+    StartWorkoutSessionRequest:
+      type: object
+      properties:
+        section_id:
+          type: string
+        section_title:
+          type: string
+    SessionNotesRequest:
+      type: object
+      properties:
+        notes:
+          type: string
+    SetLogRequest:
+      type: object
+      required:
+        - node_type_slug
+        - set_index
+        - completed
+      properties:
+        workflow_block_id:
+          type: integer
+          nullable: true
+        block_client_id:
+          type: string
+        node_type_slug:
+          type: string
+        set_index:
+          type: integer
+        prescribed_reps:
+          type: string
+        prescribed_load:
+          type: string
+        prescribed_intensity:
+          type: string
+        prescribed_rpe:
+          type: string
+        actual_reps:
+          type: string
+        actual_load:
+          type: string
+        actual_rpe:
+          type: string
+        actual_rir:
+          type: string
+        completed:
+          type: boolean
+        notes:
+          type: string
+    ProgressionState:
+      type: object
+      required:
+        - id
+        - user_id
+        - workflow_id
+        - workflow_block_id
+        - block_key
+        - node_type_slug
+        - state_type
+        - exercise_name
+        - outcome
+        - current_load
+        - suggested_load
+        - current_week
+        - suggested_week
+        - suggested_intensity_offset
+        - avg_actual_rpe
+        - avg_actual_rir
+        - last_session_id
+        - last_log_count
+        - summary
+        - metadata
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        workflow_id:
+          type: integer
+        workflow_block_id:
+          type: integer
+        block_key:
+          type: string
+        node_type_slug:
+          type: string
+        state_type:
+          type: string
+          enum: [linear, wave, skill]
+        exercise_name:
+          type: string
+        outcome:
+          type: string
+          enum: [increase, maintain, reduce, advance, regress]
+        current_load:
+          type: string
+        suggested_load:
+          type: string
+        current_week:
+          type: integer
+        suggested_week:
+          type: integer
+        suggested_intensity_offset:
+          type: string
+        avg_actual_rpe:
+          type: string
+        avg_actual_rir:
+          type: string
+        last_session_id:
+          type: integer
+        last_log_count:
+          type: integer
+        summary:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    TemplateBlock:
+      type: object
+      required: [id, template_id, node_type_slug, position, data, created_at]
+      properties:
+        id:
+          type: integer
+        template_id:
+          type: integer
+        node_type_slug:
+          type: string
+        position:
+          type: integer
+        data:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+    Template:
+      type: object
+      required: [id, name, description, category, is_official, metadata, created_at]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        is_official:
+          type: boolean
+        author_id:
+          type: integer
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        blocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/TemplateBlock'
+    PaginatedTemplates:
+      type: object
+      required: [data, has_more]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Template'
+        next_cursor:
+          type: integer
+          nullable: true
+        has_more:
+          type: boolean
+    CloneTemplateResponse:
+      type: object
+      required: [job_id, status]
+      properties:
+        job_id:
+          type: integer
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+    CloneJob:
+      type: object
+      required:
+        - id
+        - template_id
+        - user_id
+        - idempotency_key
+        - status
+        - attempts
+        - error_message
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+        template_id:
+          type: integer
+        user_id:
+          type: integer
+        workflow_id:
+          type: integer
+          nullable: true
+        idempotency_key:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        attempts:
+          type: integer
+        error_message:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time

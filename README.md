@@ -1,5 +1,8 @@
 # RepEngine
 
+[![CI](https://github.com/momarinho/repengine/actions/workflows/ci.yml/badge.svg)](https://github.com/momarinho/repengine/actions/workflows/ci.yml)
+[![Docker](https://github.com/momarinho/repengine/actions/workflows/docker.yml/badge.svg)](https://github.com/momarinho/repengine/actions/workflows/docker.yml)
+
 RepEngine is a full-stack training routine builder with a Go API, a SvelteKit frontend, and PostgreSQL.
 
 The project currently delivers:
@@ -196,6 +199,15 @@ From `web/`:
 npm run check
 ```
 
+## Contributing and Release
+
+- contribution rules live in [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+- project licensing lives in [`LICENSE`](./LICENSE)
+- the initial API contract lives in [`openapi/openapi.yaml`](./openapi/openapi.yaml)
+- container images are published by `.github/workflows/docker.yml`
+- image tags use `sha-<shortsha>` for every publish and `latest` on the default branch
+- recommended branch protection and PR policy are documented in `CONTRIBUTING.md`
+
 ### Manual validation
 
 Recommended Sprint 14 validation:
@@ -272,6 +284,7 @@ Status: `PASS` (`p95 < 200ms`)
 - Sprint 12: API quality and tests
 - Sprint 13: frontend bug fixes
 - Sprint 14: account and history
+- Sprint 15: CI/CD
 
 ### Not completed yet
 
@@ -290,7 +303,6 @@ Features not yet started:
 
 | Sprint | Theme | Scope |
 |--------|-------|-------|
-| **15** | **CI/CD** | GitHub Actions (lint, test, build, push), migration testing on fresh DB, branch protection, `CONTRIBUTING.md`, `LICENSE`, OpenAPI spec |
 | **15.5** | **Cloud Infrastructure** | External PostgreSQL host for staging/production (for example OCI VM or managed PostgreSQL), private networking, backup/restore, secret management, migration runbook |
 | **16** | **Observability** | Prometheus alerting rules, `node_exporter`, `postgres_exporter`, Grafana dashboard JSON, nginx rate limiting, CSP header, TLS certificate automation |
 | **17** | **Accessibility & PWA** | ARIA roles/labels, modal focus trap, keyboard drag-and-drop, undo/redo, Service Worker offline support, background sync |
@@ -315,5 +327,6 @@ Known issues that don't block current functionality but need to be addressed bef
 - Sprint 12 moved auth into a dedicated service/repository layer, replaced handler package singletons with explicit dependency wiring, added handler-level Fiber tests, surfaced progression failures on session completion, and serialized workflow version creation to avoid duplicate version numbers.
 - Sprint 13 fixed protected-route token validation in SvelteKit, restored the workflow versions GET proxy, corrected the dashboard filter, scoped player local persistence by user with migration from the legacy key, resumed persisted timer/rest state correctly, and improved autosave UI semantics in the editor.
 - Sprint 14 added account settings, password reset tokens, workflow history and basic analytics pages, active-session abandonment, persisted set-log editing, and workflow version restore across the API and SvelteKit app.
+- Sprint 15 added GitHub Actions for CI and image publishing, migration smoke validation on fresh databases, repository contribution and PR policy docs, an MIT license, and an initial OpenAPI contract under `openapi/openapi.yaml`.
 - Planned infrastructure work keeps local development on Docker Compose while moving staging/production database hosting to dedicated cloud infrastructure such as an OCI VM or managed PostgreSQL.
 - The progression state `block_key` format is `sectionTitle::nodeTypeSlug::exerciseName::occurrence`. Renaming a section will orphan its progression history — this is a known limitation tracked in the roadmap.
