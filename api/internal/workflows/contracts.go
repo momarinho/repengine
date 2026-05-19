@@ -35,6 +35,8 @@ type workflowRepo interface {
 	GetWorkflowOwner(ctx context.Context, workflowID int) (int, error)
 	CreateVersion(ctx context.Context, workflowID int, commitMessage string, snapshot map[string]any) (WorkflowVersion, error)
 	ListVersions(ctx context.Context, workflowID int, cursor int64, limit int) (PaginatedVersions, error)
+	GetVersion(ctx context.Context, workflowID, versionID int) (WorkflowVersion, error)
+	RestoreWorkflowSnapshotTx(ctx context.Context, tx dbtx, workflowID, userID int, name, description string, isPublic bool, blocks []WorkflowBlock) error
 
 	GetNodeTypeSchema(ctx context.Context, slug string) (map[string]any, error)
 }

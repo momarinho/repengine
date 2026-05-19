@@ -337,6 +337,60 @@ func (r *Repository) ListVersions(ctx context.Context, workflowID int, cursor in
 	}, nil
 }
 
+func (r *Repository) GetVersion(ctx context.Context, workflowID, versionID int) (WorkflowVersion, error) {
+	var version WorkflowVersion
+	var snapshotJSON []byte
+	err := r.pool.QueryRow(ctx, `
+		SELECT id, workflow_id, version_number, snapshot, commit_message, created_at
+		FROM workflow_versions
+		WHERE workflow_id = $1
+		  AND id = $2
+	`, workflowID, versionID).Scan(
+		&version.ID,
+		&version.WorkflowID,
+		&version.VersionNumber,
+		&snapshotJSON,
+		&version.CommitMessage,
+		&version.CreatedAt,
+	)
+	if err != nil {
+		return WorkflowVersion{}, err
+	}
+	if err := json.Unmarshal(snapshotJSON, &version.Snapshot); err != nil {
+		return WorkflowVersion{}, err
+	}
+
+	return version, nil
+}
+
+func (r *Repository) RestoreWorkflowSnapshotTx(
+	ctx context.Context,
+	tx dbtx,
+	workflowID, userID int,
+	name, description string,
+	isPublic bool,
+	blocks []WorkflowBlock,
+) error {
+	tag, err := tx.Exec(ctx, `
+		UPDATE workflows
+		SET
+			name = $1,
+			description = $2,
+			is_public = $3,
+			updated_at = NOW()
+		WHERE id = $4
+		  AND user_id = $5
+	`, name, description, isPublic, workflowID, userID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+
+	return r.ReplaceBlocksTx(ctx, tx, workflowID, blocks)
+}
+
 func (r *Repository) GetNodeTypeSchema(ctx context.Context, slug string) (map[string]any, error) {
 	var raw []byte
 	err := r.pool.QueryRow(ctx, `SELECT schema FROM node_types WHERE slug = $1`, slug).Scan(&raw)

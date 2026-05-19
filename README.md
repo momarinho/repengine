@@ -11,6 +11,7 @@ The project currently delivers:
 - a persistent workout player for section-based execution
 - basic progression state and autoregulation suggestions
 - schema hardening for workout/session/progression data
+- account settings, password reset, and workflow history
 
 The workout player now creates persistent workout sessions and set logs in the backend, keeps local browser state for in-progress UX, and derives simple next-session progression suggestions from real logs.
 
@@ -26,6 +27,7 @@ The workout player now creates persistent workout sessions and set logs in the b
 ### Implemented
 
 - Auth: register, login, logout
+- Auth account management: current account read/update/delete and password reset flow
 - Auth security hardening: secure cookies by environment, logout token invalidation, CORS, auth rate limiting, register validation, JWT issuer/audience claims
 - Node types API
 - Workflow CRUD
@@ -40,6 +42,8 @@ The workout player now creates persistent workout sessions and set logs in the b
 - Session reliability hardening
 - Progression states and simple autoregulation
 - Schema hardening with constraints, FK cleanup, and canonical numeric metrics
+- Workout history, basic volume analytics, and post-session log editing
+- Workflow version restore
 
 ### Workout player 6 / 6.5 / 7
 
@@ -56,6 +60,7 @@ The player already supports:
 - workout history by workflow
 - browser persistence via `localStorage`
 - session resume / active-session reuse
+- active session abandonment
 - duplicate log protection for repeated clicks / retries
 - progression state by workflow block
 - simple next-session suggestions for `linear_progression`
@@ -66,7 +71,7 @@ The player still does not support:
 
 - complex autoregulation
 - sophisticated training-max logic
-- analytics / charts
+- advanced analytics / charts
 - mobile / offline sync
 
 ## Running locally
@@ -120,6 +125,11 @@ npm run dev
 - `POST /auth/register`
 - `POST /auth/login`
 - `POST /auth/logout`
+- `GET /auth/me`
+- `PUT /auth/me`
+- `DELETE /auth/me`
+- `POST /auth/password-reset/request`
+- `POST /auth/password-reset/confirm`
 
 ### Node Types
 
@@ -135,15 +145,19 @@ npm run dev
 - `DELETE /workflows/:id`
 - `POST /workflows/:id/versions`
 - `GET /workflows/:id/versions`
+- `POST /workflows/:id/versions/:versionId/restore`
 - `GET /workflows/:id/sessions`
 - `POST /workflows/:id/sessions`
 - `GET /workflows/:id/progression-states`
+- `GET /workflows/:id/analytics`
 
 ### Workout Sessions
 
 - `GET /workout-sessions/:id`
 - `POST /workout-sessions/:id/logs`
+- `PUT /workout-sessions/:id/logs/:logId`
 - `POST /workout-sessions/:id/complete`
+- `POST /workout-sessions/:id/abandon`
 
 ### Templates
 
@@ -184,7 +198,7 @@ npm run check
 
 ### Manual validation
 
-Recommended Sprint 13 validation:
+Recommended Sprint 14 validation:
 
 - start a section and confirm a session is created
 - log a few sets with `actual reps`, `actual load`, `actual RPE`, and `actual RIR`
@@ -202,6 +216,12 @@ Recommended Sprint 13 validation:
 - open the editor, make a change, confirm the UI shows unsaved state before autosave completes, and confirm manual save flushes immediately
 - resume a player session after reload and confirm timer/rest state resumes from persisted state
 - log in as a second user on the same browser profile and confirm player local persistence does not leak across users
+- open workflow history and confirm recent sessions, set logs, and basic analytics render
+- edit a persisted set log and confirm the updated values remain visible after reload
+- abandon an active session from the player and confirm it appears as `abandoned` in history
+- restore an older workflow version from the editor history tab and confirm blocks/title/settings revert to the snapshot
+- open `/settings`, change email or password, and confirm the current session is invalidated
+- request a password reset from `/forgot-password` and complete it from `/reset-password`
 
 ### Workflow update benchmark
 
@@ -251,20 +271,12 @@ Status: `PASS` (`p95 < 200ms`)
 - Sprint 11: schema hardening
 - Sprint 12: API quality and tests
 - Sprint 13: frontend bug fixes
+- Sprint 14: account and history
 
 ### Not completed yet
 
-Features present in the backend but with no UI surface:
-
-- workout history / analytics view (sessions exist in the DB, no browse/chart page)
-- version restore (endpoint does not exist yet)
-- set log editing or deletion after the fact
-- session abandonment (an active session cannot be discarded from the UI)
-
 Features not yet started:
 
-- password reset / forgot-password flow
-- account settings (change email/password, delete account)
 - exercise autocomplete / search
 - undo/redo in the block editor
 - filter workflows by category (UI exists, backend field does not)
@@ -278,7 +290,6 @@ Features not yet started:
 
 | Sprint | Theme | Scope |
 |--------|-------|-------|
-| **14** | **Account & History** | Password reset, account settings page, workout history, basic volume analytics, session abandonment, set log editing, version restore |
 | **15** | **CI/CD** | GitHub Actions (lint, test, build, push), migration testing on fresh DB, branch protection, `CONTRIBUTING.md`, `LICENSE`, OpenAPI spec |
 | **15.5** | **Cloud Infrastructure** | External PostgreSQL host for staging/production (for example OCI VM or managed PostgreSQL), private networking, backup/restore, secret management, migration runbook |
 | **16** | **Observability** | Prometheus alerting rules, `node_exporter`, `postgres_exporter`, Grafana dashboard JSON, nginx rate limiting, CSP header, TLS certificate automation |
@@ -303,5 +314,6 @@ Known issues that don't block current functionality but need to be addressed bef
 - Sprint 11 hardened the schema with status/outcome/state `CHECK` constraints, missing FKs, targeted indexes, and canonical numeric columns alongside the existing raw text fitness fields.
 - Sprint 12 moved auth into a dedicated service/repository layer, replaced handler package singletons with explicit dependency wiring, added handler-level Fiber tests, surfaced progression failures on session completion, and serialized workflow version creation to avoid duplicate version numbers.
 - Sprint 13 fixed protected-route token validation in SvelteKit, restored the workflow versions GET proxy, corrected the dashboard filter, scoped player local persistence by user with migration from the legacy key, resumed persisted timer/rest state correctly, and improved autosave UI semantics in the editor.
+- Sprint 14 added account settings, password reset tokens, workflow history and basic analytics pages, active-session abandonment, persisted set-log editing, and workflow version restore across the API and SvelteKit app.
 - Planned infrastructure work keeps local development on Docker Compose while moving staging/production database hosting to dedicated cloud infrastructure such as an OCI VM or managed PostgreSQL.
 - The progression state `block_key` format is `sectionTitle::nodeTypeSlug::exerciseName::occurrence`. Renaming a section will orphan its progression history — this is a known limitation tracked in the roadmap.

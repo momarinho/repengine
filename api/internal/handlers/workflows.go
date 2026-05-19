@@ -50,6 +50,15 @@ func parseWorkflowID(c *fiber.Ctx) (int, error) {
 	return id, nil
 }
 
+func parseVersionID(c *fiber.Ctx) (int, error) {
+	versionID := c.Params("versionId")
+	id, err := strconv.Atoi(versionID)
+	if err != nil {
+		return 0, fmt.Errorf("invalid version id")
+	}
+	return id, nil
+}
+
 func (a *App) ListWorkflows(c *fiber.Ctx) error {
 	ctx, cancel := withTimeout(c.UserContext())
 	defer cancel()
@@ -255,6 +264,36 @@ func (a *App) ListVersions(c *fiber.Ctx) error {
 	}
 
 	out, err := a.workflows.ListVersions(ctx, in)
+	if err != nil {
+		return apperrors.WriteAppError(c, err)
+	}
+
+	return c.JSON(out)
+}
+
+func (a *App) RestoreVersion(c *fiber.Ctx) error {
+	ctx, cancel := withTimeout(c.UserContext())
+	defer cancel()
+
+	if a.workflows == nil {
+		return apperrors.WriteAppError(c, apperrors.ErrInternal())
+	}
+
+	userID := c.Locals("user_id").(int)
+	workflowID, err := parseWorkflowID(c)
+	if err != nil {
+		return apperrors.WriteAppError(c, apperrors.ErrBadRequest(err.Error()))
+	}
+	versionID, err := parseVersionID(c)
+	if err != nil {
+		return apperrors.WriteAppError(c, apperrors.ErrBadRequest(err.Error()))
+	}
+
+	out, err := a.workflows.RestoreVersion(ctx, workflowsvc.RestoreVersionInput{
+		UserID:     userID,
+		WorkflowID: workflowID,
+		VersionID:  versionID,
+	})
 	if err != nil {
 		return apperrors.WriteAppError(c, err)
 	}

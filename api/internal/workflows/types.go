@@ -96,3 +96,9 @@ type ListVersionsInput struct {
 	Cursor     int64
 	Limit      int
 }
+
+type RestoreVersionInput struct {
+	UserID     int
+	WorkflowID int
+	VersionID  int
+}

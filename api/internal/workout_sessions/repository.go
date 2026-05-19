@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/momarinho/rep_engine/internal/fitness"
 )
@@ -188,6 +189,89 @@ func (r *Repository) CompleteSession(ctx context.Context, sessionID, userID int,
 	return nil
 }
 
+func (r *Repository) AbandonSession(ctx context.Context, sessionID, userID int, notes string) error {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE workout_sessions
+		SET
+			status = $1,
+			completed_at = COALESCE(completed_at, NOW()),
+			notes = COALESCE(NULLIF($2, ''), notes)
+		WHERE id = $3
+		  AND user_id = $4
+		  AND status = $5
+	`, SessionStatusAbandoned, notes, sessionID, userID, SessionStatusActive)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+
+	return nil
+}
+
+func (r *Repository) UpdateSetLog(ctx context.Context, in UpdateSetLogInput) (WorkoutSetLog, error) {
+	actualLoadValue := fitness.OptionalFirstNumberString(in.ActualLoad)
+	actualRPEValue := fitness.OptionalFirstNumberString(in.ActualRPE)
+	actualRIRValue := fitness.OptionalFirstNumberString(in.ActualRIR)
+
+	row := r.pool.QueryRow(ctx, `
+		UPDATE workout_set_logs AS logs
+		SET
+			workflow_block_id = $1,
+			block_client_id = $2,
+			node_type_slug = $3,
+			set_index = $4,
+			prescribed_reps = $5,
+			prescribed_load = $6,
+			prescribed_intensity = $7,
+			prescribed_rpe = $8,
+			actual_reps = $9,
+			actual_load = $10,
+			actual_rpe = $11,
+			actual_rir = $12,
+			actual_load_value = $13,
+			actual_rpe_value = $14,
+			actual_rir_value = $15,
+			completed = $16,
+			notes = $17
+		FROM workout_sessions AS sessions
+		WHERE logs.id = $18
+		  AND logs.session_id = $19
+		  AND sessions.id = logs.session_id
+		  AND sessions.user_id = $20
+		RETURNING logs.id, logs.session_id, logs.workflow_block_id, COALESCE(logs.block_client_id, ''),
+		          logs.node_type_slug, logs.set_index, COALESCE(logs.prescribed_reps, ''),
+		          COALESCE(logs.prescribed_load, ''), COALESCE(logs.prescribed_intensity, ''),
+		          COALESCE(logs.prescribed_rpe, ''), COALESCE(logs.actual_reps, ''),
+		          COALESCE(logs.actual_load, ''), COALESCE(logs.actual_rpe, ''),
+		          COALESCE(logs.actual_rir, ''), logs.completed, COALESCE(logs.notes, ''), logs.created_at
+	`,
+		in.WorkflowBlockID,
+		in.BlockClientID,
+		in.NodeTypeSlug,
+		in.SetIndex,
+		in.PrescribedReps,
+		in.PrescribedLoad,
+		in.PrescribedIntensity,
+		in.PrescribedRPE,
+		in.ActualReps,
+		in.ActualLoad,
+		in.ActualRPE,
+		in.ActualRIR,
+		actualLoadValue,
+		actualRPEValue,
+		actualRIRValue,
+		in.Completed,
+		in.Notes,
+		in.LogID,
+		in.SessionID,
+		in.UserID,
+	)
+
+	return scanWorkoutSetLog(row)
+}
+
 func (r *Repository) GetSession(ctx context.Context, sessionID, userID int) (WorkoutSession, error) {
 	row := r.pool.QueryRow(ctx, `
 		SELECT id, workflow_id, user_id,
@@ -296,6 +380,64 @@ func (r *Repository) ListSessions(
 		NextCursor: nextCursor,
 		HasMore:    hasMore,
 	}, nil
+}
+
+func (r *Repository) GetAnalytics(ctx context.Context, userID, workflowID int) (WorkoutAnalytics, error) {
+	var analytics WorkoutAnalytics
+	var avgRPE pgtype.Float8
+	var avgRIR pgtype.Float8
+	var lastCompletedAt pgtype.Timestamptz
+
+	err := r.pool.QueryRow(ctx, `
+		SELECT
+			$2 AS workflow_id,
+			COUNT(*) FILTER (WHERE sessions.status = 'completed')::INTEGER AS completed_sessions,
+			COUNT(*) FILTER (WHERE sessions.status = 'abandoned')::INTEGER AS abandoned_sessions,
+			COUNT(logs.id) FILTER (WHERE logs.completed)::INTEGER AS total_logged_sets,
+			COALESCE(SUM(
+				COALESCE(logs.actual_load_value, 0) *
+				COALESCE(
+					CASE
+						WHEN logs.actual_reps ~ '-?[0-9]+(\.[0-9]+)?'
+							THEN substring(logs.actual_reps FROM '-?[0-9]+(\.[0-9]+)?')::NUMERIC(10,2)
+						ELSE 0
+					END,
+					0
+				)
+			), 0)::DOUBLE PRECISION AS total_volume,
+			AVG(logs.actual_rpe_value)::DOUBLE PRECISION AS average_rpe,
+			AVG(logs.actual_rir_value)::DOUBLE PRECISION AS average_rir,
+			MAX(sessions.completed_at) FILTER (WHERE sessions.status = 'completed') AS last_completed_at
+		FROM workout_sessions AS sessions
+		LEFT JOIN workout_set_logs AS logs
+		  ON logs.session_id = sessions.id
+		WHERE sessions.user_id = $1
+		  AND sessions.workflow_id = $2
+	`, userID, workflowID).Scan(
+		&analytics.WorkflowID,
+		&analytics.CompletedSessions,
+		&analytics.AbandonedSessions,
+		&analytics.TotalLoggedSets,
+		&analytics.TotalVolume,
+		&avgRPE,
+		&avgRIR,
+		&lastCompletedAt,
+	)
+	if err != nil {
+		return WorkoutAnalytics{}, err
+	}
+
+	if avgRPE.Valid {
+		analytics.AverageRPE = &avgRPE.Float64
+	}
+	if avgRIR.Valid {
+		analytics.AverageRIR = &avgRIR.Float64
+	}
+	if lastCompletedAt.Valid {
+		analytics.LastCompletedAt = &lastCompletedAt.Time
+	}
+
+	return analytics, nil
 }
 
 func scanWorkoutSession(row pgx.Row) (WorkoutSession, error) {

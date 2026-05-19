@@ -77,6 +77,11 @@
 							required
 						/>
 					</div>
+					<div class="mt-2 text-right">
+						<a class="text-xs font-medium text-primary-container transition-colors hover:text-primary" href="/forgot-password">
+							Forgot password?
+						</a>
+					</div>
 				</div>
 
 				{#if form?.message}

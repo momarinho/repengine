@@ -35,7 +35,13 @@ type CreateWorkoutSetLogRequest struct {
 	Notes               string `json:"notes"`
 }
 
+type UpdateWorkoutSetLogRequest = CreateWorkoutSetLogRequest
+
 type CompleteWorkoutSessionRequest struct {
+	Notes string `json:"notes"`
+}
+
+type AbandonWorkoutSessionRequest struct {
 	Notes string `json:"notes"`
 }
 
@@ -44,6 +50,15 @@ func parseWorkoutSessionID(c *fiber.Ctx) (int, error) {
 	id, err := strconv.Atoi(sessionID)
 	if err != nil {
 		return 0, fmt.Errorf("invalid workout session id")
+	}
+	return id, nil
+}
+
+func parseWorkoutSetLogID(c *fiber.Ctx) (int, error) {
+	logID := c.Params("logId")
+	id, err := strconv.Atoi(logID)
+	if err != nil {
+		return 0, fmt.Errorf("invalid workout set log id")
 	}
 	return id, nil
 }
@@ -199,6 +214,111 @@ func (a *App) CompleteWorkoutSession(c *fiber.Ctx) error {
 		UserID:    userID,
 		SessionID: sessionID,
 		Notes:     req.Notes,
+	})
+	if serviceErr != nil {
+		return apperrors.WriteAppError(c, serviceErr)
+	}
+
+	return c.JSON(out)
+}
+
+func (a *App) AbandonWorkoutSession(c *fiber.Ctx) error {
+	ctx, cancel := withTimeout(c.UserContext())
+	defer cancel()
+
+	if a.workoutSessions == nil {
+		return apperrors.WriteAppError(c, apperrors.ErrInternal())
+	}
+
+	userID := c.Locals("user_id").(int)
+	sessionID, err := parseWorkoutSessionID(c)
+	if err != nil {
+		return apperrors.WriteAppError(c, apperrors.ErrBadRequest(err.Error()))
+	}
+
+	var req AbandonWorkoutSessionRequest
+	if err := c.BodyParser(&req); err != nil {
+		return apperrors.WriteAppError(c, apperrors.ErrBadRequest("invalid request body"))
+	}
+
+	out, serviceErr := a.workoutSessions.AbandonSession(ctx, workoutsessionsvc.AbandonSessionInput{
+		UserID:    userID,
+		SessionID: sessionID,
+		Notes:     req.Notes,
+	})
+	if serviceErr != nil {
+		return apperrors.WriteAppError(c, serviceErr)
+	}
+
+	return c.JSON(out)
+}
+
+func (a *App) UpdateWorkoutSetLog(c *fiber.Ctx) error {
+	ctx, cancel := withTimeout(c.UserContext())
+	defer cancel()
+
+	if a.workoutSessions == nil {
+		return apperrors.WriteAppError(c, apperrors.ErrInternal())
+	}
+
+	userID := c.Locals("user_id").(int)
+	sessionID, err := parseWorkoutSessionID(c)
+	if err != nil {
+		return apperrors.WriteAppError(c, apperrors.ErrBadRequest(err.Error()))
+	}
+	logID, err := parseWorkoutSetLogID(c)
+	if err != nil {
+		return apperrors.WriteAppError(c, apperrors.ErrBadRequest(err.Error()))
+	}
+
+	var req UpdateWorkoutSetLogRequest
+	if err := c.BodyParser(&req); err != nil {
+		return apperrors.WriteAppError(c, apperrors.ErrBadRequest("invalid request body"))
+	}
+
+	out, serviceErr := a.workoutSessions.UpdateSetLog(ctx, workoutsessionsvc.UpdateSetLogInput{
+		UserID:              userID,
+		SessionID:           sessionID,
+		LogID:               logID,
+		WorkflowBlockID:     req.WorkflowBlockID,
+		BlockClientID:       req.BlockClientID,
+		NodeTypeSlug:        req.NodeTypeSlug,
+		SetIndex:            req.SetIndex,
+		PrescribedReps:      req.PrescribedReps,
+		PrescribedLoad:      req.PrescribedLoad,
+		PrescribedIntensity: req.PrescribedIntensity,
+		PrescribedRPE:       req.PrescribedRPE,
+		ActualReps:          req.ActualReps,
+		ActualLoad:          req.ActualLoad,
+		ActualRPE:           req.ActualRPE,
+		ActualRIR:           req.ActualRIR,
+		Completed:           req.Completed,
+		Notes:               req.Notes,
+	})
+	if serviceErr != nil {
+		return apperrors.WriteAppError(c, serviceErr)
+	}
+
+	return c.JSON(out)
+}
+
+func (a *App) GetWorkoutAnalytics(c *fiber.Ctx) error {
+	ctx, cancel := withTimeout(c.UserContext())
+	defer cancel()
+
+	if a.workoutSessions == nil {
+		return apperrors.WriteAppError(c, apperrors.ErrInternal())
+	}
+
+	userID := c.Locals("user_id").(int)
+	workflowID, err := parseWorkflowID(c)
+	if err != nil {
+		return apperrors.WriteAppError(c, apperrors.ErrBadRequest(err.Error()))
+	}
+
+	out, serviceErr := a.workoutSessions.GetAnalytics(ctx, workoutsessionsvc.GetAnalyticsInput{
+		UserID:     userID,
+		WorkflowID: workflowID,
 	})
 	if serviceErr != nil {
 		return apperrors.WriteAppError(c, serviceErr)

@@ -2,6 +2,7 @@ package workflows
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -211,6 +212,74 @@ func (s *Service) ListVersions(ctx context.Context, in ListVersionsInput) (Pagin
 	return versions, nil
 }
 
+func (s *Service) RestoreVersion(ctx context.Context, in RestoreVersionInput) (Workflow, error) {
+	ownerID, err := s.repo.GetWorkflowOwner(ctx, in.WorkflowID)
+	if err != nil {
+		if IsNotFound(err) {
+			return Workflow{}, apperrors.ErrWorkflowNotFound()
+		}
+		return Workflow{}, apperrors.ErrInternal()
+	}
+	if ownerID != in.UserID {
+		return Workflow{}, apperrors.ErrForbidden()
+	}
+
+	version, err := s.repo.GetVersion(ctx, in.WorkflowID, in.VersionID)
+	if err != nil {
+		if IsNotFound(err) {
+			return Workflow{}, apperrors.ErrWorkflowNotFound()
+		}
+		return Workflow{}, apperrors.ErrInternal()
+	}
+
+	restore, err := parseSnapshot(version.Snapshot)
+	if err != nil {
+		return Workflow{}, apperrors.ErrBadRequest(err.Error())
+	}
+
+	for _, block := range restore.Blocks {
+		if err := s.validateBlock(ctx, block); err != nil {
+			return Workflow{}, err
+		}
+	}
+
+	tx, err := s.repo.BeginTx(ctx)
+	if err != nil {
+		return Workflow{}, apperrors.ErrInternal()
+	}
+	defer tx.Rollback(ctx)
+
+	if err := s.repo.RestoreWorkflowSnapshotTx(
+		ctx,
+		tx,
+		in.WorkflowID,
+		in.UserID,
+		restore.Name,
+		restore.Description,
+		restore.IsPublic,
+		restore.Blocks,
+	); err != nil {
+		if IsNotFound(err) {
+			return Workflow{}, apperrors.ErrWorkflowNotFound()
+		}
+		return Workflow{}, apperrors.ErrInternal()
+	}
+
+	workflow, err := s.repo.GetWorkflowWithBlocksTx(ctx, tx, in.WorkflowID, in.UserID)
+	if err != nil {
+		if IsNotFound(err) {
+			return Workflow{}, apperrors.ErrWorkflowNotFound()
+		}
+		return Workflow{}, apperrors.ErrInternal()
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return Workflow{}, apperrors.ErrInternal()
+	}
+
+	return workflow, nil
+}
+
 func (s *Service) validateBlock(ctx context.Context, block WorkflowBlock) error {
 	if strings.TrimSpace(block.NodeTypeSlug) == "" {
 		return apperrors.ErrBlockInvalid("node_type_slug is required")
@@ -285,4 +354,28 @@ func jsonTypeName(value any) string {
 	default:
 		return fmt.Sprintf("%T", value)
 	}
+}
+
+type snapshotPayload struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	IsPublic    bool            `json:"is_public"`
+	Blocks      []WorkflowBlock `json:"blocks"`
+}
+
+func parseSnapshot(snapshot map[string]any) (snapshotPayload, error) {
+	raw, err := json.Marshal(snapshot)
+	if err != nil {
+		return snapshotPayload{}, fmt.Errorf("invalid snapshot")
+	}
+
+	var parsed snapshotPayload
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return snapshotPayload{}, fmt.Errorf("invalid snapshot")
+	}
+	if strings.TrimSpace(parsed.Name) == "" {
+		return snapshotPayload{}, fmt.Errorf("snapshot name is required")
+	}
+
+	return parsed, nil
 }

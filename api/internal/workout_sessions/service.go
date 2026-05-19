@@ -157,6 +157,72 @@ func (s *Service) CompleteSession(ctx context.Context, in CompleteSessionInput) 
 	return session, nil
 }
 
+func (s *Service) AbandonSession(ctx context.Context, in AbandonSessionInput) (WorkoutSession, error) {
+	if in.SessionID <= 0 {
+		return WorkoutSession{}, apperrors.ErrBadRequest("session_id is required")
+	}
+
+	if err := s.repo.AbandonSession(ctx, in.SessionID, in.UserID, strings.TrimSpace(in.Notes)); err != nil {
+		if IsNotFound(err) {
+			return WorkoutSession{}, apperrors.ErrWorkoutSessionNotFound()
+		}
+		return WorkoutSession{}, apperrors.ErrInternal()
+	}
+
+	session, err := s.repo.GetSession(ctx, in.SessionID, in.UserID)
+	if err != nil {
+		if IsNotFound(err) {
+			return WorkoutSession{}, apperrors.ErrWorkoutSessionNotFound()
+		}
+		return WorkoutSession{}, apperrors.ErrInternal()
+	}
+
+	return session, nil
+}
+
+func (s *Service) UpdateSetLog(ctx context.Context, in UpdateSetLogInput) (WorkoutSetLog, error) {
+	if in.SessionID <= 0 {
+		return WorkoutSetLog{}, apperrors.ErrBadRequest("session_id is required")
+	}
+	if in.LogID <= 0 {
+		return WorkoutSetLog{}, apperrors.ErrBadRequest("log_id is required")
+	}
+	if strings.TrimSpace(in.NodeTypeSlug) == "" {
+		return WorkoutSetLog{}, apperrors.ErrBadRequest("node_type_slug is required")
+	}
+	if in.SetIndex <= 0 {
+		return WorkoutSetLog{}, apperrors.ErrBadRequest("set_index must be greater than zero")
+	}
+
+	log, err := s.repo.UpdateSetLog(ctx, UpdateSetLogInput{
+		UserID:              in.UserID,
+		SessionID:           in.SessionID,
+		LogID:               in.LogID,
+		WorkflowBlockID:     in.WorkflowBlockID,
+		BlockClientID:       strings.TrimSpace(in.BlockClientID),
+		NodeTypeSlug:        strings.TrimSpace(in.NodeTypeSlug),
+		SetIndex:            in.SetIndex,
+		PrescribedReps:      strings.TrimSpace(in.PrescribedReps),
+		PrescribedLoad:      strings.TrimSpace(in.PrescribedLoad),
+		PrescribedIntensity: strings.TrimSpace(in.PrescribedIntensity),
+		PrescribedRPE:       strings.TrimSpace(in.PrescribedRPE),
+		ActualReps:          strings.TrimSpace(in.ActualReps),
+		ActualLoad:          strings.TrimSpace(in.ActualLoad),
+		ActualRPE:           strings.TrimSpace(in.ActualRPE),
+		ActualRIR:           strings.TrimSpace(in.ActualRIR),
+		Completed:           in.Completed,
+		Notes:               strings.TrimSpace(in.Notes),
+	})
+	if err != nil {
+		if IsNotFound(err) {
+			return WorkoutSetLog{}, apperrors.ErrWorkoutSessionNotFound()
+		}
+		return WorkoutSetLog{}, apperrors.ErrInternal()
+	}
+
+	return log, nil
+}
+
 func (s *Service) GetSession(ctx context.Context, in GetSessionInput) (WorkoutSession, error) {
 	if in.SessionID <= 0 {
 		return WorkoutSession{}, apperrors.ErrBadRequest("session_id is required")
@@ -200,4 +266,25 @@ func (s *Service) ListSessions(ctx context.Context, in ListSessionsInput) (Pagin
 	}
 
 	return out, nil
+}
+
+func (s *Service) GetAnalytics(ctx context.Context, in GetAnalyticsInput) (WorkoutAnalytics, error) {
+	if in.WorkflowID <= 0 {
+		return WorkoutAnalytics{}, apperrors.ErrBadRequest("workflow_id is required")
+	}
+
+	ownsWorkflow, err := s.repo.UserOwnsWorkflow(ctx, in.UserID, in.WorkflowID)
+	if err != nil {
+		return WorkoutAnalytics{}, apperrors.ErrInternal()
+	}
+	if !ownsWorkflow {
+		return WorkoutAnalytics{}, apperrors.ErrWorkflowNotFound()
+	}
+
+	analytics, err := s.repo.GetAnalytics(ctx, in.UserID, in.WorkflowID)
+	if err != nil {
+		return WorkoutAnalytics{}, apperrors.ErrInternal()
+	}
+
+	return analytics, nil
 }

@@ -16,9 +16,12 @@ type fakeRepo struct {
 	getActiveSessionFunc func(ctx context.Context, userID, workflowID int) (WorkoutSession, error)
 	insertSetLogFunc     func(ctx context.Context, in InsertSetLogInput) (WorkoutSetLog, error)
 	completeSessionFunc  func(ctx context.Context, sessionID, userID int, notes string) error
+	abandonSessionFunc   func(ctx context.Context, sessionID, userID int, notes string) error
+	updateSetLogFunc     func(ctx context.Context, in UpdateSetLogInput) (WorkoutSetLog, error)
 	getSessionFunc       func(ctx context.Context, sessionID, userID int) (WorkoutSession, error)
 	listSessionLogsFunc  func(ctx context.Context, sessionID int) ([]WorkoutSetLog, error)
 	listSessionsFunc     func(ctx context.Context, userID, workflowID int, cursor int64, limit int) (PaginatedWorkoutSessions, error)
+	getAnalyticsFunc     func(ctx context.Context, userID, workflowID int) (WorkoutAnalytics, error)
 	userOwnsWorkflowFunc func(ctx context.Context, userID, workflowID int) (bool, error)
 }
 
@@ -61,6 +64,20 @@ func (f *fakeRepo) CompleteSession(ctx context.Context, sessionID, userID int, n
 	return f.completeSessionFunc(ctx, sessionID, userID, notes)
 }
 
+func (f *fakeRepo) AbandonSession(ctx context.Context, sessionID, userID int, notes string) error {
+	if f.abandonSessionFunc == nil {
+		panic("unexpected call to AbandonSession")
+	}
+	return f.abandonSessionFunc(ctx, sessionID, userID, notes)
+}
+
+func (f *fakeRepo) UpdateSetLog(ctx context.Context, in UpdateSetLogInput) (WorkoutSetLog, error) {
+	if f.updateSetLogFunc == nil {
+		panic("unexpected call to UpdateSetLog")
+	}
+	return f.updateSetLogFunc(ctx, in)
+}
+
 func (f *fakeRepo) GetSession(ctx context.Context, sessionID, userID int) (WorkoutSession, error) {
 	if f.getSessionFunc == nil {
 		panic("unexpected call to GetSession")
@@ -80,6 +97,13 @@ func (f *fakeRepo) ListSessions(ctx context.Context, userID, workflowID int, cur
 		panic("unexpected call to ListSessions")
 	}
 	return f.listSessionsFunc(ctx, userID, workflowID, cursor, limit)
+}
+
+func (f *fakeRepo) GetAnalytics(ctx context.Context, userID, workflowID int) (WorkoutAnalytics, error) {
+	if f.getAnalyticsFunc == nil {
+		panic("unexpected call to GetAnalytics")
+	}
+	return f.getAnalyticsFunc(ctx, userID, workflowID)
 }
 
 func (f *fakeRepo) UserOwnsWorkflow(ctx context.Context, userID, workflowID int) (bool, error) {

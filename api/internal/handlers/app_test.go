@@ -41,6 +41,26 @@ func (f *fakeAuthService) Logout(ctx context.Context, userID int) error {
 	return f.logoutFunc(ctx, userID)
 }
 
+func (f *fakeAuthService) GetAccount(ctx context.Context, userID int) (authnsvc.Account, error) {
+	panic("unexpected call to GetAccount")
+}
+
+func (f *fakeAuthService) UpdateAccount(ctx context.Context, in authnsvc.UpdateAccountInput) (authnsvc.UpdateAccountResult, error) {
+	panic("unexpected call to UpdateAccount")
+}
+
+func (f *fakeAuthService) DeleteAccount(ctx context.Context, in authnsvc.DeleteAccountInput) error {
+	panic("unexpected call to DeleteAccount")
+}
+
+func (f *fakeAuthService) RequestPasswordReset(ctx context.Context, in authnsvc.RequestPasswordResetInput) (authnsvc.RequestPasswordResetResult, error) {
+	panic("unexpected call to RequestPasswordReset")
+}
+
+func (f *fakeAuthService) ResetPassword(ctx context.Context, in authnsvc.ResetPasswordInput) error {
+	panic("unexpected call to ResetPassword")
+}
+
 type fakeWorkflowService struct {
 	createVersionFunc func(ctx context.Context, in workflowsvc.CreateVersionInput) (workflowsvc.WorkflowVersion, error)
 }
@@ -74,6 +94,10 @@ func (f *fakeWorkflowService) CreateVersion(ctx context.Context, in workflowsvc.
 
 func (f *fakeWorkflowService) ListVersions(ctx context.Context, in workflowsvc.ListVersionsInput) (workflowsvc.PaginatedVersions, error) {
 	panic("unexpected call to ListVersions")
+}
+
+func (f *fakeWorkflowService) RestoreVersion(ctx context.Context, in workflowsvc.RestoreVersionInput) (workflowsvc.Workflow, error) {
+	panic("unexpected call to RestoreVersion")
 }
 
 func decodeBody(t *testing.T, resp *http.Response) map[string]any {

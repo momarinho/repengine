@@ -5,6 +5,7 @@ import "time"
 const (
 	SessionStatusActive    = "active"
 	SessionStatusCompleted = "completed"
+	SessionStatusAbandoned = "abandoned"
 )
 
 type WorkoutSession struct {
@@ -47,6 +48,17 @@ type PaginatedWorkoutSessions struct {
 	HasMore    bool             `json:"has_more"`
 }
 
+type WorkoutAnalytics struct {
+	WorkflowID        int        `json:"workflow_id"`
+	CompletedSessions int        `json:"completed_sessions"`
+	AbandonedSessions int        `json:"abandoned_sessions"`
+	TotalLoggedSets   int        `json:"total_logged_sets"`
+	TotalVolume       float64    `json:"total_volume"`
+	AverageRPE        *float64   `json:"average_rpe"`
+	AverageRIR        *float64   `json:"average_rir"`
+	LastCompletedAt   *time.Time `json:"last_completed_at"`
+}
+
 type StartSessionInput struct {
 	UserID       int
 	WorkflowID   int
@@ -79,6 +91,32 @@ type CompleteSessionInput struct {
 	Notes     string
 }
 
+type AbandonSessionInput struct {
+	UserID    int
+	SessionID int
+	Notes     string
+}
+
+type UpdateSetLogInput struct {
+	UserID              int
+	SessionID           int
+	LogID               int
+	WorkflowBlockID     *int
+	BlockClientID       string
+	NodeTypeSlug        string
+	SetIndex            int
+	PrescribedReps      string
+	PrescribedLoad      string
+	PrescribedIntensity string
+	PrescribedRPE       string
+	ActualReps          string
+	ActualLoad          string
+	ActualRPE           string
+	ActualRIR           string
+	Completed           bool
+	Notes               string
+}
+
 type GetSessionInput struct {
 	UserID    int
 	SessionID int
@@ -89,4 +127,9 @@ type ListSessionsInput struct {
 	WorkflowID int
 	Cursor     int64
 	Limit      int
+}
+
+type GetAnalyticsInput struct {
+	UserID     int
+	WorkflowID int
 }

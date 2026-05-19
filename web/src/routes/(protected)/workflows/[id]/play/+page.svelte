@@ -635,7 +635,7 @@
 		sessionError = null;
 	}
 
-	function clearLocalSession(): void {
+	function clearLocalSession(options?: { autoStart?: boolean; chooserOpen?: boolean }): void {
 		if (browser && localSessionKey) {
 			localStorage.removeItem(localSessionKey);
 		}
@@ -643,11 +643,41 @@
 		activePersistedSession = null;
 		completedSessionSummary = null;
 		sessionError = null;
-		const chooserOpen = Boolean(routine?.sections.length) && !hasSectionQuery;
+		const chooserOpen = options?.chooserOpen ?? (Boolean(routine?.sections.length) && !hasSectionQuery);
 		const nextSection = activeSection ?? initialSection;
 		resetRuntimeState(initialBlockIndex, initialSection, chooserOpen);
-		if (!chooserOpen) {
+		if (!chooserOpen && options?.autoStart !== false) {
 			void startSection(nextSection);
+		}
+	}
+
+	async function abandonPersistedSession(): Promise<void> {
+		if (!activePersistedSession || isSyncingSession) return;
+		if (!confirm('Abandon this active session? Logged data will remain in history as abandoned.')) {
+			return;
+		}
+
+		isSyncingSession = true;
+		sessionError = null;
+		try {
+			const response = await fetch(`/api/workout-sessions/${activePersistedSession.id}/abandon`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					notes: buildSessionNotes()
+				})
+			});
+			const session = await parseApiResponse<WorkoutSession>(response);
+			if (!response.ok || !session) {
+				throw new Error('Unable to abandon workout session.');
+			}
+
+			syncSessionHistory(session);
+			clearLocalSession({ autoStart: false, chooserOpen: true });
+		} catch (error: unknown) {
+			sessionError = error instanceof Error ? error.message : 'Unable to abandon workout session.';
+		} finally {
+			isSyncingSession = false;
 		}
 	}
 
@@ -1274,10 +1304,16 @@
 					<button
 						type="button"
 						class="rounded-md border border-outline-variant/20 px-4 py-2 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
-						onclick={clearLocalSession}
+						onclick={() => clearLocalSession()}
 					>
 						Clear local run
 					</button>
+					<a
+						href={`/workflows/${routine.id}/history`}
+						class="rounded-md border border-outline-variant/20 px-4 py-2 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+					>
+						View history
+					</a>
 					<a
 						href={`/workflows/${routine.id}/edit`}
 						class="rounded-md border border-outline-variant/20 px-4 py-2 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
@@ -1887,7 +1923,7 @@
 						<button
 							type="button"
 							class="text-[10px] font-bold uppercase tracking-[0.18em] text-tertiary transition-colors hover:text-primary"
-							onclick={clearLocalSession}
+							onclick={() => clearLocalSession()}
 						>
 							Reset
 						</button>
@@ -1901,6 +1937,24 @@
 							Start a section to create a persisted workout session.
 						{/if}
 					</p>
+					<div class="mt-4 flex flex-wrap gap-2">
+						<a
+							href={`/workflows/${routine.id}/history`}
+							class="rounded-md border border-outline-variant/20 px-3 py-2 text-[11px] font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+						>
+							Open history
+						</a>
+						{#if activePersistedSession}
+							<button
+								type="button"
+								class="rounded-md border border-error/20 bg-error/10 px-3 py-2 text-[11px] font-semibold text-error transition-colors hover:bg-error/20"
+								onclick={() => void abandonPersistedSession()}
+								disabled={isSyncingSession}
+							>
+								Abandon session
+							</button>
+						{/if}
+					</div>
 				</div>
 				{#if recentActivity.length > 0}
 					<div class="mt-5">

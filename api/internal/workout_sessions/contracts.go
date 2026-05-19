@@ -15,8 +15,11 @@ type workoutSessionRepo interface {
 	GetActiveSessionByWorkflow(ctx context.Context, userID, workflowID int) (WorkoutSession, error)
 	InsertSetLog(ctx context.Context, in InsertSetLogInput) (WorkoutSetLog, error)
 	CompleteSession(ctx context.Context, sessionID, userID int, notes string) error
+	AbandonSession(ctx context.Context, sessionID, userID int, notes string) error
+	UpdateSetLog(ctx context.Context, in UpdateSetLogInput) (WorkoutSetLog, error)
 	GetSession(ctx context.Context, sessionID, userID int) (WorkoutSession, error)
 	ListSessionLogs(ctx context.Context, sessionID int) ([]WorkoutSetLog, error)
 	ListSessions(ctx context.Context, userID, workflowID int, cursor int64, limit int) (PaginatedWorkoutSessions, error)
+	GetAnalytics(ctx context.Context, userID, workflowID int) (WorkoutAnalytics, error)
 	UserOwnsWorkflow(ctx context.Context, userID, workflowID int) (bool, error)
 }

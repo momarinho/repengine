@@ -14,6 +14,11 @@ type authService interface {
 	Register(ctx context.Context, in authnsvc.RegisterInput) (authnsvc.RegisterResult, error)
 	Login(ctx context.Context, in authnsvc.LoginInput) (authnsvc.LoginResult, error)
 	Logout(ctx context.Context, userID int) error
+	GetAccount(ctx context.Context, userID int) (authnsvc.Account, error)
+	UpdateAccount(ctx context.Context, in authnsvc.UpdateAccountInput) (authnsvc.UpdateAccountResult, error)
+	DeleteAccount(ctx context.Context, in authnsvc.DeleteAccountInput) error
+	RequestPasswordReset(ctx context.Context, in authnsvc.RequestPasswordResetInput) (authnsvc.RequestPasswordResetResult, error)
+	ResetPassword(ctx context.Context, in authnsvc.ResetPasswordInput) error
 }
 
 type workflowService interface {
@@ -24,6 +29,7 @@ type workflowService interface {
 	DeleteWorkflow(ctx context.Context, in workflowsvc.DeleteWorkflowInput) error
 	CreateVersion(ctx context.Context, in workflowsvc.CreateVersionInput) (workflowsvc.WorkflowVersion, error)
 	ListVersions(ctx context.Context, in workflowsvc.ListVersionsInput) (workflowsvc.PaginatedVersions, error)
+	RestoreVersion(ctx context.Context, in workflowsvc.RestoreVersionInput) (workflowsvc.Workflow, error)
 }
 
 type templateService interface {
@@ -42,7 +48,10 @@ type workoutSessionService interface {
 	StartSession(ctx context.Context, in workoutsessionsvc.StartSessionInput) (workoutsessionsvc.WorkoutSession, error)
 	GetSession(ctx context.Context, in workoutsessionsvc.GetSessionInput) (workoutsessionsvc.WorkoutSession, error)
 	InsertSetLog(ctx context.Context, in workoutsessionsvc.InsertSetLogInput) (workoutsessionsvc.WorkoutSetLog, error)
+	UpdateSetLog(ctx context.Context, in workoutsessionsvc.UpdateSetLogInput) (workoutsessionsvc.WorkoutSetLog, error)
 	CompleteSession(ctx context.Context, in workoutsessionsvc.CompleteSessionInput) (workoutsessionsvc.WorkoutSession, error)
+	AbandonSession(ctx context.Context, in workoutsessionsvc.AbandonSessionInput) (workoutsessionsvc.WorkoutSession, error)
+	GetAnalytics(ctx context.Context, in workoutsessionsvc.GetAnalyticsInput) (workoutsessionsvc.WorkoutAnalytics, error)
 }
 
 type Dependencies struct {

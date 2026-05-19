@@ -1,4 +1,4 @@
-export type WorkoutSessionStatus = 'active' | 'completed';
+export type WorkoutSessionStatus = 'active' | 'completed' | 'abandoned';
 
 export type WorkoutSetLog = {
 	id: number;
@@ -38,4 +38,15 @@ export type PaginatedWorkoutSessions = {
 	data: WorkoutSession[];
 	next_cursor: number | null;
 	has_more: boolean;
+};
+
+export type WorkoutAnalytics = {
+	workflow_id: number;
+	completed_sessions: number;
+	abandoned_sessions: number;
+	total_logged_sets: number;
+	total_volume: number;
+	average_rpe: number | null;
+	average_rir: number | null;
+	last_completed_at: string | null;
 };

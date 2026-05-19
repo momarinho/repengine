@@ -150,6 +150,11 @@ func main() {
 	auth.Post("/register", middleware.AuthRateLimit(5, time.Minute), h.Register)
 	auth.Post("/login", middleware.AuthRateLimit(10, time.Minute), h.Login)
 	auth.Post("/logout", requireAuth, h.Logout)
+	auth.Get("/me", requireAuth, h.GetAccount)
+	auth.Put("/me", requireAuth, h.UpdateAccount)
+	auth.Delete("/me", requireAuth, h.DeleteAccount)
+	auth.Post("/password-reset/request", middleware.AuthRateLimit(5, time.Minute), h.RequestPasswordReset)
+	auth.Post("/password-reset/confirm", middleware.AuthRateLimit(5, time.Minute), h.ResetPassword)
 	app.Get("/node-types", h.GetNodeTypes)
 	app.Get("/node-types/:slug", h.GetNodeTypeBySlug)
 
@@ -161,9 +166,11 @@ func main() {
 	workflows.Delete("/:id", h.DeleteWorkflow)
 	workflows.Post("/:id/versions", h.CreateVersion)
 	workflows.Get("/:id/versions", h.ListVersions)
+	workflows.Post("/:id/versions/:versionId/restore", h.RestoreVersion)
 	workflows.Get("/:id/sessions", h.ListWorkoutSessions)
 	workflows.Post("/:id/sessions", h.StartWorkoutSession)
 	workflows.Get("/:id/progression-states", h.ListProgressionStates)
+	workflows.Get("/:id/analytics", h.GetWorkoutAnalytics)
 
 	templates := app.Group("/templates", requireAuth)
 	templates.Get("/", h.ListTemplates)
@@ -176,7 +183,9 @@ func main() {
 	workoutSessions := app.Group("/workout-sessions", requireAuth)
 	workoutSessions.Get("/:id", h.GetWorkoutSession)
 	workoutSessions.Post("/:id/logs", h.CreateWorkoutSetLog)
+	workoutSessions.Put("/:id/logs/:logId", h.UpdateWorkoutSetLog)
 	workoutSessions.Post("/:id/complete", h.CompleteWorkoutSession)
+	workoutSessions.Post("/:id/abandon", h.AbandonWorkoutSession)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)

@@ -52,6 +52,7 @@
 	let saveInFlight = $state(false);
 	let queuedSave = $state<{ source: 'autosave' | 'manual'; createVersion: boolean } | null>(null);
 	let sectionCollapseState = $state<Record<string, boolean>>({});
+	let restoringVersionID = $state<number | null>(null);
 
 	const hasWorkflow = $derived(Boolean(workflow));
 	const selectedBlock = $derived(blocks.find((block) => block.client_id === selectedBlockId) ?? null);
@@ -350,6 +351,33 @@
 				await persist(next.source, next.createVersion);
 			}
 		}
+	}
+
+	async function restoreVersion(version: WorkflowVersion): Promise<void> {
+		if (!workflow) return;
+		if (restoringVersionID !== null) return;
+		if (!confirm(`Restore version ${version.version_number}? This will overwrite the current routine draft.`)) {
+			return;
+		}
+
+		restoringVersionID = version.id;
+		statusMessage = '';
+
+		const response = await fetch(`/api/workflows/${workflow.id}/versions/${version.id}/restore`, {
+			method: 'POST'
+		});
+		const body = await response.json().catch(() => null);
+
+		if (!response.ok || !body) {
+			statusMessage = body?.message ?? 'Unable to restore version.';
+			restoringVersionID = null;
+			return;
+		}
+
+		initializeFromWorkflow(body as Workflow);
+		saveState = 'saved';
+		statusMessage = `Version ${version.version_number} restored.`;
+		restoringVersionID = null;
 	}
 
 	$effect(() => {
@@ -857,9 +885,19 @@
 												<p class="text-sm font-semibold text-on-surface">Version {version.version_number}</p>
 												<p class="mt-1 text-xs text-on-surface-variant">{version.commit_message || 'Manual save'}</p>
 											</div>
-											<p class="text-xs text-on-surface-variant">
-												{new Date(version.created_at).toLocaleString()}
-											</p>
+											<div class="text-right">
+												<p class="text-xs text-on-surface-variant">
+													{new Date(version.created_at).toLocaleString()}
+												</p>
+												<button
+													type="button"
+													class="mt-3 rounded-md border border-primary/20 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+													onclick={() => void restoreVersion(version)}
+													disabled={restoringVersionID === version.id}
+												>
+													{restoringVersionID === version.id ? 'Restoring...' : 'Restore'}
+												</button>
+											</div>
 										</div>
 										<p class="mt-3 text-sm text-on-surface-variant">
 											{blockSnapshotSummary(

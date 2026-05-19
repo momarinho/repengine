@@ -52,6 +52,8 @@ type fakeRepo struct {
 	getWorkflowOwnerFunc               func(ctx context.Context, workflowID int) (int, error)
 	createVersionFunc                  func(ctx context.Context, workflowID int, commitMessage string, snapshot map[string]any) (WorkflowVersion, error)
 	listVersionsFunc                   func(ctx context.Context, workflowID int, cursor int64, limit int) (PaginatedVersions, error)
+	getVersionFunc                     func(ctx context.Context, workflowID, versionID int) (WorkflowVersion, error)
+	restoreWorkflowSnapshotTxFunc      func(ctx context.Context, tx dbtx, workflowID, userID int, name, description string, isPublic bool, blocks []WorkflowBlock) error
 	getNodeTypeSchemaFunc              func(ctx context.Context, slug string) (map[string]any, error)
 	listWorkflowsFunc                  func(ctx context.Context, userID int, cursor int64, limit int) (PaginatedWorkflows, error)
 }
@@ -152,6 +154,20 @@ func (f *fakeRepo) ListVersions(ctx context.Context, workflowID int, cursor int6
 		panic("unexpected call to ListVersions")
 	}
 	return f.listVersionsFunc(ctx, workflowID, cursor, limit)
+}
+
+func (f *fakeRepo) GetVersion(ctx context.Context, workflowID, versionID int) (WorkflowVersion, error) {
+	if f.getVersionFunc == nil {
+		panic("unexpected call to GetVersion")
+	}
+	return f.getVersionFunc(ctx, workflowID, versionID)
+}
+
+func (f *fakeRepo) RestoreWorkflowSnapshotTx(ctx context.Context, tx dbtx, workflowID, userID int, name, description string, isPublic bool, blocks []WorkflowBlock) error {
+	if f.restoreWorkflowSnapshotTxFunc == nil {
+		panic("unexpected call to RestoreWorkflowSnapshotTx")
+	}
+	return f.restoreWorkflowSnapshotTxFunc(ctx, tx, workflowID, userID, name, description, isPublic, blocks)
 }
 
 func (f *fakeRepo) GetNodeTypeSchema(ctx context.Context, slug string) (map[string]any, error) {
