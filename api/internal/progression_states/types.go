@@ -56,6 +56,11 @@ type CompletedSetLog struct {
 	Notes               string
 }
 
+type HistoricalCompletedSetLog struct {
+	SessionID int
+	CompletedSetLog
+}
+
 type ApplySessionProgressionInput struct {
 	UserID     int
 	WorkflowID int

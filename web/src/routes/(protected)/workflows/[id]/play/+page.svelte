@@ -101,6 +101,35 @@
 			return acc;
 		}, {})
 	);
+	const activeSessionWaveWeekByBlockID = $derived.by(() => {
+		const sessionLogs = activePersistedSession?.logs ?? [];
+		if (!sessionLogs.length || activePersistedSession?.status !== 'active') {
+			return {} as Record<number, number>;
+		}
+
+		return sessionLogs.reduce<Record<number, number>>((acc, log) => {
+			if (!log.workflow_block_id || log.node_type_slug !== 'wave') {
+				return acc;
+			}
+
+			const block = routine?.blocks.find((entry) => entry.workflowBlockID === log.workflow_block_id);
+			if (!block || block.node_type_slug !== 'wave') {
+				return acc;
+			}
+
+			const groupedLogs = sessionLogs.filter(
+				(entry) =>
+					entry.workflow_block_id === log.workflow_block_id &&
+					entry.node_type_slug === 'wave' &&
+					entry.completed
+			);
+			const weekIndex = inferWaveWeekIndexFromSessionLogs(block, groupedLogs);
+			if (weekIndex !== null) {
+				acc[log.workflow_block_id] = weekIndex;
+			}
+			return acc;
+		}, {});
+	});
 	const currentBlock = $derived(routine?.blocks[currentBlockIndex] ?? null);
 	const currentProgressionState = $derived(
 		currentBlock?.workflowBlockID ? progressionStateByBlockID[currentBlock.workflowBlockID] ?? null : null
@@ -259,6 +288,83 @@
 		return progressionStateByBlockID[block.workflowBlockID] ?? null;
 	}
 
+	function normalizeWaveValue(value: string | null | undefined): string {
+		return (value ?? '').trim().toLowerCase().replaceAll(' ', '').replace(/%$/u, '');
+	}
+
+	function splitWaveValues(value: string): string[] {
+		return value
+			.split('/')
+			.map((part) => normalizeWaveValue(part))
+			.filter(Boolean);
+	}
+
+	function getWaveValue(parts: string[], index: number): string {
+		if (!parts.length) return '';
+		return parts[Math.min(index, parts.length - 1)] ?? '';
+	}
+
+	function inferWaveWeekIndexFromSessionLogs(block: PlayerBlock, logs: WorkoutSetLog[]): number | null {
+		if (block.node_type_slug !== 'wave' || !block.waveSteps?.length || !logs.length) {
+			return null;
+		}
+
+		const sortedLogs = [...logs].sort((a, b) => a.set_index - b.set_index);
+		let bestIndex: number | null = null;
+		let bestScore = -1;
+
+		for (const [weekIndex, week] of block.waveSteps.entries()) {
+			const repParts = splitWaveValues(week.reps);
+			const intensityParts = splitWaveValues(week.intensity);
+			const rpeParts = splitWaveValues(week.rpe);
+			let score = 0;
+			let compared = 0;
+			let failed = false;
+
+			for (const log of sortedLogs) {
+				const setIndex = Math.max(log.set_index - 1, 0);
+				const expectedReps = getWaveValue(repParts, setIndex);
+				const expectedIntensity = getWaveValue(intensityParts, setIndex);
+				const expectedRPE = getWaveValue(rpeParts, setIndex);
+				const actualReps = normalizeWaveValue(log.prescribed_reps);
+				const actualIntensity = normalizeWaveValue(log.prescribed_intensity);
+				const actualRPE = normalizeWaveValue(log.prescribed_rpe);
+
+				if (expectedReps && actualReps) {
+					compared += 1;
+					if (expectedReps !== actualReps) {
+						failed = true;
+						break;
+					}
+					score += 3;
+				}
+
+				if (expectedRPE && actualRPE) {
+					compared += 1;
+					if (expectedRPE !== actualRPE) {
+						failed = true;
+						break;
+					}
+					score += 2;
+				}
+
+				if (expectedIntensity && actualIntensity) {
+					compared += 1;
+					if (expectedIntensity === actualIntensity) {
+						score += 1;
+					}
+				}
+			}
+
+			if (!failed && compared > 0 && score > bestScore) {
+				bestScore = score;
+				bestIndex = weekIndex;
+			}
+		}
+
+		return bestIndex;
+	}
+
 	function formatSignedMetric(value: string): string {
 		const trimmed = value.trim();
 		if (!trimmed || trimmed === '0' || trimmed === '+0' || trimmed === '-0') return '0%';
@@ -285,14 +391,25 @@
 			.join('/');
 	}
 
+	function resolveWaveWeekIndex(block: PlayerBlock | null): number | null {
+		if (!block || block.node_type_slug !== 'wave' || !block.waveSteps?.length) return null;
+		const progression = getBlockProgressionState(block);
+		const resumedWeekIndex =
+			block.workflowBlockID !== undefined ? activeSessionWaveWeekByBlockID[block.workflowBlockID] : undefined;
+		const suggestedWeekIndex =
+			resumedWeekIndex !== undefined
+				? resumedWeekIndex
+				: progression?.state_type === 'wave' && progression.suggested_week > 0
+					? progression.suggested_week - 1
+					: block.activeWaveWeekIndex ?? 0;
+		return Math.min(Math.max(suggestedWeekIndex, 0), block.waveSteps.length - 1);
+	}
+
 	function resolveWaveWeek(block: PlayerBlock | null): WaveWeek | null {
 		if (!block || block.node_type_slug !== 'wave' || !block.waveSteps?.length) return null;
 		const progression = getBlockProgressionState(block);
-		const suggestedWeekIndex =
-			progression?.state_type === 'wave' && progression.suggested_week > 0
-				? progression.suggested_week - 1
-				: block.activeWaveWeekIndex ?? 0;
-		const weekIndex = Math.min(Math.max(suggestedWeekIndex, 0), block.waveSteps.length - 1);
+		const weekIndex = resolveWaveWeekIndex(block);
+		if (weekIndex === null) return null;
 		const week = block.waveSteps[weekIndex];
 		const offset = progression?.state_type === 'wave' ? progression.suggested_intensity_offset : '';
 
@@ -985,10 +1102,12 @@
 		if (!rawState) {
 			hasRestoredSession = true;
 			if (recentActiveSession) {
-				activePersistedSession = recentActiveSession;
 				const resumedSection = getSectionByID(recentActiveSession.section_id) ?? initialSection;
 				const index = resumedSection?.startBlockIndex ?? initialBlockIndex;
 				resetRuntimeState(index, resumedSection, false);
+				void restorePersistedSession(recentActiveSession.id).catch(() => {
+					sessionError = 'Unable to restore workout session.';
+				});
 			} else if (!isChoosingSection) {
 				void startSection(initialSection);
 			}
@@ -1040,7 +1159,9 @@
 					sessionError = 'Unable to restore workout session.';
 				});
 			} else if (recentActiveSession) {
-				activePersistedSession = recentActiveSession;
+				void restorePersistedSession(recentActiveSession.id).catch(() => {
+					sessionError = 'Unable to restore workout session.';
+				});
 			}
 		} catch {
 			localStorage.removeItem(localSessionKey);
@@ -1714,12 +1835,12 @@
 								</div>
 								<div class="flex gap-2">
 									{#each currentBlock.waveSteps ?? [] as step, index}
-										<div class={`h-2 flex-1 rounded-full ${index <= ((currentProgressionState?.state_type === 'wave' && currentProgressionState.suggested_week > 0 ? currentProgressionState.suggested_week - 1 : currentBlock.activeWaveWeekIndex ?? 0)) ? 'bg-secondary' : 'bg-surface-variant'}`}></div>
+										<div class={`h-2 flex-1 rounded-full ${index <= (resolveWaveWeekIndex(currentBlock) ?? 0) ? 'bg-secondary' : 'bg-surface-variant'}`}></div>
 									{/each}
 								</div>
 								<div class="mt-5 grid gap-3 md:grid-cols-2">
 									{#each currentBlock.waveSteps ?? [] as step, index}
-										<div class={`rounded-xl border px-4 py-3 ${index === ((currentProgressionState?.state_type === 'wave' && currentProgressionState.suggested_week > 0 ? currentProgressionState.suggested_week - 1 : currentBlock.activeWaveWeekIndex ?? 0)) ? 'border-secondary/30 bg-secondary/10' : 'border-white/5 bg-surface-container'}`}>
+										<div class={`rounded-xl border px-4 py-3 ${index === (resolveWaveWeekIndex(currentBlock) ?? 0) ? 'border-secondary/30 bg-secondary/10' : 'border-white/5 bg-surface-container'}`}>
 											<p class="text-sm font-semibold text-on-surface">{step.label}</p>
 											<p class="mt-1 text-xs text-on-surface-variant">{step.reps} • {applyWaveIntensityOffset(step.intensity, currentProgressionState?.state_type === 'wave' ? currentProgressionState.suggested_intensity_offset : '')} • RPE {step.rpe}</p>
 										</div>

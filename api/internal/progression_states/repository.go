@@ -98,6 +98,85 @@ func (r *Repository) ListProgressionStates(ctx context.Context, userID, workflow
 	return states, nil
 }
 
+func (r *Repository) ListLatestCompletedLogsByBlock(ctx context.Context, userID, workflowID int) ([]HistoricalCompletedSetLog, error) {
+	rows, err := r.pool.Query(ctx, `
+		WITH latest_block_sessions AS (
+			SELECT DISTINCT ON (logs.workflow_block_id)
+				logs.workflow_block_id,
+				sessions.id AS session_id
+			FROM workout_set_logs AS logs
+			INNER JOIN workout_sessions AS sessions
+				ON sessions.id = logs.session_id
+			WHERE sessions.user_id = $1
+			  AND sessions.workflow_id = $2
+			  AND sessions.status = 'completed'
+			  AND logs.workflow_block_id IS NOT NULL
+			  AND logs.completed
+			ORDER BY logs.workflow_block_id, sessions.completed_at DESC NULLS LAST, sessions.id DESC
+		)
+		SELECT
+			lbs.session_id,
+			logs.workflow_block_id,
+			COALESCE(logs.block_client_id, ''),
+			logs.node_type_slug,
+			logs.set_index,
+			COALESCE(logs.prescribed_reps, ''),
+			COALESCE(logs.prescribed_load, ''),
+			COALESCE(logs.prescribed_intensity, ''),
+			COALESCE(logs.prescribed_rpe, ''),
+			COALESCE(logs.actual_reps, ''),
+			COALESCE(logs.actual_load, ''),
+			COALESCE(logs.actual_rpe, ''),
+			COALESCE(logs.actual_rir, ''),
+			logs.completed,
+			COALESCE(logs.notes, '')
+		FROM latest_block_sessions AS lbs
+		INNER JOIN workout_set_logs AS logs
+			ON logs.session_id = lbs.session_id
+			AND logs.workflow_block_id = lbs.workflow_block_id
+		WHERE logs.completed
+		ORDER BY logs.workflow_block_id ASC, logs.set_index ASC, logs.id ASC
+	`, userID, workflowID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	logs := []HistoricalCompletedSetLog{}
+	for rows.Next() {
+		var entry HistoricalCompletedSetLog
+		var workflowBlockID int
+		entry.Completed = true
+		entry.WorkflowBlockID = &workflowBlockID
+		if err := rows.Scan(
+			&entry.SessionID,
+			&workflowBlockID,
+			&entry.BlockClientID,
+			&entry.NodeTypeSlug,
+			&entry.SetIndex,
+			&entry.PrescribedReps,
+			&entry.PrescribedLoad,
+			&entry.PrescribedIntensity,
+			&entry.PrescribedRPE,
+			&entry.ActualReps,
+			&entry.ActualLoad,
+			&entry.ActualRPE,
+			&entry.ActualRIR,
+			&entry.Completed,
+			&entry.Notes,
+		); err != nil {
+			return nil, err
+		}
+		logs = append(logs, entry)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return logs, nil
+}
+
 func (r *Repository) UpsertProgressionState(ctx context.Context, in UpsertProgressionStateInput) (ProgressionState, error) {
 	metadataJSON, err := json.Marshal(in.Metadata)
 	if err != nil {

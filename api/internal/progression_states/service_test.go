@@ -9,6 +9,7 @@ type fakeRepo struct {
 	userOwnsWorkflowFunc       func(ctx context.Context, userID, workflowID int) (bool, error)
 	listWorkflowBlocksFunc     func(ctx context.Context, workflowID int) ([]workflowBlockConfig, error)
 	listProgressionStatesFunc  func(ctx context.Context, userID, workflowID int) ([]ProgressionState, error)
+	listLatestLogsByBlockFunc  func(ctx context.Context, userID, workflowID int) ([]HistoricalCompletedSetLog, error)
 	upsertProgressionStateFunc func(ctx context.Context, in UpsertProgressionStateInput) (ProgressionState, error)
 }
 
@@ -22,6 +23,13 @@ func (f *fakeRepo) ListWorkflowBlocks(ctx context.Context, workflowID int) ([]wo
 
 func (f *fakeRepo) ListProgressionStates(ctx context.Context, userID, workflowID int) ([]ProgressionState, error) {
 	return f.listProgressionStatesFunc(ctx, userID, workflowID)
+}
+
+func (f *fakeRepo) ListLatestCompletedLogsByBlock(ctx context.Context, userID, workflowID int) ([]HistoricalCompletedSetLog, error) {
+	if f.listLatestLogsByBlockFunc == nil {
+		return nil, nil
+	}
+	return f.listLatestLogsByBlockFunc(ctx, userID, workflowID)
 }
 
 func (f *fakeRepo) UpsertProgressionState(ctx context.Context, in UpsertProgressionStateInput) (ProgressionState, error) {
@@ -153,6 +161,139 @@ func TestApplySessionProgression_WaveReduce(t *testing.T) {
 	}
 	if gotState.SuggestedIntensityOffset != "-2.5" {
 		t.Fatalf("expected suggested intensity offset -2.5, got %q", gotState.SuggestedIntensityOffset)
+	}
+}
+
+func TestApplySessionProgression_WaveInfersCurrentWeekFromLogsWhenStateIsMissing(t *testing.T) {
+	ctx := context.Background()
+	var gotState UpsertProgressionStateInput
+
+	repo := &fakeRepo{
+		userOwnsWorkflowFunc: func(ctx context.Context, userID, workflowID int) (bool, error) {
+			return true, nil
+		},
+		listWorkflowBlocksFunc: func(ctx context.Context, workflowID int) ([]workflowBlockConfig, error) {
+			return []workflowBlockConfig{
+				{
+					ID:           14,
+					NodeTypeSlug: "wave",
+					Position:     1,
+					Data: map[string]any{
+						"exercise_name":    "Bench Press",
+						"active_week":      1.0,
+						"week_1_reps":      "5/5/5+",
+						"week_1_intensity": "65/70/75",
+						"week_1_rpe":       "7/7/8",
+						"week_2_reps":      "3/3/3+",
+						"week_2_intensity": "70/75/80",
+						"week_2_rpe":       "7/8/8.5",
+						"week_3_reps":      "5/3/1+",
+						"week_3_intensity": "75/80/85",
+						"week_3_rpe":       "8/8.5/9",
+					},
+				},
+			}, nil
+		},
+		listProgressionStatesFunc: func(ctx context.Context, userID, workflowID int) ([]ProgressionState, error) {
+			return nil, nil
+		},
+		upsertProgressionStateFunc: func(ctx context.Context, in UpsertProgressionStateInput) (ProgressionState, error) {
+			gotState = in
+			return ProgressionState{}, nil
+		},
+	}
+
+	service := NewService(repo)
+
+	err := service.ApplySessionProgression(ctx, ApplySessionProgressionInput{
+		UserID:     2,
+		WorkflowID: 9,
+		SessionID:  23,
+		Logs: []CompletedSetLog{
+			{WorkflowBlockID: intPtr(14), Completed: true, SetIndex: 1, PrescribedReps: "3", PrescribedIntensity: "70", PrescribedRPE: "7", ActualRPE: "7.5"},
+			{WorkflowBlockID: intPtr(14), Completed: true, SetIndex: 2, PrescribedReps: "3", PrescribedIntensity: "75", PrescribedRPE: "8", ActualRPE: "8"},
+			{WorkflowBlockID: intPtr(14), Completed: true, SetIndex: 3, PrescribedReps: "3+", PrescribedIntensity: "80", PrescribedRPE: "8.5", ActualRPE: "8.5"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ApplySessionProgression returned error: %v", err)
+	}
+
+	if gotState.CurrentWeek != 2 {
+		t.Fatalf("expected inferred current week 2, got %d", gotState.CurrentWeek)
+	}
+	if gotState.SuggestedWeek != 3 {
+		t.Fatalf("expected suggested week 3, got %d", gotState.SuggestedWeek)
+	}
+	if gotState.Outcome != OutcomeIncrease {
+		t.Fatalf("expected increase outcome, got %q", gotState.Outcome)
+	}
+}
+
+func TestListProgressionStates_RebuildsMissingWaveStateFromHistory(t *testing.T) {
+	ctx := context.Background()
+
+	repo := &fakeRepo{
+		userOwnsWorkflowFunc: func(ctx context.Context, userID, workflowID int) (bool, error) {
+			return true, nil
+		},
+		listWorkflowBlocksFunc: func(ctx context.Context, workflowID int) ([]workflowBlockConfig, error) {
+			return []workflowBlockConfig{
+				{
+					ID:           14,
+					NodeTypeSlug: "wave",
+					Position:     1,
+					Data: map[string]any{
+						"exercise_name":    "Upper Push",
+						"active_week":      1.0,
+						"week_1_reps":      "5/5/5+",
+						"week_1_intensity": "65/70/75",
+						"week_1_rpe":       "7/7/8",
+						"week_2_reps":      "3/3/3+",
+						"week_2_intensity": "70/75/80",
+						"week_2_rpe":       "7/8/8.5",
+						"week_3_reps":      "5/3/1+",
+						"week_3_intensity": "75/80/85",
+						"week_3_rpe":       "8/8.5/9",
+					},
+				},
+			}, nil
+		},
+		listProgressionStatesFunc: func(ctx context.Context, userID, workflowID int) ([]ProgressionState, error) {
+			return nil, nil
+		},
+		listLatestLogsByBlockFunc: func(ctx context.Context, userID, workflowID int) ([]HistoricalCompletedSetLog, error) {
+			return []HistoricalCompletedSetLog{
+				{SessionID: 31, CompletedSetLog: CompletedSetLog{WorkflowBlockID: intPtr(14), Completed: true, SetIndex: 1, PrescribedReps: "3", PrescribedIntensity: "70", PrescribedRPE: "7", ActualRPE: "7.5"}},
+				{SessionID: 31, CompletedSetLog: CompletedSetLog{WorkflowBlockID: intPtr(14), Completed: true, SetIndex: 2, PrescribedReps: "3", PrescribedIntensity: "75", PrescribedRPE: "8", ActualRPE: "8"}},
+				{SessionID: 31, CompletedSetLog: CompletedSetLog{WorkflowBlockID: intPtr(14), Completed: true, SetIndex: 3, PrescribedReps: "3+", PrescribedIntensity: "80", PrescribedRPE: "8.5", ActualRPE: "8.5"}},
+			}, nil
+		},
+		upsertProgressionStateFunc: func(ctx context.Context, in UpsertProgressionStateInput) (ProgressionState, error) {
+			return ProgressionState{}, nil
+		},
+	}
+
+	service := NewService(repo)
+	states, err := service.ListProgressionStates(ctx, ListProgressionStatesInput{
+		UserID:     2,
+		WorkflowID: 9,
+	})
+	if err != nil {
+		t.Fatalf("ListProgressionStates returned error: %v", err)
+	}
+
+	if len(states) != 1 {
+		t.Fatalf("expected 1 synthesized state, got %d", len(states))
+	}
+	if states[0].CurrentWeek != 2 {
+		t.Fatalf("expected synthesized current week 2, got %d", states[0].CurrentWeek)
+	}
+	if states[0].SuggestedWeek != 3 {
+		t.Fatalf("expected synthesized suggested week 3, got %d", states[0].SuggestedWeek)
+	}
+	if states[0].WorkflowBlockID != 14 {
+		t.Fatalf("expected workflow block id 14, got %d", states[0].WorkflowBlockID)
 	}
 }
 

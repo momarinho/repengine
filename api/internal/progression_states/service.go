@@ -25,6 +25,11 @@ type resolvedWorkflowBlock struct {
 	SectionTitle string
 }
 
+type historicalBlockLogs struct {
+	SessionID int
+	Logs      []CompletedSetLog
+}
+
 var numberPattern = regexp.MustCompile(`-?\d+(?:\.\d+)?`)
 
 func (s *Service) ApplySessionProgression(ctx context.Context, in ApplySessionProgressionInput) error {
@@ -116,10 +121,30 @@ func (s *Service) ListProgressionStates(ctx context.Context, in ListProgressionS
 		stateByKey[state.BlockKey] = state
 	}
 
-	ordered := make([]ProgressionState, 0, len(states))
+	historicalLogs, err := s.repo.ListLatestCompletedLogsByBlock(ctx, in.UserID, in.WorkflowID)
+	if err != nil {
+		return nil, apperrors.ErrInternal()
+	}
+	historyByBlockID := groupHistoricalLogsByBlock(historicalLogs)
+
+	ordered := make([]ProgressionState, 0, len(states)+len(historyByBlockID))
 	for _, block := range resolvedBlocks {
 		state, exists := stateByKey[block.BlockKey]
 		if !exists {
+			history, ok := historyByBlockID[block.ID]
+			if !ok {
+				continue
+			}
+			stateInput, ok := s.buildNextState(block, history.Logs, ProgressionState{}, false, ApplySessionProgressionInput{
+				UserID:     in.UserID,
+				WorkflowID: in.WorkflowID,
+				SessionID:  history.SessionID,
+				Logs:       history.Logs,
+			})
+			if !ok {
+				continue
+			}
+			ordered = append(ordered, progressionStateFromUpsert(stateInput))
 			continue
 		}
 		state.WorkflowBlockID = block.ID
@@ -251,7 +276,7 @@ func buildWaveProgressionState(
 	hasExisting bool,
 	session ApplySessionProgressionInput,
 ) UpsertProgressionStateInput {
-	currentWeek := intOrDefault(block.Data["active_week"], 1)
+	currentWeek := resolveWaveCurrentWeek(block, logs, existing, hasExisting)
 	currentOffset := 0.0
 	if hasExisting {
 		if existing.SuggestedWeek > 0 {
@@ -382,6 +407,55 @@ func buildSkillProgressionState(
 			"target_reps":      targetReps,
 			"notes":            asString(block.Data["notes"]),
 		},
+	}
+}
+
+func groupHistoricalLogsByBlock(entries []HistoricalCompletedSetLog) map[int]historicalBlockLogs {
+	grouped := make(map[int]historicalBlockLogs, len(entries))
+	for _, entry := range entries {
+		if entry.WorkflowBlockID == nil {
+			continue
+		}
+		blockID := *entry.WorkflowBlockID
+		group := grouped[blockID]
+		if group.SessionID == 0 {
+			group.SessionID = entry.SessionID
+		}
+		group.Logs = append(group.Logs, entry.CompletedSetLog)
+		grouped[blockID] = group
+	}
+
+	for blockID, group := range grouped {
+		slices.SortFunc(group.Logs, func(a, b CompletedSetLog) int {
+			return a.SetIndex - b.SetIndex
+		})
+		grouped[blockID] = group
+	}
+
+	return grouped
+}
+
+func progressionStateFromUpsert(in UpsertProgressionStateInput) ProgressionState {
+	return ProgressionState{
+		UserID:                   in.UserID,
+		WorkflowID:               in.WorkflowID,
+		WorkflowBlockID:          in.WorkflowBlockID,
+		BlockKey:                 in.BlockKey,
+		NodeTypeSlug:             in.NodeTypeSlug,
+		StateType:                in.StateType,
+		ExerciseName:             in.ExerciseName,
+		Outcome:                  in.Outcome,
+		CurrentLoad:              in.CurrentLoad,
+		SuggestedLoad:            in.SuggestedLoad,
+		CurrentWeek:              in.CurrentWeek,
+		SuggestedWeek:            in.SuggestedWeek,
+		SuggestedIntensityOffset: in.SuggestedIntensityOffset,
+		AvgActualRPE:             in.AvgActualRPE,
+		AvgActualRIR:             in.AvgActualRIR,
+		LastSessionID:            in.LastSessionID,
+		LastLogCount:             in.LastLogCount,
+		Summary:                  in.Summary,
+		Metadata:                 in.Metadata,
 	}
 }
 
@@ -554,6 +628,127 @@ func resolveLinearCurrentLoad(
 	return ""
 }
 
+func resolveWaveCurrentWeek(
+	block resolvedWorkflowBlock,
+	logs []CompletedSetLog,
+	existing ProgressionState,
+	hasExisting bool,
+) int {
+	currentWeek := intOrDefault(block.Data["active_week"], 1)
+	if hasExisting && existing.SuggestedWeek > 0 {
+		return existing.SuggestedWeek
+	}
+	if inferredWeek, ok := inferWaveWeekFromLogs(block.Data, logs); ok {
+		return inferredWeek
+	}
+	return currentWeek
+}
+
+func inferWaveWeekFromLogs(data map[string]any, logs []CompletedSetLog) (int, bool) {
+	if len(logs) == 0 {
+		return 0, false
+	}
+
+	maxWeek := countConfiguredWaveWeeks(data)
+	bestWeek := 0
+	bestScore := -1
+
+	for week := 1; week <= maxWeek; week++ {
+		score, ok := scoreWaveWeekMatch(data, week, logs)
+		if !ok {
+			continue
+		}
+		if score > bestScore {
+			bestWeek = week
+			bestScore = score
+		}
+	}
+
+	if bestWeek == 0 {
+		return 0, false
+	}
+
+	return bestWeek, true
+}
+
+func scoreWaveWeekMatch(data map[string]any, week int, logs []CompletedSetLog) (int, bool) {
+	repParts := splitPrescriptionParts(asString(data[fmt.Sprintf("week_%d_reps", week)]))
+	intensityParts := splitPrescriptionParts(asString(data[fmt.Sprintf("week_%d_intensity", week)]))
+	rpeParts := splitPrescriptionParts(asString(data[fmt.Sprintf("week_%d_rpe", week)]))
+	totalPrescriptions := maxInt(len(repParts), maxInt(len(intensityParts), len(rpeParts)))
+	if totalPrescriptions == 0 {
+		return 0, false
+	}
+
+	score := 0
+	compared := 0
+	for index, log := range logs {
+		expectedReps := wavePrescriptionPart(repParts, index)
+		expectedIntensity := wavePrescriptionPart(intensityParts, index)
+		expectedRPE := wavePrescriptionPart(rpeParts, index)
+
+		if expectedReps != "" && normalizeWaveValue(log.PrescribedReps) != "" {
+			compared++
+			if !waveValuesMatch(expectedReps, log.PrescribedReps) {
+				return 0, false
+			}
+			score += 3
+		}
+		if expectedRPE != "" && normalizeWaveValue(log.PrescribedRPE) != "" {
+			compared++
+			if !waveValuesMatch(expectedRPE, log.PrescribedRPE) {
+				return 0, false
+			}
+			score += 2
+		}
+		if expectedIntensity != "" && normalizeWaveValue(log.PrescribedIntensity) != "" {
+			compared++
+			if waveValuesMatch(expectedIntensity, log.PrescribedIntensity) {
+				score++
+			}
+		}
+	}
+
+	return score, compared > 0
+}
+
+func splitPrescriptionParts(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	parts := strings.Split(value, "/")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		normalized := normalizeWaveValue(part)
+		if normalized == "" {
+			continue
+		}
+		out = append(out, normalized)
+	}
+	return out
+}
+
+func wavePrescriptionPart(parts []string, index int) string {
+	if len(parts) == 0 {
+		return ""
+	}
+	if index < len(parts) {
+		return parts[index]
+	}
+	return parts[len(parts)-1]
+}
+
+func waveValuesMatch(expected, actual string) bool {
+	return normalizeWaveValue(expected) == normalizeWaveValue(actual)
+}
+
+func normalizeWaveValue(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	value = strings.ReplaceAll(value, " ", "")
+	value = strings.TrimSuffix(value, "%")
+	return value
+}
+
 func anyRepTargetMiss(logs []CompletedSetLog, lowerTarget float64) bool {
 	if lowerTarget <= 0 {
 		return false
@@ -682,6 +877,13 @@ func firstNonEmpty(values ...string) string {
 }
 
 func maxFloat(a, b float64) float64 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func maxInt(a, b int) int {
 	if a > b {
 		return a
 	}
