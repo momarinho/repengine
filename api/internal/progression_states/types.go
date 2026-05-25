@@ -57,7 +57,8 @@ type CompletedSetLog struct {
 }
 
 type HistoricalCompletedSetLog struct {
-	SessionID int
+	SessionID   int
+	CompletedAt time.Time
 	CompletedSetLog
 }
 

@@ -21,8 +21,22 @@
 		note?: string;
 	};
 
+	type WaveWeekHistoryEntry = {
+		week: number;
+		label: string;
+		session_id: number;
+		completed_at: string;
+		actual_reps: string;
+		actual_load: string;
+		actual_rpe: string;
+		actual_rir: string;
+		prescribed_reps: string;
+		prescribed_intensity: string;
+		prescribed_rpe: string;
+	};
+
 	type PersistedPlayerState = {
-		version: 3;
+		version: 4;
 		currentBlockIndex: number;
 		completedBlockIds: string[];
 		currentSetByBlock: Record<string, number>;
@@ -45,6 +59,8 @@
 			blockID: string;
 			remainingSeconds: number;
 			nextLabel: string;
+			advanceType?: 'set' | 'wave_set';
+			advanceValue?: number;
 		} | null;
 		isIntraSetRestRunning: boolean;
 	};
@@ -81,6 +97,8 @@
 		blockID: string;
 		remainingSeconds: number;
 		nextLabel: string;
+		advanceType?: 'set' | 'wave_set';
+		advanceValue?: number;
 	} | null>(null);
 	let isIntraSetRestRunning = $state(false);
 	let mobileQueueOpen = $state(false);
@@ -219,7 +237,10 @@
 		return {
 			blockID: value.blockID,
 			remainingSeconds: Math.max(value.remainingSeconds, 0),
-			nextLabel: value.nextLabel
+			nextLabel: value.nextLabel,
+			advanceType:
+				value.advanceType === 'set' || value.advanceType === 'wave_set' ? value.advanceType : undefined,
+			advanceValue: typeof value.advanceValue === 'number' ? value.advanceValue : undefined
 		};
 	}
 
@@ -436,6 +457,53 @@
 
 	function getProgressionSummary(state: ProgressionState | null): string | null {
 		return state?.summary?.trim() ? state.summary : null;
+	}
+
+	function getWaveWeekHistory(state: ProgressionState | null): WaveWeekHistoryEntry[] {
+		if (state?.state_type !== 'wave' || !Array.isArray(state.metadata?.week_history)) {
+			return [];
+		}
+
+		return state.metadata.week_history.flatMap((entry): WaveWeekHistoryEntry[] => {
+			if (!entry || typeof entry !== 'object') {
+				return [];
+			}
+
+			const record = entry as Record<string, unknown>;
+			if (
+				typeof record.week !== 'number' ||
+				typeof record.label !== 'string' ||
+				typeof record.actual_reps !== 'string' ||
+				typeof record.actual_load !== 'string' ||
+				typeof record.actual_rpe !== 'string' ||
+				typeof record.actual_rir !== 'string' ||
+				typeof record.prescribed_reps !== 'string' ||
+				typeof record.prescribed_intensity !== 'string' ||
+				typeof record.prescribed_rpe !== 'string'
+			) {
+				return [];
+			}
+
+			return [
+				{
+					week: record.week,
+					label: record.label,
+					session_id: typeof record.session_id === 'number' ? record.session_id : 0,
+					completed_at: typeof record.completed_at === 'string' ? record.completed_at : '',
+					actual_reps: record.actual_reps,
+					actual_load: record.actual_load,
+					actual_rpe: record.actual_rpe,
+					actual_rir: record.actual_rir,
+					prescribed_reps: record.prescribed_reps,
+					prescribed_intensity: record.prescribed_intensity,
+					prescribed_rpe: record.prescribed_rpe
+				}
+			];
+		});
+	}
+
+	function getWaveWeekHistoryEntry(state: ProgressionState | null, weekIndex: number): WaveWeekHistoryEntry | null {
+		return getWaveWeekHistory(state).find((entry) => entry.week === weekIndex + 1) ?? null;
 	}
 
 	function getProgressionDetail(state: ProgressionState | null): string | null {
@@ -813,8 +881,7 @@
 		currentBlockIndex = index;
 		timerRemainingSeconds = getInitialTimerSeconds(routine.blocks[index]);
 		isTimerRunning = false;
-		intraSetRest = null;
-		isIntraSetRestRunning = false;
+		clearIntraSetRest();
 		mobileQueueOpen = false;
 	}
 
@@ -873,19 +940,37 @@
 		}
 	}
 
-	function startIntraSetRest(block: PlayerBlock, nextLabel: string): void {
+	function startIntraSetRest(
+		block: PlayerBlock,
+		nextLabel: string,
+		advance?: {
+			type: 'set' | 'wave_set';
+			value: number;
+		}
+	): void {
 		const duration = block.restSeconds ?? 0;
 		if (duration <= 0) return;
 
 		intraSetRest = {
 			blockID: block.id,
 			remainingSeconds: duration,
-			nextLabel
+			nextLabel,
+			advanceType: advance?.type,
+			advanceValue: advance?.value
 		};
 		isIntraSetRestRunning = true;
 	}
 
-	function clearIntraSetRest(): void {
+	function clearIntraSetRest(applyAdvance = false): void {
+		if (applyAdvance && intraSetRest?.advanceType && typeof intraSetRest.advanceValue === 'number') {
+			if (intraSetRest.advanceType === 'set') {
+				currentSetByBlock = { ...currentSetByBlock, [intraSetRest.blockID]: intraSetRest.advanceValue };
+			}
+			if (intraSetRest.advanceType === 'wave_set') {
+				waveSetByBlock = { ...waveSetByBlock, [intraSetRest.blockID]: intraSetRest.advanceValue };
+			}
+		}
+
 		intraSetRest = null;
 		isIntraSetRestRunning = false;
 	}
@@ -931,8 +1016,10 @@
 				}
 
 				const nextSet = currentSet + 1;
-				currentSetByBlock = { ...currentSetByBlock, [block.id]: nextSet };
-				startIntraSetRest(block, `Set ${nextSet}`);
+				startIntraSetRest(block, `Set ${nextSet}`, {
+					type: 'set',
+					value: nextSet
+				});
 				return;
 			}
 			case 'rest':
@@ -999,8 +1086,10 @@
 				}
 
 				const nextSet = currentSet + 1;
-				waveSetByBlock = { ...waveSetByBlock, [block.id]: nextSet };
-				startIntraSetRest(block, `Set ${nextSet + 1}`);
+				startIntraSetRest(block, `Set ${nextSet + 1}`, {
+					type: 'wave_set',
+					value: nextSet
+				});
 				return;
 			}
 			case 'repeat': {
@@ -1059,7 +1148,7 @@
 		const block = currentBlock;
 
 		if (isRestingBetweenSets) {
-			clearIntraSetRest();
+			clearIntraSetRest(true);
 			return;
 		}
 
@@ -1190,6 +1279,15 @@
 			if (timerRemainingSeconds <= 1) {
 				timerRemainingSeconds = 0;
 				isTimerRunning = false;
+				if (currentBlock.node_type_slug === 'rest') {
+					appendActivity(
+						currentBlock,
+						'timer',
+						'Rest complete',
+						`${formatClock(getInitialTimerSeconds(currentBlock))} elapsed`
+					);
+					completeCurrentBlock(currentBlock, 'Recovery finished');
+				}
 				return;
 			}
 
@@ -1207,11 +1305,7 @@
 		const restInterval = setInterval(() => {
 			if (!intraSetRest) return;
 			if (intraSetRest.remainingSeconds <= 1) {
-				intraSetRest = {
-					...intraSetRest,
-					remainingSeconds: 0
-				};
-				isIntraSetRestRunning = false;
+				clearIntraSetRest(true);
 				return;
 			}
 
@@ -1228,7 +1322,7 @@
 		if (!browser || !routine || !localSessionKey || !hasRestoredSession) return;
 
 		const state: PersistedPlayerState = {
-			version: 3,
+			version: 4,
 			currentBlockIndex,
 			completedBlockIds,
 			currentSetByBlock,
@@ -1840,9 +1934,18 @@
 								</div>
 								<div class="mt-5 grid gap-3 md:grid-cols-2">
 									{#each currentBlock.waveSteps ?? [] as step, index}
+										{@const weekHistory = getWaveWeekHistoryEntry(currentProgressionState, index)}
 										<div class={`rounded-xl border px-4 py-3 ${index === (resolveWaveWeekIndex(currentBlock) ?? 0) ? 'border-secondary/30 bg-secondary/10' : 'border-white/5 bg-surface-container'}`}>
 											<p class="text-sm font-semibold text-on-surface">{step.label}</p>
 											<p class="mt-1 text-xs text-on-surface-variant">{step.reps} • {applyWaveIntensityOffset(step.intensity, currentProgressionState?.state_type === 'wave' ? currentProgressionState.suggested_intensity_offset : '')} • RPE {step.rpe}</p>
+											{#if weekHistory}
+												<div class="mt-3 rounded-lg border border-white/5 bg-background/40 px-3 py-2">
+													<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-secondary">Logged</p>
+													<p class="mt-1 text-[11px] text-on-surface-variant">Reps: {weekHistory.actual_reps}</p>
+													<p class="mt-1 text-[11px] text-on-surface-variant">Load: {weekHistory.actual_load}</p>
+													<p class="mt-1 text-[11px] text-on-surface-variant">RPE/RIR: {weekHistory.actual_rpe} / {weekHistory.actual_rir}</p>
+												</div>
+											{/if}
 										</div>
 									{/each}
 								</div>

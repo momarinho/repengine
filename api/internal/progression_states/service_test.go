@@ -10,6 +10,7 @@ type fakeRepo struct {
 	listWorkflowBlocksFunc     func(ctx context.Context, workflowID int) ([]workflowBlockConfig, error)
 	listProgressionStatesFunc  func(ctx context.Context, userID, workflowID int) ([]ProgressionState, error)
 	listLatestLogsByBlockFunc  func(ctx context.Context, userID, workflowID int) ([]HistoricalCompletedSetLog, error)
+	listCompletedLogsByBlockFn func(ctx context.Context, userID, workflowID int) ([]HistoricalCompletedSetLog, error)
 	upsertProgressionStateFunc func(ctx context.Context, in UpsertProgressionStateInput) (ProgressionState, error)
 }
 
@@ -30,6 +31,13 @@ func (f *fakeRepo) ListLatestCompletedLogsByBlock(ctx context.Context, userID, w
 		return nil, nil
 	}
 	return f.listLatestLogsByBlockFunc(ctx, userID, workflowID)
+}
+
+func (f *fakeRepo) ListCompletedLogsByBlock(ctx context.Context, userID, workflowID int) ([]HistoricalCompletedSetLog, error) {
+	if f.listCompletedLogsByBlockFn == nil {
+		return nil, nil
+	}
+	return f.listCompletedLogsByBlockFn(ctx, userID, workflowID)
 }
 
 func (f *fakeRepo) UpsertProgressionState(ctx context.Context, in UpsertProgressionStateInput) (ProgressionState, error) {
@@ -269,6 +277,16 @@ func TestListProgressionStates_RebuildsMissingWaveStateFromHistory(t *testing.T)
 				{SessionID: 31, CompletedSetLog: CompletedSetLog{WorkflowBlockID: intPtr(14), Completed: true, SetIndex: 3, PrescribedReps: "3+", PrescribedIntensity: "80", PrescribedRPE: "8.5", ActualRPE: "8.5"}},
 			}, nil
 		},
+		listCompletedLogsByBlockFn: func(ctx context.Context, userID, workflowID int) ([]HistoricalCompletedSetLog, error) {
+			return []HistoricalCompletedSetLog{
+				{SessionID: 31, CompletedSetLog: CompletedSetLog{WorkflowBlockID: intPtr(14), Completed: true, SetIndex: 1, PrescribedReps: "3", PrescribedIntensity: "70", PrescribedRPE: "7", ActualReps: "3", ActualLoad: "30 kg", ActualRPE: "7.5"}},
+				{SessionID: 31, CompletedSetLog: CompletedSetLog{WorkflowBlockID: intPtr(14), Completed: true, SetIndex: 2, PrescribedReps: "3", PrescribedIntensity: "75", PrescribedRPE: "8", ActualReps: "3", ActualLoad: "32.5 kg", ActualRPE: "8"}},
+				{SessionID: 31, CompletedSetLog: CompletedSetLog{WorkflowBlockID: intPtr(14), Completed: true, SetIndex: 3, PrescribedReps: "3+", PrescribedIntensity: "80", PrescribedRPE: "8.5", ActualReps: "5", ActualLoad: "35 kg", ActualRPE: "8.5"}},
+				{SessionID: 27, CompletedSetLog: CompletedSetLog{WorkflowBlockID: intPtr(14), Completed: true, SetIndex: 1, PrescribedReps: "5", PrescribedIntensity: "65", PrescribedRPE: "7", ActualReps: "5", ActualLoad: "25 kg", ActualRPE: "7"}},
+				{SessionID: 27, CompletedSetLog: CompletedSetLog{WorkflowBlockID: intPtr(14), Completed: true, SetIndex: 2, PrescribedReps: "5", PrescribedIntensity: "70", PrescribedRPE: "7", ActualReps: "5", ActualLoad: "27.5 kg", ActualRPE: "7.5"}},
+				{SessionID: 27, CompletedSetLog: CompletedSetLog{WorkflowBlockID: intPtr(14), Completed: true, SetIndex: 3, PrescribedReps: "5+", PrescribedIntensity: "75", PrescribedRPE: "8", ActualReps: "8", ActualLoad: "30 kg", ActualRPE: "8"}},
+			}, nil
+		},
 		upsertProgressionStateFunc: func(ctx context.Context, in UpsertProgressionStateInput) (ProgressionState, error) {
 			return ProgressionState{}, nil
 		},
@@ -294,6 +312,17 @@ func TestListProgressionStates_RebuildsMissingWaveStateFromHistory(t *testing.T)
 	}
 	if states[0].WorkflowBlockID != 14 {
 		t.Fatalf("expected workflow block id 14, got %d", states[0].WorkflowBlockID)
+	}
+	weekHistory, ok := states[0].Metadata["week_history"].([]map[string]any)
+	if !ok {
+		raw, ok := states[0].Metadata["week_history"].([]any)
+		if !ok || len(raw) != 2 {
+			t.Fatalf("expected 2 week history entries, got %#v", states[0].Metadata["week_history"])
+		}
+		return
+	}
+	if len(weekHistory) != 2 {
+		t.Fatalf("expected 2 week history entries, got %d", len(weekHistory))
 	}
 }
 

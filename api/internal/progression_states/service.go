@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	apperrors "github.com/momarinho/rep_engine/internal/errors"
 )
@@ -28,6 +29,12 @@ type resolvedWorkflowBlock struct {
 type historicalBlockLogs struct {
 	SessionID int
 	Logs      []CompletedSetLog
+}
+
+type waveHistorySession struct {
+	SessionID   int
+	CompletedAt string
+	Logs        []CompletedSetLog
 }
 
 var numberPattern = regexp.MustCompile(`-?\d+(?:\.\d+)?`)
@@ -127,6 +134,12 @@ func (s *Service) ListProgressionStates(ctx context.Context, in ListProgressionS
 	}
 	historyByBlockID := groupHistoricalLogsByBlock(historicalLogs)
 
+	completedLogs, err := s.repo.ListCompletedLogsByBlock(ctx, in.UserID, in.WorkflowID)
+	if err != nil {
+		return nil, apperrors.ErrInternal()
+	}
+	waveHistoryByBlockID := buildWaveHistoryByBlock(completedLogs)
+
 	ordered := make([]ProgressionState, 0, len(states)+len(historyByBlockID))
 	for _, block := range resolvedBlocks {
 		state, exists := stateByKey[block.BlockKey]
@@ -144,10 +157,13 @@ func (s *Service) ListProgressionStates(ctx context.Context, in ListProgressionS
 			if !ok {
 				continue
 			}
-			ordered = append(ordered, progressionStateFromUpsert(stateInput))
+			synthesized := progressionStateFromUpsert(stateInput)
+			synthesized.Metadata = enrichStateMetadata(block, synthesized.Metadata, waveHistoryByBlockID[block.ID])
+			ordered = append(ordered, synthesized)
 			continue
 		}
 		state.WorkflowBlockID = block.ID
+		state.Metadata = enrichStateMetadata(block, state.Metadata, waveHistoryByBlockID[block.ID])
 		ordered = append(ordered, state)
 	}
 
@@ -459,6 +475,26 @@ func progressionStateFromUpsert(in UpsertProgressionStateInput) ProgressionState
 	}
 }
 
+func enrichStateMetadata(
+	block resolvedWorkflowBlock,
+	metadata map[string]any,
+	history []waveHistorySession,
+) map[string]any {
+	if metadata == nil {
+		metadata = map[string]any{}
+	}
+	if block.NodeTypeSlug != "wave" || len(history) == 0 {
+		return metadata
+	}
+
+	enriched := make(map[string]any, len(metadata)+1)
+	for key, value := range metadata {
+		enriched[key] = value
+	}
+	enriched["week_history"] = buildWaveWeekHistoryMetadata(block.Data, history)
+	return enriched
+}
+
 func okState(states map[string]ProgressionState, key string) bool {
 	_, ok := states[key]
 	return ok
@@ -747,6 +783,93 @@ func normalizeWaveValue(value string) string {
 	value = strings.ReplaceAll(value, " ", "")
 	value = strings.TrimSuffix(value, "%")
 	return value
+}
+
+func buildWaveHistoryByBlock(entries []HistoricalCompletedSetLog) map[int][]waveHistorySession {
+	type sessionKey struct {
+		BlockID   int
+		SessionID int
+	}
+
+	grouped := make(map[sessionKey]waveHistorySession)
+	order := make([]sessionKey, 0, len(entries))
+	for _, entry := range entries {
+		if entry.WorkflowBlockID == nil {
+			continue
+		}
+		key := sessionKey{BlockID: *entry.WorkflowBlockID, SessionID: entry.SessionID}
+		group, exists := grouped[key]
+		if !exists {
+			group = waveHistorySession{
+				SessionID:   entry.SessionID,
+				CompletedAt: entry.CompletedAt.UTC().Format(time.RFC3339),
+			}
+			order = append(order, key)
+		}
+		group.Logs = append(group.Logs, entry.CompletedSetLog)
+		grouped[key] = group
+	}
+
+	byBlock := map[int][]waveHistorySession{}
+	for _, key := range order {
+		group := grouped[key]
+		slices.SortFunc(group.Logs, func(a, b CompletedSetLog) int {
+			return a.SetIndex - b.SetIndex
+		})
+		byBlock[key.BlockID] = append(byBlock[key.BlockID], group)
+	}
+
+	return byBlock
+}
+
+func buildWaveWeekHistoryMetadata(data map[string]any, sessions []waveHistorySession) []map[string]any {
+	latestByWeek := map[int]waveHistorySession{}
+	maxWeek := countConfiguredWaveWeeks(data)
+	for _, session := range sessions {
+		week, ok := inferWaveWeekFromLogs(data, session.Logs)
+		if !ok || week <= 0 || week > maxWeek {
+			continue
+		}
+		if _, exists := latestByWeek[week]; exists {
+			continue
+		}
+		latestByWeek[week] = session
+	}
+
+	history := make([]map[string]any, 0, len(latestByWeek))
+	for week := 1; week <= maxWeek; week++ {
+		session, exists := latestByWeek[week]
+		if !exists {
+			continue
+		}
+		history = append(history, map[string]any{
+			"week":                 week,
+			"label":                fmt.Sprintf("Week %d", week),
+			"session_id":           session.SessionID,
+			"completed_at":         session.CompletedAt,
+			"actual_reps":          joinLogValues(session.Logs, func(log CompletedSetLog) string { return log.ActualReps }),
+			"actual_load":          joinLogValues(session.Logs, func(log CompletedSetLog) string { return log.ActualLoad }),
+			"actual_rpe":           joinLogValues(session.Logs, func(log CompletedSetLog) string { return log.ActualRPE }),
+			"actual_rir":           joinLogValues(session.Logs, func(log CompletedSetLog) string { return log.ActualRIR }),
+			"prescribed_reps":      joinLogValues(session.Logs, func(log CompletedSetLog) string { return log.PrescribedReps }),
+			"prescribed_intensity": joinLogValues(session.Logs, func(log CompletedSetLog) string { return log.PrescribedIntensity }),
+			"prescribed_rpe":       joinLogValues(session.Logs, func(log CompletedSetLog) string { return log.PrescribedRPE }),
+		})
+	}
+
+	return history
+}
+
+func joinLogValues(logs []CompletedSetLog, extractor func(CompletedSetLog) string) string {
+	values := make([]string, 0, len(logs))
+	for _, log := range logs {
+		value := strings.TrimSpace(extractor(log))
+		if value == "" {
+			value = "-"
+		}
+		values = append(values, value)
+	}
+	return strings.Join(values, " / ")
 }
 
 func anyRepTargetMiss(logs []CompletedSetLog, lowerTarget float64) bool {
