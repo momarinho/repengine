@@ -88,7 +88,8 @@ export function resolveNodeTypeIcon(icon: string): string {
 		trending_up: 'trending_up',
 		repeat: 'repeat',
 		pause: 'timer_pause',
-		folder: 'folder'
+		folder: 'folder',
+		layers: 'layers'
 	};
 
 	return map[icon] ?? 'extension';

@@ -56,6 +56,7 @@ function resolveTone(type: PlayerBlockType): QueueTone {
 		case 'exercise':
 		case 'linear_progression':
 		case 'exercise_timed':
+		case 'superset':
 			return 'primary';
 		case 'wave':
 			return 'tertiary';
@@ -68,7 +69,7 @@ function resolveTone(type: PlayerBlockType): QueueTone {
 }
 
 function resolveBlockType(slug: string): PlayerBlockType | null {
-	return ['section', 'exercise', 'linear_progression', 'rest', 'wave', 'repeat', 'exercise_timed'].includes(slug)
+	return ['section', 'exercise', 'linear_progression', 'rest', 'wave', 'repeat', 'exercise_timed', 'superset'].includes(slug)
 		? (slug as PlayerBlockType)
 		: null;
 }
@@ -81,6 +82,8 @@ function blockTitle(type: PlayerBlockType, data: Record<string, unknown>, index:
 		case 'linear_progression':
 		case 'exercise_timed':
 			return asString(data.exercise_name) ?? `Exercise ${index + 1}`;
+		case 'superset':
+			return `${asString(data.exercise_a_name) || 'Exercise A'} + ${asString(data.exercise_b_name) || 'Exercise B'}`;
 		case 'rest':
 			return 'Rest';
 		case 'wave':
@@ -100,6 +103,8 @@ function blockSubtitle(type: PlayerBlockType, data: Record<string, unknown>): st
 			return 'Track sets with a session-to-session load progression target.';
 		case 'exercise_timed':
 			return 'Run the interval timer and keep moving until the block completes.';
+		case 'superset':
+			return `Superset of ${asString(data.exercise_a_name) || 'Exercise A'} and ${asString(data.exercise_b_name) || 'Exercise B'}.`;
 		case 'rest':
 			return 'Use the timer to manage recovery before the next effort.';
 		case 'wave':
@@ -119,6 +124,8 @@ function blockEyebrow(type: PlayerBlockType): string {
 			return 'Linear progression';
 		case 'exercise_timed':
 			return 'Timed effort';
+		case 'superset':
+			return 'Superset';
 		case 'rest':
 			return 'Rest';
 		case 'wave':
@@ -145,6 +152,8 @@ function estimateBlockSeconds(type: PlayerBlockType, block: PlayerBlock): number
 		case 'exercise':
 		case 'linear_progression':
 			return (block.sets ?? 3) * ((block.restSeconds ?? 60) + 45);
+		case 'superset':
+			return (block.sets ?? 3) * 120 + (block.restSeconds ?? 120);
 		case 'wave':
 			return (block.waveSteps?.[block.activeWaveWeekIndex ?? 0]?.prescriptions.length ?? 1) * 180;
 		case 'repeat':
@@ -254,7 +263,8 @@ function mapPlayerBlock(block: WorkflowBlockApi, index: number, section: Section
 		sectionKind: section?.kind,
 		notePlaceholder: exerciseName
 			? `Execution notes for ${exerciseName}...`
-			: 'Execution notes for this block...'
+			: 'Execution notes for this block...',
+		data: data
 	};
 }
 

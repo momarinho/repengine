@@ -5,7 +5,8 @@ export type PlayerBlockType =
 	| 'rest'
 	| 'wave'
 	| 'repeat'
-	| 'exercise_timed';
+	| 'exercise_timed'
+	| 'superset';
 
 export type QueueTone = 'primary' | 'secondary' | 'tertiary' | 'muted';
 
@@ -51,6 +52,7 @@ export type PlayerBlock = {
 	sectionSubtitle?: string;
 	sectionKind?: string;
 	notePlaceholder?: string;
+	data?: Record<string, unknown>;
 };
 
 export type PlayerSection = {

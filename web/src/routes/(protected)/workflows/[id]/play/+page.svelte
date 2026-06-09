@@ -90,6 +90,10 @@
 	let actualLoadByBlock = $state<Record<string, string>>({});
 	let actualRPEByBlock = $state<Record<string, string>>({});
 	let actualRIRByBlock = $state<Record<string, string>>({});
+	let actualRepsAByBlock = $state<Record<string, string>>({});
+	let actualRepsBByBlock = $state<Record<string, string>>({});
+	let actualLoadAByBlock = $state<Record<string, string>>({});
+	let actualLoadBByBlock = $state<Record<string, string>>({});
 	let sessionElapsedSeconds = $state(routine?.elapsedSeconds ?? 0);
 	let isTimerRunning = $state(false);
 	let timerRemainingSeconds = $state(routine ? getInitialTimerSeconds(routine.blocks[initialBlockIndex]) : 0);
@@ -291,6 +295,18 @@
 		actualRPE: string;
 		actualRIR: string;
 	} {
+		if (currentBlock && currentBlock.node_type_slug === 'superset') {
+			const repsA = actualRepsAByBlock[blockID]?.trim() ?? '';
+			const repsB = actualRepsBByBlock[blockID]?.trim() ?? '';
+			const loadA = actualLoadAByBlock[blockID]?.trim() ?? '';
+			const loadB = actualLoadBByBlock[blockID]?.trim() ?? '';
+			return {
+				actualReps: repsA || repsB ? `${repsA || '0'}/${repsB || '0'}` : '',
+				actualLoad: loadA || loadB ? `${loadA || '0'}/${loadB || '0'}` : '',
+				actualRPE: actualRPEByBlock[blockID]?.trim() ?? '',
+				actualRIR: actualRIRByBlock[blockID]?.trim() ?? ''
+			};
+		}
 		const actualReps = actualRepsByBlock[blockID]?.trim() ?? '';
 		const actualLoad = actualLoadByBlock[blockID]?.trim() ?? '';
 		const actualRPE = actualRPEByBlock[blockID]?.trim() ?? '';
@@ -542,6 +558,8 @@
 				return 'Repeat';
 			case 'section':
 				return 'Section';
+			case 'superset':
+				return 'Superset';
 			default:
 				return 'Block';
 		}
@@ -582,6 +600,8 @@
 			case 'exercise':
 			case 'linear_progression':
 				return getCurrentSet(block) >= (block.sets ?? 1) ? 'Complete Exercise' : 'Log Set';
+			case 'superset':
+				return getCurrentSet(block) >= (block.sets ?? 1) ? 'Complete Superset' : 'Log Set';
 			case 'rest':
 				return timerRemainingSeconds <= 0 ? 'Complete Rest' : isTimerRunning ? 'Pause Rest' : 'Start Rest';
 			case 'exercise_timed':
@@ -609,6 +629,7 @@
 				return '+30s';
 			case 'exercise':
 			case 'linear_progression':
+			case 'superset':
 				return 'Start Rest';
 			case 'exercise_timed':
 				return 'Reset Timer';
@@ -697,13 +718,20 @@
 			actualRIR: string;
 		}
 	): Record<string, unknown> {
+		let reps = block.reps ?? '';
+		let load = getResolvedPrescribedLoad(block) || '';
+		if (block.node_type_slug === 'superset') {
+			reps = `${block.data?.reps_a || '0'}/${block.data?.reps_b || '0'}`;
+			load = `${block.data?.start_load_a !== null && block.data?.start_load_a !== undefined ? block.data.start_load_a : '0'}/${block.data?.start_load_b !== null && block.data?.start_load_b !== undefined ? block.data.start_load_b : '0'}`;
+		}
+
 		return {
 			workflow_block_id: block.workflowBlockID ?? null,
 			block_client_id: block.id,
 			node_type_slug: block.node_type_slug,
 			set_index: setIndex,
-			prescribed_reps: block.reps ?? '',
-			prescribed_load: getResolvedPrescribedLoad(block),
+			prescribed_reps: reps,
+			prescribed_load: load,
 			prescribed_intensity: prescribedIntensity,
 			prescribed_rpe: prescribedRPE,
 			actual_reps: actual.actualReps,
@@ -986,7 +1014,8 @@
 
 		switch (block.node_type_slug) {
 			case 'exercise':
-			case 'linear_progression': {
+			case 'linear_progression':
+			case 'superset': {
 				const currentSet = getCurrentSet(block);
 				const actual = readActualInputs(block.id);
 				isSyncingSession = true;
@@ -1158,6 +1187,7 @@
 				return;
 			case 'exercise':
 			case 'linear_progression':
+			case 'superset':
 				startIntraSetRest(block, `Set ${getCurrentSet(block)}`);
 				return;
 			case 'exercise_timed':
@@ -1768,6 +1798,207 @@
 										};
 									}}
 								/>
+							</div>
+						</div>
+					{:else if currentBlock.node_type_slug === 'superset'}
+						<!-- Current Set & Rest Summary -->
+						<div class="mb-10 grid grid-cols-2 gap-6 md:grid-cols-3">
+							<div class="space-y-1">
+								<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Current set</span>
+								<div class="flex items-baseline gap-1">
+									<span class="font-display text-5xl font-bold text-primary">{currentExerciseSet}</span>
+									<span class="text-xl font-light text-on-surface-variant">/ {currentBlock.data?.sets || 3}</span>
+								</div>
+							</div>
+
+							<div class="space-y-1 col-span-1">
+								<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Suggested rest</span>
+								<div class="font-display text-5xl font-bold">{formatClock(Number(currentBlock.data?.rest_seconds ?? 120))}</div>
+							</div>
+
+							<div class="col-span-2 space-y-1 md:col-span-1">
+								<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Set completion</span>
+								<div class="mt-4 flex gap-2">
+									{#each Array(Number(currentBlock.data?.sets ?? 3)) as _, index}
+										<div class={`h-2 flex-1 rounded-full ${index < currentExerciseSet - 1 ? 'bg-primary' : 'bg-surface-variant'}`}></div>
+									{/each}
+								</div>
+							</div>
+						</div>
+
+						<!-- Two Exercises Side by Side -->
+						<div class="mb-8 grid gap-6 md:grid-cols-2">
+							<!-- Exercise A -->
+							<div class="rounded-xl border border-primary/20 bg-primary/5 p-5">
+								<p class="text-[10px] font-bold uppercase tracking-widest text-primary">Exercise A (First)</p>
+								<h3 class="mt-2 text-xl font-bold">{currentBlock.data?.exercise_a_name || 'Exercise A'}</h3>
+								<div class="mt-4 grid grid-cols-2 gap-4">
+									<div>
+										<p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Target Reps</p>
+										<p class="text-2xl font-bold mt-1">{currentBlock.data?.reps_a || '5'}</p>
+									</div>
+									<div>
+										<p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Prescribed Load</p>
+										<p class="text-2xl font-bold mt-1">
+											{currentBlock.data?.start_load_a !== null && currentBlock.data?.start_load_a !== undefined ? `${currentBlock.data.start_load_a} ${currentBlock.data.load_unit_a || 'kg'}` : '-'}
+										</p>
+									</div>
+								</div>
+								{#if currentBlock.data?.progression_type_a === 'linear'}
+									<div class="mt-3 text-[10px] text-primary bg-primary/10 rounded px-2 py-1 inline-block font-semibold">
+										Linear: +{currentBlock.data.increment_a || 2.5} {currentBlock.data.load_unit_a || 'kg'}
+									</div>
+								{/if}
+							</div>
+
+							<!-- Exercise B -->
+							<div class="rounded-xl border border-secondary/20 bg-secondary/5 p-5">
+								<p class="text-[10px] font-bold uppercase tracking-widest text-secondary">Exercise B (Second)</p>
+								<h3 class="mt-2 text-xl font-bold">{currentBlock.data?.exercise_b_name || 'Exercise B'}</h3>
+								<div class="mt-4 grid grid-cols-2 gap-4">
+									<div>
+										<p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Target Reps</p>
+										<p class="text-2xl font-bold mt-1">{currentBlock.data?.reps_b || '10'}</p>
+									</div>
+									<div>
+										<p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Prescribed Load</p>
+										<p class="text-2xl font-bold mt-1">
+											{currentBlock.data?.start_load_b !== null && currentBlock.data?.start_load_b !== undefined ? `${currentBlock.data.start_load_b} ${currentBlock.data.load_unit_b || 'kg'}` : '-'}
+										</p>
+									</div>
+								</div>
+								{#if currentBlock.data?.progression_type_b === 'linear'}
+									<div class="mt-3 text-[10px] text-secondary bg-secondary/10 rounded px-2 py-1 inline-block font-semibold">
+										Linear: +{currentBlock.data.increment_b || 2.5} {currentBlock.data.load_unit_b || 'kg'}
+									</div>
+								{/if}
+							</div>
+						</div>
+
+						{#if isRestingBetweenSets && intraSetRest}
+							<div class="mb-6 rounded-xl border border-primary/20 bg-primary/10 p-5">
+								<div class="flex flex-wrap items-center justify-between gap-4">
+									<div>
+										<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-primary font-headline">Rest between sets</p>
+										<p class="mt-2 text-sm text-on-surface-variant">Next: {intraSetRest.nextLabel}</p>
+									</div>
+									<p class="font-display text-4xl font-bold text-on-surface">{formatClock(intraSetRest.remainingSeconds)}</p>
+								</div>
+							</div>
+						{/if}
+
+						<!-- Superset Inputs -->
+						<div class="rounded-xl border border-white/5 bg-surface-container-low p-5 space-y-5">
+							<p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-headline">Log Set {currentExerciseSet} Results</p>
+							
+							<div class="grid gap-4 md:grid-cols-2 border-b border-outline-variant/10 pb-4">
+								<!-- Inputs for A -->
+								<div class="space-y-4">
+									<p class="text-xs font-bold text-primary font-headline">Exercise A Performance</p>
+									<div class="grid grid-cols-2 gap-3">
+										<div>
+											<label for="superset-actual-reps-a" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
+											<input
+												id="superset-actual-reps-a"
+												class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
+												placeholder={`${currentBlock.data?.reps_a ?? '5'}`}
+												value={actualRepsAByBlock[currentBlock.id] ?? ''}
+												oninput={(event) => {
+													actualRepsAByBlock = {
+														...actualRepsAByBlock,
+														[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+													};
+												}}
+											/>
+										</div>
+										<div>
+											<label for="superset-actual-load-a" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual load</label>
+											<input
+												id="superset-actual-load-a"
+												class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
+												placeholder={currentBlock.data?.start_load_a !== null && currentBlock.data?.start_load_a !== undefined ? `${currentBlock.data.start_load_a}` : 'kg'}
+												value={actualLoadAByBlock[currentBlock.id] ?? ''}
+												oninput={(event) => {
+													actualLoadAByBlock = {
+														...actualLoadAByBlock,
+														[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+													};
+												}}
+											/>
+										</div>
+									</div>
+								</div>
+
+								<!-- Inputs for B -->
+								<div class="space-y-4">
+									<p class="text-xs font-bold text-secondary font-headline">Exercise B Performance</p>
+									<div class="grid grid-cols-2 gap-3">
+										<div>
+											<label for="superset-actual-reps-b" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
+											<input
+												id="superset-actual-reps-b"
+												class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
+												placeholder={`${currentBlock.data?.reps_b ?? '10'}`}
+												value={actualRepsBByBlock[currentBlock.id] ?? ''}
+												oninput={(event) => {
+													actualRepsBByBlock = {
+														...actualRepsBByBlock,
+														[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+													};
+												}}
+											/>
+										</div>
+										<div>
+											<label for="superset-actual-load-b" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual load</label>
+											<input
+												id="superset-actual-load-b"
+												class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
+												placeholder={currentBlock.data?.start_load_b !== null && currentBlock.data?.start_load_b !== undefined ? `${currentBlock.data.start_load_b}` : 'kg'}
+												value={actualLoadBByBlock[currentBlock.id] ?? ''}
+												oninput={(event) => {
+													actualLoadBByBlock = {
+														...actualLoadBByBlock,
+														[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+													};
+												}}
+											/>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<!-- Shared RPE/RIR -->
+							<div class="grid grid-cols-2 gap-4">
+								<div>
+									<label for="superset-actual-rpe" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RPE</label>
+									<input
+										id="superset-actual-rpe"
+										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
+										placeholder="e.g. 8"
+										value={actualRPEByBlock[currentBlock.id] ?? ''}
+										oninput={(event) => {
+											actualRPEByBlock = {
+												...actualRPEByBlock,
+												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+											};
+										}}
+									/>
+								</div>
+								<div>
+									<label for="superset-actual-rir" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RIR</label>
+									<input
+										id="superset-actual-rir"
+										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
+										placeholder="e.g. 2"
+										value={actualRIRByBlock[currentBlock.id] ?? ''}
+										oninput={(event) => {
+											actualRIRByBlock = {
+												...actualRIRByBlock,
+												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+											};
+										}}
+									/>
+								</div>
 							</div>
 						</div>
 					{:else if currentBlock.node_type_slug === 'rest' || currentBlock.node_type_slug === 'exercise_timed'}

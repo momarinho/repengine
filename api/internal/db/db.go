@@ -111,6 +111,31 @@ func SeedNodeTypes(ctx context.Context) error {
 				"rest_seconds": 120
 			}`,
 		},
+		{
+			"superset",
+			"Superset",
+			"Alternating pull/push or multi-exercise group",
+			"layers",
+			`{
+				"exercise_a_name": "",
+				"exercise_b_name": "",
+				"sets": 3,
+				"reps_a": "5",
+				"reps_b": "10",
+				"progression_type_a": "linear",
+				"progression_type_b": "none",
+				"start_load_a": null,
+				"start_load_b": null,
+				"increment_a": 2.5,
+				"increment_b": 0,
+				"load_unit_a": "kg",
+				"load_unit_b": "kg",
+				"progression_rule_a": "add_each_session",
+				"progression_rule_b": "manual",
+				"rest_seconds": 120,
+				"notes": ""
+			}`,
+		},
 		{"repeat", "Repeat", "Repeat block", "repeat", `{"times": 3}`},
 		{"rest", "Rest", "Rest period between sets", "pause", `{"duration": 30}`},
 		{"section", "Section", "Logical section or training day divider", "folder",
@@ -233,6 +258,46 @@ func exerciseBlockWithNotes(exercise, reps string, sets int, notes string) templ
 	block := exerciseBlock(exercise, reps, sets)
 	block.Data["notes"] = notes
 	return block
+}
+
+func supersetBlock(exA, exB, repsA, repsB string, sets, restSeconds int) templateBlockSeed {
+	return templateBlockSeed{
+		NodeTypeSlug: "superset",
+		Data: map[string]any{
+			"exercise_a_name":    exA,
+			"exercise_b_name":    exB,
+			"sets":               sets,
+			"reps_a":             repsA,
+			"reps_b":             repsB,
+			"progression_type_a": "none",
+			"progression_type_b": "none",
+			"rest_seconds":       restSeconds,
+		},
+	}
+}
+
+func hybridSupersetBlock(exA, exB, repsA, repsB string, sets int, progA, progB string, startLoadA, startLoadB float64, restSeconds int) templateBlockSeed {
+	return templateBlockSeed{
+		NodeTypeSlug: "superset",
+		Data: map[string]any{
+			"exercise_a_name":    exA,
+			"exercise_b_name":    exB,
+			"sets":               sets,
+			"reps_a":             repsA,
+			"reps_b":             repsB,
+			"progression_type_a": progA,
+			"progression_type_b": progB,
+			"start_load_a":       startLoadA,
+			"start_load_b":       startLoadB,
+			"increment_a":        2.5,
+			"increment_b":        2.5,
+			"load_unit_a":        "kg",
+			"load_unit_b":        "kg",
+			"progression_rule_a": "add_each_session",
+			"progression_rule_b": "add_each_session",
+			"rest_seconds":       restSeconds,
+		},
+	}
 }
 
 func timedExerciseBlock(exercise string, duration int) templateBlockSeed {
@@ -481,6 +546,50 @@ func SeedTemplates(ctx context.Context) error {
 				exerciseBlockWithNotes("Wave Loading Rules", "Fixed sets", 1, "Wave load only primary compounds: OHP, Ring Dips, Back Squat, Pull-Ups, Deadlift. Each week climbs set by set, e.g. 65/70/75 -> 70/75/80 -> 75/80/85, then repeats slightly heavier before the deload."),
 				exerciseBlockWithNotes("Calisthenics Skill Rules", "Technical quality", 1, "Stop crow pose, pistol, and front lever work when form breaks. No grinding skill reps."),
 				exerciseBlockWithNotes("Push-Up Finisher Principle", "Hypertrophy", 1, "After ring dips, use push-up variation as hypertrophy work without adding another heavy press."),
+			},
+		},
+		{
+			Name:        "Upper/Lower (Pull & Dip Focus)",
+			Description: "An Upper/Lower split program focusing on Weighted Pull-Ups (Day 1) and Weighted Dips (Day 3) as main weighted compound exercises in a native Pull/Push superset fashion, followed by Abs and Arms, with a repeating Lower day structure featuring Deadlifts.",
+			Category:    "hypertrophy",
+			IsOfficial:  true,
+			Metadata: map[string]any{
+				"duration":  "8 weeks",
+				"frequency": "4 days/week",
+				"level":     "intermediate",
+			},
+			Blocks: []templateBlockSeed{
+				sectionBlock("Day 1 - Upper (Pull Focus / Supersets)", "Weighted pull-up main lift, alternating pull + push supersets, abs, and arms.", "day"),
+				hybridSupersetBlock("Weighted Pull-Up", "Dumbbell Bench Press", "5", "8-10", 4, "linear", "none", 10.0, 0.0, 120),
+				hybridSupersetBlock("Barbell Row", "Incline Dumbbell Fly", "8-10", "10-12", 3, "linear", "none", 50.0, 0.0, 90),
+				exerciseBlock("Hanging Leg Raise (Abs)", "12-15", 3),
+				restBlock(60),
+				exerciseBlock("Bicep Curl (Arms)", "10-12", 3),
+
+				sectionBlock("Day 2 - Lower (Squat Focus)", "Squat progression with posterior chain accessories.", "day"),
+				linearProgressionBlock("Back Squat", "6-8", "kg", 4, 60, 2.5, 180),
+				restBlock(180),
+				linearProgressionBlock("Romanian Deadlift", "8-10", "kg", 3, 60, 2.5, 120),
+				restBlock(120),
+				exerciseBlock("Leg Press", "10-12", 3),
+				restBlock(90),
+				exerciseBlock("Standing Calf Raise", "12-15", 4),
+
+				sectionBlock("Day 3 - Upper (Dip Focus / Supersets)", "Weighted dip main lift, alternating pull + push supersets, abs, and arms.", "day"),
+				hybridSupersetBlock("Lat Pulldown", "Weighted Dip", "8-10", "5", 4, "none", "linear", 0.0, 15.0, 120),
+				supersetBlock("Chest-Supported Row", "Dumbbell Overhead Press", "10-12", "8-10", 3, 90),
+				exerciseBlock("Cable Crunch (Abs)", "12-15", 3),
+				restBlock(60),
+				exerciseBlock("Lateral Raise (Arms)", "12-15", 3),
+
+				sectionBlock("Day 4 - Lower (Deadlift Focus)", "Deadlift main lift with repeating squat and leg accessories.", "day"),
+				linearProgressionBlock("Deadlift", "5", "kg", 3, 80, 5.0, 210),
+				restBlock(210),
+				linearProgressionBlock("Back Squat", "8-10", "kg", 3, 50, 2.5, 150),
+				restBlock(150),
+				exerciseBlock("Leg Press", "12-15", 3),
+				restBlock(90),
+				exerciseBlock("Standing Calf Raise", "12-15", 4),
 			},
 		},
 	}
