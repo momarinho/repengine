@@ -123,6 +123,25 @@
 			return acc;
 		}, {})
 	);
+
+	function getLastSessionLogs(block: PlayerBlock): WorkoutSetLog[] {
+		if (!block) return [];
+		for (const session of sessionHistory) {
+			if (activePersistedSession && session.id === activePersistedSession.id) {
+				continue;
+			}
+			if (!session.logs || session.logs.length === 0) continue;
+			const blockLogs = session.logs.filter(
+				(log) =>
+					(block.workflowBlockID && log.workflow_block_id === block.workflowBlockID) ||
+					(log.block_client_id === block.id)
+			);
+			if (blockLogs.length > 0) {
+				return [...blockLogs].sort((a, b) => a.set_index - b.set_index);
+			}
+		}
+		return [];
+	}
 	const activeSessionWaveWeekByBlockID = $derived.by(() => {
 		const sessionLogs = activePersistedSession?.logs ?? [];
 		if (!sessionLogs.length || activePersistedSession?.status !== 'active') {
@@ -1726,6 +1745,35 @@
 							</div>
 						</div>
 
+						{#if getLastSessionLogs(currentBlock).length > 0}
+							<div class="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-5">
+								<div class="mb-3 flex items-center justify-between">
+									<span class="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Previous performance</span>
+									<span class="text-[10px] font-medium text-on-surface-variant">Last session</span>
+								</div>
+								<div class="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
+									{#each getLastSessionLogs(currentBlock) as log}
+										<div class="rounded-lg border border-white/5 bg-surface-container-lowest p-3 text-center">
+											<p class="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">Set {log.set_index}</p>
+											<p class="mt-1 text-base font-bold text-on-surface">
+												{log.actual_reps || '-'} <span class="text-xs font-normal text-on-surface-variant">reps</span>
+											</p>
+											{#if log.actual_load}
+												<p class="mt-0.5 text-xs font-semibold text-secondary">{log.actual_load}</p>
+											{/if}
+											{#if log.actual_rpe || log.actual_rir}
+												<p class="mt-0.5 text-[10px] text-on-surface-variant/70">
+													{log.actual_rpe ? `RPE ${log.actual_rpe}` : ''}
+													{log.actual_rpe && log.actual_rir ? ' • ' : ''}
+													{log.actual_rir ? `RIR ${log.actual_rir}` : ''}
+												</p>
+											{/if}
+										</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
+
 						{#if isRestingBetweenSets && intraSetRest}
 							<div class="mt-4 rounded-xl border border-primary/20 bg-primary/10 p-5">
 								<div class="flex flex-wrap items-center justify-between gap-4">
@@ -2000,6 +2048,51 @@
 									/>
 								</div>
 							</div>
+
+							{#if getLastSessionLogs(currentBlock).length > 0}
+								<div class="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-4">
+									<div class="mb-3 flex items-center justify-between">
+										<span class="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Previous performance</span>
+										<span class="text-[10px] font-medium text-on-surface-variant">Last session</span>
+									</div>
+									<div class="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+										{#each getLastSessionLogs(currentBlock) as log}
+											{@const repsParts = log.actual_reps.split('/')}
+											{@const loadParts = log.actual_load.split('/')}
+											<div class="rounded-lg border border-white/5 bg-surface-container-lowest p-3">
+												<p class="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant text-center border-b border-white/5 pb-1 mb-2">Set {log.set_index}</p>
+												<div class="space-y-1.5">
+													<div class="flex justify-between text-xs">
+														<span class="text-on-surface-variant">Ex A:</span>
+														<span class="font-bold text-on-surface">
+															{repsParts[0] || '-'} reps
+															{#if loadParts[0] && loadParts[0] !== '0'}
+																• {loadParts[0]}
+															{/if}
+														</span>
+													</div>
+													<div class="flex justify-between text-xs">
+														<span class="text-on-surface-variant">Ex B:</span>
+														<span class="font-bold text-on-surface">
+															{repsParts[1] || '-'} reps
+															{#if loadParts[1] && loadParts[1] !== '0'}
+																• {loadParts[1]}
+															{/if}
+														</span>
+													</div>
+												</div>
+												{#if log.actual_rpe || log.actual_rir}
+													<p class="mt-2 text-center text-[9px] text-on-surface-variant/60">
+														{log.actual_rpe ? `RPE ${log.actual_rpe}` : ''}
+														{log.actual_rpe && log.actual_rir ? ' • ' : ''}
+														{log.actual_rir ? `RIR ${log.actual_rir}` : ''}
+													</p>
+												{/if}
+											</div>
+										{/each}
+									</div>
+								</div>
+							{/if}
 						</div>
 					{:else if currentBlock.node_type_slug === 'rest' || currentBlock.node_type_slug === 'exercise_timed'}
 						<div class="flex flex-col items-center justify-center py-4">
@@ -2270,6 +2363,35 @@
 									/>
 								</div>
 							</div>
+
+							{#if getLastSessionLogs(currentBlock).length > 0}
+								<div class="rounded-xl border border-primary/20 bg-primary/5 p-5">
+									<div class="mb-3 flex items-center justify-between">
+										<span class="text-[10px] font-bold uppercase tracking-[0.18em] text-primary font-headline">Previous performance</span>
+										<span class="text-[10px] font-medium text-on-surface-variant">Last session</span>
+									</div>
+									<div class="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
+										{#each getLastSessionLogs(currentBlock) as log}
+											<div class="rounded-lg border border-white/5 bg-surface-container-lowest p-3 text-center">
+												<p class="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">Round {log.set_index}</p>
+												<p class="mt-1 text-base font-bold text-on-surface">
+													{log.actual_reps || '-'} <span class="text-xs font-normal text-on-surface-variant">reps</span>
+												</p>
+												{#if log.actual_load}
+													<p class="mt-0.5 text-xs font-semibold text-secondary">{log.actual_load}</p>
+												{/if}
+												{#if log.actual_rpe || log.actual_rir}
+													<p class="mt-0.5 text-[10px] text-on-surface-variant/70">
+														{log.actual_rpe ? `RPE ${log.actual_rpe}` : ''}
+														{log.actual_rpe && log.actual_rir ? ' • ' : ''}
+														{log.actual_rir ? `RIR ${log.actual_rir}` : ''}
+													</p>
+												{/if}
+											</div>
+										{/each}
+									</div>
+								</div>
+							{/if}
 						</div>
 					{:else}
 						<div class="rounded-xl border border-white/5 bg-surface-container-low p-6">

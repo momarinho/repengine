@@ -367,6 +367,14 @@ func (r *Repository) ListSessions(
 		return PaginatedWorkoutSessions{}, err
 	}
 
+	for i := range sessions {
+		logs, err := r.ListSessionLogs(ctx, sessions[i].ID)
+		if err != nil {
+			return PaginatedWorkoutSessions{}, err
+		}
+		sessions[i].Logs = logs
+	}
+
 	hasMore := len(sessions) > limit
 	var nextCursor *int64
 	if hasMore {

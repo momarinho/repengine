@@ -550,7 +550,7 @@ func SeedTemplates(ctx context.Context) error {
 		},
 		{
 			Name:        "Upper/Lower (Pull & Dip Focus)",
-			Description: "An Upper/Lower split program focusing on Weighted Pull-Ups (Day 1) and Weighted Dips (Day 3) as main weighted compound exercises in a native Pull/Push superset fashion, followed by Abs and Arms, with a repeating Lower day structure featuring Deadlifts.",
+			Description: "An Upper/Lower split program featuring Barbell Overhead Press as a solo T1 main lift on Day 3, alongside Weighted Pull-Ups (Day 1) and Weighted Dips (Day 3) as weighted compound exercises, using native Pull/Push supersets for accessories, followed by Abs and Arms, with a repeating Lower day structure.",
 			Category:    "hypertrophy",
 			IsOfficial:  true,
 			Metadata: map[string]any{
@@ -575,9 +575,11 @@ func SeedTemplates(ctx context.Context) error {
 				restBlock(90),
 				exerciseBlock("Standing Calf Raise", "12-15", 4),
 
-				sectionBlock("Day 3 - Upper (Dip Focus / Supersets)", "Weighted dip main lift, alternating pull + push supersets, abs, and arms.", "day"),
+				sectionBlock("Day 3 - Upper (Dip Focus / Supersets)", "Barbell overhead press main lift, alternating pull + push supersets with weighted dips, abs, and arms.", "day"),
+				linearProgressionBlock("Barbell Overhead Press", "5", "kg", 4, 30, 2.5, 180),
+				restBlock(180),
 				hybridSupersetBlock("Lat Pulldown", "Weighted Dip", "8-10", "5", 4, "none", "linear", 0.0, 15.0, 120),
-				supersetBlock("Chest-Supported Row", "Dumbbell Overhead Press", "10-12", "8-10", 3, 90),
+				supersetBlock("Chest-Supported Row", "Incline Dumbbell Press", "10-12", "8-10", 3, 90),
 				exerciseBlock("Cable Crunch (Abs)", "12-15", 3),
 				restBlock(60),
 				exerciseBlock("Lateral Raise (Arms)", "12-15", 3),
