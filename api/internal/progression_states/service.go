@@ -245,6 +245,20 @@ func parseFailSequence(s string) []failStep {
 	return steps
 }
 
+func roundToPrecision(val float64, precision float64) float64 {
+	if precision <= 0 {
+		return val
+	}
+	ratio := val / precision
+	var rounded int
+	if ratio >= 0 {
+		rounded = int(ratio + 0.5)
+	} else {
+		rounded = int(ratio - 0.5)
+	}
+	return float64(rounded) * precision
+}
+
 func buildLinearProgressionState(
 	block resolvedWorkflowBlock,
 	logs []CompletedSetLog,
@@ -257,11 +271,21 @@ func buildLinearProgressionState(
 	if resetPercent <= 0 {
 		resetPercent = 0.85 // default to 85% GZCLP reset
 	}
+	precision := parseNumberValue(block.Data["rounding_precision"])
+	deloadWeeks := intOrDefault(block.Data["deload_weeks"], 0)
+	deloadPercent := parseNumberValue(block.Data["deload_percent"])
+	if deloadPercent <= 0 {
+		deloadPercent = 0.90 // default to 90% deload
+	}
 
 	currentSeqIndex := 0
+	sessionCount := 0
 	if hasExisting && existing.Metadata != nil {
 		if val, ok := existing.Metadata["current_sequence_index"]; ok {
 			currentSeqIndex = intOrDefault(val, 0)
+		}
+		if val, ok := existing.Metadata["session_count"]; ok {
+			sessionCount = intOrDefault(val, 0)
 		}
 	}
 
@@ -309,6 +333,7 @@ func buildLinearProgressionState(
 	switch {
 	case missedTarget || !allSetsCompleted || isLinearTooHard(hasRPE, avgRPE, hasRIR, avgRIR):
 		outcome = OutcomeReduce
+		sessionCount = 0 // reset consecutive sessions on failure
 		if len(steps) > 0 {
 			if currentSeqIndex < len(steps)-1 {
 				suggestedSeqIndex = currentSeqIndex + 1
@@ -318,24 +343,49 @@ func buildLinearProgressionState(
 			} else {
 				suggestedSeqIndex = 0
 				if hasCurrentLoad {
-					suggestedLoad = formatLoad(maxFloat(currentLoadValue*resetPercent, 0), loadUnit)
+					rawReset := currentLoadValue * resetPercent
+					if precision > 0 {
+						rawReset = roundToPrecision(rawReset, precision)
+					}
+					suggestedLoad = formatLoad(maxFloat(rawReset, 0), loadUnit)
 				}
 				nextStep := steps[0]
 				summary = fmt.Sprintf("Failed final rep scheme. Resetting sequence to %dx%s and reducing load by %d%% to %s.", nextStep.Sets, nextStep.Reps, int((1.0-resetPercent)*100), suggestedLoad)
 			}
 		} else {
 			if hasCurrentLoad && increment > 0 {
-				suggestedLoad = formatLoad(maxFloat(currentLoadValue-increment, 0), loadUnit)
+				rawReduce := currentLoadValue - increment
+				if precision > 0 {
+					rawReduce = roundToPrecision(rawReduce, precision)
+				}
+				suggestedLoad = formatLoad(maxFloat(rawReduce, 0), loadUnit)
 			}
 			summary = "Reduce the load next session. Reps fell off or effort ran too high."
 		}
 
 	case isLinearEasy(hasRPE, avgRPE, hasRIR, avgRIR):
 		outcome = OutcomeIncrease
-		if hasCurrentLoad && increment > 0 {
-			suggestedLoad = formatLoad(currentLoadValue+increment, loadUnit)
+		sessionCount++
+
+		if deloadWeeks > 0 && sessionCount%deloadWeeks == 0 {
+			if hasCurrentLoad {
+				rawDeload := currentLoadValue * deloadPercent
+				if precision > 0 {
+					rawDeload = roundToPrecision(rawDeload, precision)
+				}
+				suggestedLoad = formatLoad(maxFloat(rawDeload, 0), loadUnit)
+			}
+			summary = fmt.Sprintf("Deload milestone reached (%d sessions). Reducing load by %d%% to %s next session for recovery.", sessionCount, int((1.0-deloadPercent)*100), suggestedLoad)
+		} else {
+			if hasCurrentLoad && increment > 0 {
+				rawIncrease := currentLoadValue + increment
+				if precision > 0 {
+					rawIncrease = roundToPrecision(rawIncrease, precision)
+				}
+				suggestedLoad = formatLoad(rawIncrease, loadUnit)
+			}
+			summary = "Add load next session. The work stayed within a manageable effort."
 		}
-		summary = "Add load next session. The work stayed within a manageable effort."
 
 	default:
 		summary = "Keep the load steady next session. The work landed close to the target effort."
@@ -366,6 +416,7 @@ func buildLinearProgressionState(
 			"target_reps_lower":      lowerTarget,
 			"current_sequence_index": suggestedSeqIndex,
 			"fail_sequence":          failSequenceStr,
+			"session_count":          sessionCount,
 		},
 	}
 }

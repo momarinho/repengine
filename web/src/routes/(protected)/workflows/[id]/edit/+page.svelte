@@ -1242,6 +1242,62 @@
 												<span class="text-[10px] text-on-surface-variant/70 block leading-tight">Percent of failed weight to reset to (e.g. 0.85 for 85%). Defaults to 85% GZCLP.</span>
 											</div>
 										</div>
+
+										<div class="grid gap-3 md:grid-cols-3 pt-3 border-t border-outline-variant/10">
+											<div class="space-y-2">
+												<label for="linear-rounding-precision" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Rounding</label>
+												<select
+													id="linear-rounding-precision"
+													class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+													value={typeof selectedBlock.data.rounding_precision === 'number' ? selectedBlock.data.rounding_precision : ''}
+													onchange={(event) => {
+														const val = (event.currentTarget as HTMLSelectElement).value;
+														updateBlockField(selectedBlock.client_id, 'rounding_precision', val === '' ? null : Number(val));
+													}}
+												>
+													<option value="">No rounding</option>
+													<option value="0.5">0.5 kg/lb</option>
+													<option value="1">1.0 kg/lb</option>
+													<option value="2.5">2.5 kg/lb</option>
+													<option value="5">5.0 kg/lb</option>
+												</select>
+												<span class="text-[10px] text-on-surface-variant/70 block leading-tight">Rounding step for weight suggestions.</span>
+											</div>
+											<div class="space-y-2">
+												<label for="linear-deload-weeks" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Deload Every</label>
+												<input
+													id="linear-deload-weeks"
+													type="number"
+													min="0"
+													placeholder="e.g. 4 weeks"
+													class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+													value={typeof selectedBlock.data.deload_weeks === 'number' ? selectedBlock.data.deload_weeks : ''}
+													oninput={(event) => {
+														const val = (event.currentTarget as HTMLInputElement).value;
+														updateBlockField(selectedBlock.client_id, 'deload_weeks', val === '' ? null : Number(val));
+													}}
+												/>
+												<span class="text-[10px] text-on-surface-variant/70 block leading-tight">Trigger deload every X sessions. Keep 0 to disable.</span>
+											</div>
+											<div class="space-y-2">
+												<label for="linear-deload-percent" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Deload Percent</label>
+												<input
+													id="linear-deload-percent"
+													type="number"
+													step="0.05"
+													min="0.1"
+													max="1.0"
+													placeholder="0.90 (90%)"
+													class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+													value={typeof selectedBlock.data.deload_percent === 'number' ? selectedBlock.data.deload_percent : ''}
+													oninput={(event) => {
+														const val = (event.currentTarget as HTMLInputElement).value;
+														updateBlockField(selectedBlock.client_id, 'deload_percent', val === '' ? null : Number(val));
+													}}
+												/>
+												<span class="text-[10px] text-on-surface-variant/70 block leading-tight">Load reduction during deload week (e.g. 0.90).</span>
+											</div>
+										</div>
 									</div>
 								</div>
 							{:else if selectedBlock.node_type_slug === 'wave'}

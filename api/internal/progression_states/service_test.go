@@ -559,6 +559,136 @@ func TestApplySessionProgression_LinearFailSequenceReset(t *testing.T) {
 	}
 }
 
+func TestApplySessionProgression_LinearRounding(t *testing.T) {
+	ctx := context.Background()
+	var gotState UpsertProgressionStateInput
+
+	repo := &fakeRepo{
+		userOwnsWorkflowFunc: func(ctx context.Context, userID, workflowID int) (bool, error) {
+			return true, nil
+		},
+		listWorkflowBlocksFunc: func(ctx context.Context, workflowID int) ([]workflowBlockConfig, error) {
+			return []workflowBlockConfig{
+				{
+					ID:           11,
+					NodeTypeSlug: "linear_progression",
+					Position:     1,
+					Data: map[string]any{
+						"exercise_name":      "Squat",
+						"rounding_precision": 2.5, // round to nearest 2.5 kg/lb
+						"start_load":         100.0,
+						"load_unit":          "kg",
+						"increment":          2.4, // increment is 2.4, but rounding to 2.5 means suggestions should be 102.5
+						"progression_rule":   "add_each_session",
+					},
+				},
+			}, nil
+		},
+		listProgressionStatesFunc: func(ctx context.Context, userID, workflowID int) ([]ProgressionState, error) {
+			return nil, nil
+		},
+		upsertProgressionStateFunc: func(ctx context.Context, in UpsertProgressionStateInput) (ProgressionState, error) {
+			gotState = in
+			return ProgressionState{}, nil
+		},
+	}
+
+	service := NewService(repo)
+
+	err := service.ApplySessionProgression(ctx, ApplySessionProgressionInput{
+		UserID:     2,
+		WorkflowID: 9,
+		SessionID:  21,
+		Logs: []CompletedSetLog{
+			{WorkflowBlockID: intPtr(11), Completed: true, SetIndex: 1, ActualReps: "5", ActualRPE: "8", ActualLoad: "100.0 kg"},
+			{WorkflowBlockID: intPtr(11), Completed: true, SetIndex: 2, ActualReps: "5", ActualRPE: "8", ActualLoad: "100.0 kg"},
+			{WorkflowBlockID: intPtr(11), Completed: true, SetIndex: 3, ActualReps: "5", ActualRPE: "8", ActualLoad: "100.0 kg"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ApplySessionProgression returned error: %v", err)
+	}
+
+	if gotState.SuggestedLoad != "102.5 kg" {
+		t.Fatalf("expected suggested load 102.5 kg (rounded from 102.4), got %q", gotState.SuggestedLoad)
+	}
+}
+
+func TestApplySessionProgression_LinearDeload(t *testing.T) {
+	ctx := context.Background()
+	var gotState UpsertProgressionStateInput
+
+	repo := &fakeRepo{
+		userOwnsWorkflowFunc: func(ctx context.Context, userID, workflowID int) (bool, error) {
+			return true, nil
+		},
+		listWorkflowBlocksFunc: func(ctx context.Context, workflowID int) ([]workflowBlockConfig, error) {
+			return []workflowBlockConfig{
+				{
+					ID:           11,
+					NodeTypeSlug: "linear_progression",
+					Position:     1,
+					Data: map[string]any{
+						"exercise_name":    "Squat",
+						"deload_weeks":     4, // trigger deload every 4 sessions
+						"deload_percent":   0.90, // deload to 90%
+						"start_load":       100.0,
+						"load_unit":        "kg",
+						"increment":        2.5,
+						"progression_rule": "add_each_session",
+					},
+				},
+			}, nil
+		},
+		listProgressionStatesFunc: func(ctx context.Context, userID, workflowID int) ([]ProgressionState, error) {
+			// Simulate being at session_count = 3 (so this next increase is the 4th, triggering deload!)
+			return []ProgressionState{
+				{
+					WorkflowBlockID: 11,
+					BlockKey:        "::linear_progression::squat::1",
+					StateType:       StateTypeLinear,
+					CurrentLoad:     "100 kg",
+					SuggestedLoad:   "100 kg",
+					Metadata: map[string]any{
+						"session_count": 3,
+					},
+				},
+			}, nil
+		},
+		upsertProgressionStateFunc: func(ctx context.Context, in UpsertProgressionStateInput) (ProgressionState, error) {
+			gotState = in
+			return ProgressionState{}, nil
+		},
+	}
+
+	service := NewService(repo)
+
+	err := service.ApplySessionProgression(ctx, ApplySessionProgressionInput{
+		UserID:     2,
+		WorkflowID: 9,
+		SessionID:  21,
+		Logs: []CompletedSetLog{
+			{WorkflowBlockID: intPtr(11), Completed: true, SetIndex: 1, ActualReps: "5", ActualRPE: "8", ActualLoad: "100 kg"},
+			{WorkflowBlockID: intPtr(11), Completed: true, SetIndex: 2, ActualReps: "5", ActualRPE: "8", ActualLoad: "100 kg"},
+			{WorkflowBlockID: intPtr(11), Completed: true, SetIndex: 3, ActualReps: "5", ActualRPE: "8", ActualLoad: "100 kg"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ApplySessionProgression returned error: %v", err)
+	}
+
+	if gotState.Outcome != OutcomeIncrease {
+		t.Fatalf("expected increase outcome, got %q", gotState.Outcome)
+	}
+	// 100 * 0.9 = 90
+	if gotState.SuggestedLoad != "90 kg" {
+		t.Fatalf("expected suggested load 90 kg (90%% deload), got %q", gotState.SuggestedLoad)
+	}
+	if count := gotState.Metadata["session_count"].(int); count != 4 {
+		t.Fatalf("expected session_count to increment to 4, got %d", count)
+	}
+}
+
 func intPtr(value int) *int {
 	return &value
 }

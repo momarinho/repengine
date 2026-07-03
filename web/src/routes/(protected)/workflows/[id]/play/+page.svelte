@@ -116,8 +116,108 @@
 	let progressionStates = $state<ProgressionState[]>(initialData.progressionStates ?? []);
 	let activePersistedSession = $state<WorkoutSession | null>(null);
 	let completedSessionSummary = $state<WorkoutSession | null>(null);
-	let isSyncingSession = $state(false);
 	let sessionError = $state<string | null>(null);
+	let isSyncingSession = $state(false);
+	let isPreviewingLoads = $state(false);
+	let previewSection = $state<PlayerSection | null>(null);
+	let overrideLoads = $state<Record<string, string>>({});
+
+	let syncQueue = $state<Array<{
+		sessionID: number;
+		blockID: string;
+		setIndex: number;
+		payload: Record<string, unknown>;
+	}>>([]);
+
+	$effect(() => {
+		if (browser && routine) {
+			localStorage.setItem(`repengine:sync-queue:${routine.id}`, JSON.stringify(syncQueue));
+		}
+	});
+
+	let isProcessingQueue = false;
+	async function processSyncQueue() {
+		if (isProcessingQueue || syncQueue.length === 0 || !navigator.onLine) return;
+		isProcessingQueue = true;
+
+		const queue = [...syncQueue];
+		for (const item of queue) {
+			try {
+				const response = await fetch(`/api/workout-sessions/${item.sessionID}/logs`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(item.payload)
+				});
+				if (response.ok) {
+					syncQueue = syncQueue.filter(
+						(q) => !(q.sessionID === item.sessionID && q.blockID === item.blockID && q.setIndex === item.setIndex)
+					);
+				} else {
+					break;
+				}
+			} catch (err) {
+				break;
+			}
+		}
+		isProcessingQueue = false;
+	}
+
+	const previewBlocks = $derived(
+		routine
+			? routine.blocks.filter((block) => {
+					if (previewSection) {
+						const idx = routine.blocks.indexOf(block);
+						if (idx < previewSection.startBlockIndex || idx >= previewSection.startBlockIndex + previewSection.blockCount) {
+							return false;
+						}
+					}
+					return block.node_type_slug === 'exercise' || block.node_type_slug === 'linear_progression';
+				})
+			: []
+	);
+
+	function openLoadPreview(section: PlayerSection | null) {
+		previewSection = section;
+		const newOverrides: Record<string, string> = {};
+		const blocksToInitialize = routine
+			? routine.blocks.filter((block) => {
+					if (section) {
+						const idx = routine.blocks.indexOf(block);
+						if (idx < section.startBlockIndex || idx >= section.startBlockIndex + section.blockCount) {
+							return false;
+						}
+					}
+					return block.node_type_slug === 'exercise' || block.node_type_slug === 'linear_progression';
+				})
+			: [];
+
+		for (const block of blocksToInitialize) {
+			const progression = getBlockProgressionState(block);
+			let suggested = '';
+			if (progression?.state_type === 'linear' && progression.suggested_load) {
+				suggested = progression.suggested_load;
+			} else if (block.load !== undefined) {
+				suggested = `${block.load}${block.loadUnit ? ` ${block.loadUnit}` : ''}`;
+			}
+			if (suggested) {
+				newOverrides[block.id] = suggested;
+			}
+		}
+		overrideLoads = newOverrides;
+		isPreviewingLoads = true;
+		isChoosingSection = false;
+	}
+
+	function adjustLoad(currentVal: string, amount: number): string {
+		const match = currentVal.trim().match(/^([\d.]+)\s*(.*)$/);
+		if (!match) return currentVal;
+		const num = Number.parseFloat(match[1]);
+		const unit = match[2] || '';
+		if (Number.isNaN(num)) return currentVal;
+		const newVal = Math.max(num + amount, 0);
+		const rounded = Number.isInteger(newVal) ? String(newVal) : newVal.toFixed(1);
+		return `${rounded}${unit ? ` ${unit}` : ''}`;
+	}
 	const progressionStateByBlockID = $derived(
 		progressionStates.reduce<Record<number, ProgressionState>>((acc, state) => {
 			acc[state.workflow_block_id] = state;
@@ -501,6 +601,9 @@
 	}
 
 	function getResolvedPrescribedLoad(block: PlayerBlock): string {
+		if (overrideLoads[block.id]) {
+			return overrideLoads[block.id];
+		}
 		const progression = getBlockProgressionState(block);
 		if (progression?.state_type === 'linear' && progression.suggested_load) {
 			return progression.suggested_load;
@@ -810,22 +913,89 @@
 			throw new Error('No active workout session.');
 		}
 
-		const response = await fetch(`/api/workout-sessions/${activePersistedSession.id}/logs`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(payload)
-		});
-		const log = await parseApiResponse<WorkoutSetLog>(response);
-		if (!response.ok || !log) {
-			throw new Error('Unable to save set log.');
+		const setIndex = typeof payload.set_index === 'number' ? payload.set_index : 1;
+
+		if (typeof navigator !== 'undefined' && !navigator.onLine) {
+			syncQueue = [
+				...syncQueue,
+				{
+					sessionID: activePersistedSession.id,
+					blockID: block.id,
+					setIndex,
+					payload
+				}
+			];
+			activePersistedSession = {
+				...activePersistedSession,
+				log_count: activePersistedSession.log_count + 1
+			};
+			return {
+				id: -1,
+				session_id: activePersistedSession.id,
+				workflow_block_id: block.workflowBlockID,
+				block_client_id: block.id,
+				set_index: setIndex,
+				prescribed_reps: String(payload.prescribed_reps ?? ''),
+				prescribed_load: String(payload.prescribed_load ?? ''),
+				prescribed_intensity: String(payload.prescribed_intensity ?? ''),
+				prescribed_rpe: String(payload.prescribed_rpe ?? ''),
+				actual_reps: String(payload.actual_reps ?? ''),
+				actual_load: String(payload.actual_load ?? ''),
+				actual_rpe: String(payload.actual_rpe ?? ''),
+				completed: true,
+				created_at: new Date().toISOString()
+			} as unknown as WorkoutSetLog;
 		}
 
-		activePersistedSession = {
-			...activePersistedSession,
-			log_count: activePersistedSession.log_count + 1
-		};
+		try {
+			const response = await fetch(`/api/workout-sessions/${activePersistedSession.id}/logs`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(payload)
+			});
+			const log = await parseApiResponse<WorkoutSetLog>(response);
+			if (!response.ok || !log) {
+				throw new Error('Unable to save set log.');
+			}
 
-		return log;
+			activePersistedSession = {
+				...activePersistedSession,
+				log_count: activePersistedSession.log_count + 1
+			};
+
+			return log;
+		} catch (error: unknown) {
+			console.warn('Network request failed, enqueuing log entry offline:', error);
+			syncQueue = [
+				...syncQueue,
+				{
+					sessionID: activePersistedSession.id,
+					blockID: block.id,
+					setIndex,
+					payload
+				}
+			];
+			activePersistedSession = {
+				...activePersistedSession,
+				log_count: activePersistedSession.log_count + 1
+			};
+			return {
+				id: -1,
+				session_id: activePersistedSession.id,
+				workflow_block_id: block.workflowBlockID,
+				block_client_id: block.id,
+				set_index: setIndex,
+				prescribed_reps: String(payload.prescribed_reps ?? ''),
+				prescribed_load: String(payload.prescribed_load ?? ''),
+				prescribed_intensity: String(payload.prescribed_intensity ?? ''),
+				prescribed_rpe: String(payload.prescribed_rpe ?? ''),
+				actual_reps: String(payload.actual_reps ?? ''),
+				actual_load: String(payload.actual_load ?? ''),
+				actual_rpe: String(payload.actual_rpe ?? ''),
+				completed: true,
+				created_at: new Date().toISOString()
+			} as unknown as WorkoutSetLog;
+		}
 	}
 
 	async function completePersistedSession(): Promise<void> {
@@ -1359,7 +1529,20 @@
 			sessionElapsedSeconds += 1;
 		}, 1000);
 
-		return () => clearInterval(sessionInterval);
+		const savedQueue = localStorage.getItem(`repengine:sync-queue:${routine?.id}`);
+		if (savedQueue) {
+			try {
+				syncQueue = JSON.parse(savedQueue);
+			} catch {
+				// ignore
+			}
+		}
+		const syncInterval = setInterval(processSyncQueue, 10000);
+
+		return () => {
+			clearInterval(sessionInterval);
+			clearInterval(syncInterval);
+		};
 	});
 
 	$effect(() => {
@@ -1473,10 +1656,10 @@
 					<button
 						type="button"
 						class="rounded-md border border-outline-variant/20 bg-surface-container px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
-						onclick={() => void startSection(null)}
+						onclick={() => openLoadPreview(null)}
 						disabled={isSyncingSession}
 					>
-						{isSyncingSession ? 'Starting...' : 'Start from beginning'}
+						Start Workout
 					</button>
 				</div>
 				{#if sessionError}
@@ -1490,7 +1673,7 @@
 						<button
 							type="button"
 							class="rounded-xl border border-outline-variant/20 bg-surface-container p-5 text-left transition-colors hover:border-primary/40 hover:bg-surface-container-high"
-							onclick={() => void startSection(section)}
+							onclick={() => openLoadPreview(section)}
 							disabled={isSyncingSession}
 						>
 							<div class="mb-5 flex items-start justify-between gap-4">
@@ -1507,6 +1690,149 @@
 							</div>
 						</button>
 					{/each}
+				</div>
+			</div>
+		</div>
+	{:else if isPreviewingLoads}
+		<div class="min-h-screen px-6 py-10 bg-background text-on-background">
+			<div class="mx-auto max-w-3xl">
+				<div class="mb-8">
+					<button
+						type="button"
+						class="text-xs font-bold uppercase tracking-[0.2em] text-tertiary hover:underline bg-transparent border-0 cursor-pointer"
+						onclick={() => {
+							isPreviewingLoads = false;
+							isChoosingSection = true;
+						}}
+					>
+						← Back to sections
+					</button>
+					<h1 class="mt-3 text-3xl font-bold tracking-tight text-on-background">Adjust Load Overrides</h1>
+					<p class="mt-2 text-sm text-on-surface-variant">Review and customize your target loads for this session before starting.</p>
+				</div>
+
+				<div class="space-y-6">
+					{#each previewBlocks as block}
+						{@const prevLogs = getLastSessionLogs(block)}
+						{@const suggested = getResolvedPrescribedLoad(block)}
+						<div class="rounded-2xl border border-white/5 bg-surface-container p-6 shadow-md">
+							<div class="flex flex-wrap items-start justify-between gap-4">
+								<div>
+									<p class="text-[10px] font-bold uppercase tracking-wider text-secondary">{block.node_type_slug.replaceAll('_', ' ')}</p>
+									<h3 class="mt-1 text-xl font-bold text-on-surface">{block.title}</h3>
+									<p class="mt-1 text-xs text-on-surface-variant">
+										Prescribed: {getResolvedPrescribedSets(block)}x{getResolvedPrescribedReps(block)}
+									</p>
+								</div>
+								
+								<div class="w-full sm:w-auto">
+									<div class="flex items-center gap-2">
+										<button
+											type="button"
+											class="flex h-10 w-12 items-center justify-center rounded-lg bg-surface-container-high text-sm font-bold text-on-surface hover:bg-surface-container-highest cursor-pointer border-0"
+											onclick={() => {
+												overrideLoads = {
+													...overrideLoads,
+													[block.id]: adjustLoad(overrideLoads[block.id] || suggested || '0 kg', -5)
+												};
+											}}
+										>
+											-5
+										</button>
+										<button
+											type="button"
+											class="flex h-10 w-12 items-center justify-center rounded-lg bg-surface-container-high text-sm font-bold text-on-surface hover:bg-surface-container-highest cursor-pointer border-0"
+											onclick={() => {
+												overrideLoads = {
+													...overrideLoads,
+													[block.id]: adjustLoad(overrideLoads[block.id] || suggested || '0 kg', -2.5)
+												};
+											}}
+										>
+											-2.5
+										</button>
+
+										<input
+											type="text"
+											class="h-10 w-28 rounded-lg border border-white/10 bg-surface-container-lowest text-center text-sm font-bold text-on-surface focus:ring-1 focus:ring-primary/50 outline-none"
+											value={overrideLoads[block.id] ?? ''}
+											oninput={(event) => {
+												overrideLoads = {
+													...overrideLoads,
+													[block.id]: (event.currentTarget as HTMLInputElement).value
+												};
+											}}
+										/>
+
+										<button
+											type="button"
+											class="flex h-10 w-12 items-center justify-center rounded-lg bg-surface-container-high text-sm font-bold text-on-surface hover:bg-surface-container-highest cursor-pointer border-0"
+											onclick={() => {
+												overrideLoads = {
+													...overrideLoads,
+													[block.id]: adjustLoad(overrideLoads[block.id] || suggested || '0 kg', 2.5)
+												};
+											}}
+										>
+											+2.5
+										</button>
+										<button
+											type="button"
+											class="flex h-10 w-12 items-center justify-center rounded-lg bg-surface-container-high text-sm font-bold text-on-surface hover:bg-surface-container-highest cursor-pointer border-0"
+											onclick={() => {
+												overrideLoads = {
+													...overrideLoads,
+													[block.id]: adjustLoad(overrideLoads[block.id] || suggested || '0 kg', 5)
+												};
+											}}
+										>
+											+5
+										</button>
+									</div>
+									<div class="mt-2 flex items-center justify-between text-xs text-on-surface-variant">
+										<span>Suggested: {suggested || 'none'}</span>
+										<button
+											type="button"
+											class="text-primary font-medium hover:underline bg-transparent border-0 cursor-pointer"
+											onclick={() => {
+												const { [block.id]: _, ...rest } = overrideLoads;
+												overrideLoads = rest;
+											}}
+										>
+											Reset
+										</button>
+									</div>
+								</div>
+							</div>
+
+							{#if prevLogs.length > 0}
+								<div class="mt-4 border-t border-white/5 pt-3">
+									<p class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/70">Last Session Logs</p>
+									<div class="mt-2 flex flex-wrap gap-2">
+										{#each prevLogs as log}
+											<span class="rounded bg-surface-container-high px-2 py-1 text-xs text-on-surface-variant">
+												Set {log.set_index}: {log.actual_reps} reps @ {log.actual_load || '-'}
+											</span>
+										{/each}
+									</div>
+								</div>
+							{/if}
+						</div>
+					{/each}
+				</div>
+
+				<div class="mt-8 flex justify-end">
+					<button
+						type="button"
+						class="rounded-xl bg-primary px-8 py-4 text-base font-bold text-on-primary shadow-lg transition-transform hover:scale-[1.02] focus:outline-none disabled:opacity-50 cursor-pointer border-0"
+						onclick={() => {
+							isPreviewingLoads = false;
+							void startSection(previewSection);
+						}}
+						disabled={isSyncingSession}
+					>
+						{isSyncingSession ? 'Starting Session...' : 'Confirm & Start Workout'}
+					</button>
 				</div>
 			</div>
 		</div>
@@ -1661,6 +1987,13 @@
 		<div class="h-1 w-full bg-surface-container-lowest">
 			<div class="h-full bg-primary transition-all duration-300" style={`width: ${progressPercent}%`}></div>
 		</div>
+
+		{#if syncQueue.length > 0}
+			<div class="w-full bg-amber-400/10 border-t border-white/5 text-amber-400 px-6 py-2 text-center text-xs font-semibold flex items-center justify-center gap-2">
+				<span class="material-symbols-outlined text-sm">cloud_off</span>
+				Offline: {syncQueue.length} set(s) pending sync. Saving automatically.
+			</div>
+		{/if}
 	</header>
 
 	<main class="flex h-screen overflow-hidden pt-[3.75rem] pb-24">
