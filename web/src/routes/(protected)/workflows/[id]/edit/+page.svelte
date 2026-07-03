@@ -1207,6 +1207,42 @@
 											<option value="manual">Manual</option>
 										</select>
 									</div>
+
+									<div class="border-t border-outline-variant/10 pt-4 mt-2 space-y-4">
+										<h4 class="text-xs font-bold uppercase tracking-wider text-secondary">Advanced Progression / GZCLP</h4>
+										<div class="grid gap-3 md:grid-cols-2">
+											<div class="space-y-2">
+												<label for="linear-fail-sequence" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Fail sequence (GZCLP)</label>
+												<input
+													id="linear-fail-sequence"
+													type="text"
+													placeholder="e.g. 5x3 -> 6x2 -> 10x1"
+													class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+													value={typeof selectedBlock.data.fail_sequence === 'string' ? selectedBlock.data.fail_sequence : ''}
+													oninput={(event) => updateBlockField(selectedBlock.client_id, 'fail_sequence', (event.currentTarget as HTMLInputElement).value)}
+												/>
+												<span class="text-[10px] text-on-surface-variant/70 block leading-tight">Rotates sets x reps on session failure. Keep empty for standard linear progression.</span>
+											</div>
+											<div class="space-y-2">
+												<label for="linear-reset-percent" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Reset percent</label>
+												<input
+													id="linear-reset-percent"
+													type="number"
+													step="0.05"
+													min="0.1"
+													max="1.0"
+													placeholder="0.85 (85%)"
+													class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+													value={typeof selectedBlock.data.reset_percent === 'number' ? selectedBlock.data.reset_percent : ''}
+													oninput={(event) => {
+														const val = (event.currentTarget as HTMLInputElement).value;
+														updateBlockField(selectedBlock.client_id, 'reset_percent', val === '' ? null : Number(val));
+													}}
+												/>
+												<span class="text-[10px] text-on-surface-variant/70 block leading-tight">Percent of failed weight to reset to (e.g. 0.85 for 85%). Defaults to 85% GZCLP.</span>
+											</div>
+										</div>
+									</div>
 								</div>
 							{:else if selectedBlock.node_type_slug === 'wave'}
 								<div class="space-y-6">

@@ -20,6 +20,7 @@ import (
 	"github.com/momarinho/rep_engine/internal/middleware"
 	progressionstatesvc "github.com/momarinho/rep_engine/internal/progression_states"
 	templatesvc "github.com/momarinho/rep_engine/internal/templates"
+	trainingmaxessvc "github.com/momarinho/rep_engine/internal/training_maxes"
 	workflowsvc "github.com/momarinho/rep_engine/internal/workflows"
 	workoutsessionsvc "github.com/momarinho/rep_engine/internal/workout_sessions"
 )
@@ -83,6 +84,9 @@ func main() {
 	progressionStateRepo := progressionstatesvc.NewRepository(db.Pool)
 	progressionStateService := progressionstatesvc.NewService(progressionStateRepo)
 
+	trainingMaxesRepo := trainingmaxessvc.NewRepository(db.Pool)
+	trainingMaxesService := trainingmaxessvc.NewService(trainingMaxesRepo)
+
 	workoutSessionRepo := workoutsessionsvc.NewRepository(db.Pool)
 	workoutSessionService := workoutsessionsvc.NewService(workoutSessionRepo, progressionStateService)
 
@@ -91,6 +95,7 @@ func main() {
 		Workflows:       workflowService,
 		Templates:       templateService,
 		Progression:     progressionStateService,
+		TrainingMaxes:   trainingMaxesService,
 		WorkoutSessions: workoutSessionService,
 		NodeTypes:       nodeTypesCache,
 	})
@@ -186,6 +191,10 @@ func main() {
 	workoutSessions.Put("/:id/logs/:logId", h.UpdateWorkoutSetLog)
 	workoutSessions.Post("/:id/complete", h.CompleteWorkoutSession)
 	workoutSessions.Post("/:id/abandon", h.AbandonWorkoutSession)
+
+	trainingMaxes := app.Group("/training-maxes", requireAuth)
+	trainingMaxes.Get("/", h.ListTrainingMaxes)
+	trainingMaxes.Post("/", h.UpsertTrainingMax)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)

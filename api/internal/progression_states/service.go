@@ -219,6 +219,32 @@ func resolveWorkflowBlocks(blocks []workflowBlockConfig) []resolvedWorkflowBlock
 	return resolved
 }
 
+type failStep struct {
+	Sets int
+	Reps string
+}
+
+func parseFailSequence(s string) []failStep {
+	parts := strings.Split(s, "->")
+	var steps []failStep
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		// Expecting "Sets x Reps", e.g. "5x3" or "5 x 3"
+		sub := strings.Split(strings.ToLower(part), "x")
+		if len(sub) == 2 {
+			sets, _ := strconv.Atoi(strings.TrimSpace(sub[0]))
+			reps := strings.TrimSpace(sub[1])
+			if sets > 0 && reps != "" {
+				steps = append(steps, failStep{Sets: sets, Reps: reps})
+			}
+		}
+	}
+	return steps
+}
+
 func buildLinearProgressionState(
 	block resolvedWorkflowBlock,
 	logs []CompletedSetLog,
@@ -226,8 +252,44 @@ func buildLinearProgressionState(
 	hasExisting bool,
 	session ApplySessionProgressionInput,
 ) UpsertProgressionStateInput {
-	lowerTarget, _ := parseRepRange(firstNonEmpty(asString(block.Data["reps"]), logs[0].PrescribedReps))
-	setsPlanned := intOrDefault(block.Data["sets"], len(logs))
+	failSequenceStr := asString(block.Data["fail_sequence"])
+	resetPercent := parseNumberValue(block.Data["reset_percent"])
+	if resetPercent <= 0 {
+		resetPercent = 0.85 // default to 85% GZCLP reset
+	}
+
+	currentSeqIndex := 0
+	if hasExisting && existing.Metadata != nil {
+		if val, ok := existing.Metadata["current_sequence_index"]; ok {
+			currentSeqIndex = intOrDefault(val, 0)
+		}
+	}
+
+	// Parse steps if sequence exists
+	var steps []failStep
+	if failSequenceStr != "" {
+		steps = parseFailSequence(failSequenceStr)
+	}
+
+	var setsPlanned int
+	var repsPrescribed string
+	if len(steps) > 0 {
+		// Ensure currentSeqIndex is within bounds
+		if currentSeqIndex < 0 || currentSeqIndex >= len(steps) {
+			currentSeqIndex = 0
+		}
+		setsPlanned = steps[currentSeqIndex].Sets
+		repsPrescribed = steps[currentSeqIndex].Reps
+	} else {
+		setsPlanned = intOrDefault(block.Data["sets"], len(logs))
+		repsPrescribed = asString(block.Data["reps"])
+	}
+
+	if repsPrescribed == "" && len(logs) > 0 {
+		repsPrescribed = logs[0].PrescribedReps
+	}
+	lowerTarget, _ := parseRepRange(repsPrescribed)
+
 	increment := parseNumberValue(block.Data["increment"])
 	loadUnit := asString(block.Data["load_unit"])
 
@@ -235,26 +297,46 @@ func buildLinearProgressionState(
 	currentLoadValue, hasCurrentLoad := parseNumberString(currentLoad)
 	avgRPE, avgRPELabel, hasRPE := averageMetric(logs, func(log CompletedSetLog) string { return log.ActualRPE })
 	avgRIR, avgRIRLabel, hasRIR := averageMetric(logs, func(log CompletedSetLog) string { return log.ActualRIR })
+
 	allSetsCompleted := len(logs) >= setsPlanned
 	missedTarget := anyRepTargetMiss(logs, lowerTarget)
 
 	outcome := OutcomeMaintain
 	suggestedLoad := currentLoad
+	suggestedSeqIndex := currentSeqIndex
 	summary := "Keep the current load next session."
 
 	switch {
 	case missedTarget || !allSetsCompleted || isLinearTooHard(hasRPE, avgRPE, hasRIR, avgRIR):
 		outcome = OutcomeReduce
-		if hasCurrentLoad && increment > 0 {
-			suggestedLoad = formatLoad(maxFloat(currentLoadValue-increment, 0), loadUnit)
+		if len(steps) > 0 {
+			if currentSeqIndex < len(steps)-1 {
+				suggestedSeqIndex = currentSeqIndex + 1
+				suggestedLoad = currentLoad // Keep the same load when changing schemes in GZCLP
+				nextStep := steps[suggestedSeqIndex]
+				summary = fmt.Sprintf("Failed rep target. Transition to next scheme: %dx%s at %s.", nextStep.Sets, nextStep.Reps, currentLoad)
+			} else {
+				suggestedSeqIndex = 0
+				if hasCurrentLoad {
+					suggestedLoad = formatLoad(maxFloat(currentLoadValue*resetPercent, 0), loadUnit)
+				}
+				nextStep := steps[0]
+				summary = fmt.Sprintf("Failed final rep scheme. Resetting sequence to %dx%s and reducing load by %d%% to %s.", nextStep.Sets, nextStep.Reps, int((1.0-resetPercent)*100), suggestedLoad)
+			}
+		} else {
+			if hasCurrentLoad && increment > 0 {
+				suggestedLoad = formatLoad(maxFloat(currentLoadValue-increment, 0), loadUnit)
+			}
+			summary = "Reduce the load next session. Reps fell off or effort ran too high."
 		}
-		summary = "Reduce the load next session. Reps fell off or effort ran too high."
+
 	case isLinearEasy(hasRPE, avgRPE, hasRIR, avgRIR):
 		outcome = OutcomeIncrease
 		if hasCurrentLoad && increment > 0 {
 			suggestedLoad = formatLoad(currentLoadValue+increment, loadUnit)
 		}
 		summary = "Add load next session. The work stayed within a manageable effort."
+
 	default:
 		summary = "Keep the load steady next session. The work landed close to the target effort."
 	}
@@ -276,11 +358,14 @@ func buildLinearProgressionState(
 		LastLogCount:    len(logs),
 		Summary:         summary,
 		Metadata: map[string]any{
-			"increment":         increment,
-			"load_unit":         loadUnit,
-			"progression_rule":  asString(block.Data["progression_rule"]),
-			"sets_planned":      setsPlanned,
-			"target_reps_lower": lowerTarget,
+			"increment":              increment,
+			"load_unit":              loadUnit,
+			"progression_rule":       asString(block.Data["progression_rule"]),
+			"sets_planned":           setsPlanned,
+			"reps_planned":           repsPrescribed,
+			"target_reps_lower":      lowerTarget,
+			"current_sequence_index": suggestedSeqIndex,
+			"fail_sequence":          failSequenceStr,
 		},
 	}
 }

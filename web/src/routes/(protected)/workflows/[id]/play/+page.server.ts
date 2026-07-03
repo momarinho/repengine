@@ -3,6 +3,7 @@ import type { Workflow } from '$lib/editor/types';
 import { normalizeWorkflow } from '$lib/editor/normalize';
 import { normalizePlayerRoutine } from '$lib/player/normalize';
 import type { ProgressionState } from '$lib/progression-states/types';
+import type { TrainingMax } from '$lib/training-maxes/types';
 import { apiFetch, safeJson } from '$lib/server/api';
 import type { PaginatedWorkoutSessions, WorkoutSession } from '$lib/workout-sessions/types';
 
@@ -10,6 +11,7 @@ type LoadResult = {
 	routine: ReturnType<typeof normalizePlayerRoutine>;
 	sessionHistory: WorkoutSession[];
 	progressionStates: ProgressionState[];
+	trainingMaxes: TrainingMax[];
 	error: string | null;
 };
 
@@ -32,6 +34,7 @@ export const load = (async ({ params, cookies, fetch, url }) => {
 			routine: null,
 			sessionHistory: [],
 			progressionStates: [],
+			trainingMaxes: [],
 			error: errorMessage
 		} satisfies LoadResult;
 	}
@@ -51,10 +54,16 @@ export const load = (async ({ params, cookies, fetch, url }) => {
 		? await safeJson<ProgressionState[]>(progressionResponse)
 		: null;
 
+	const tmsResponse = await apiFetch(fetch, '/training-maxes', token, {
+		method: 'GET'
+	});
+	const tmsPayload = tmsResponse.ok ? await safeJson<TrainingMax[]>(tmsResponse) : null;
+
 	return {
 		routine,
 		sessionHistory: sessionsPayload?.data ?? [],
 		progressionStates: progressionPayload ?? [],
+		trainingMaxes: tmsPayload ?? [],
 		error: routine ? null : 'Routine payload is invalid for the player.'
 	} satisfies LoadResult;
 }) satisfies PageServerLoad;

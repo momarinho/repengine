@@ -1,8 +1,71 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import type { PageData } from './$types';
+	import type { TrainingMax } from '$lib/training-maxes/types';
 
 	let { data, form }: { data: PageData; form: any } = $props();
+
+	let trainingMaxes = $state<TrainingMax[]>((data.trainingMaxes as TrainingMax[]) ?? []);
+	let isSaving = $state(false);
+	let saveError = $state<string | null>(null);
+
+	let newExerciseName = $state('');
+	let newValue = $state<number | undefined>(undefined);
+	let newUnit = $state<'kg' | 'lb'>('kg');
+
+	let editingExerciseName = $state<string | null>(null);
+	let editingValue = $state<number | undefined>(undefined);
+	let editingUnit = $state<'kg' | 'lb'>('kg');
+
+	async function handleSaveTM(exerciseName: string, value: number, unit: 'kg' | 'lb') {
+		if (!exerciseName.trim()) return;
+		if (value <= 0) {
+			saveError = 'Value must be greater than zero.';
+			return;
+		}
+
+		isSaving = true;
+		saveError = null;
+
+		try {
+			const res = await fetch('/api/training-maxes', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					exercise_name: exerciseName.trim(),
+					value,
+					unit
+				})
+			});
+
+			if (!res.ok) {
+				const body = await res.json();
+				saveError = body?.message || 'Failed to save training max.';
+				return;
+			}
+
+			const saved = (await res.json()) as TrainingMax;
+			const idx = trainingMaxes.findIndex((t) => t.exercise_name.toLowerCase() === saved.exercise_name.toLowerCase());
+			if (idx !== -1) {
+				trainingMaxes[idx] = saved;
+			} else {
+				trainingMaxes = [...trainingMaxes, saved].sort((a, b) => a.exercise_name.localeCompare(b.exercise_name));
+			}
+
+			// Clear form if saving new
+			if (editingExerciseName === null) {
+				newExerciseName = '';
+				newValue = undefined;
+			} else {
+				editingExerciseName = null;
+				editingValue = undefined;
+			}
+		} catch (err) {
+			saveError = 'Network error occurred.';
+		} finally {
+			isSaving = false;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -27,75 +90,193 @@
 			</div>
 		{:else}
 			<div class="grid gap-6 lg:grid-cols-2">
-				<section class="rounded-2xl border border-white/5 bg-surface-container p-6 shadow-xl">
-					<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Profile</p>
-					<h2 class="mt-2 text-2xl font-bold text-on-surface">{data.account.email}</h2>
-					<p class="mt-2 text-sm text-on-surface-variant">Created {new Date(data.account.created_at).toLocaleString()}</p>
+				<!-- Left Column: Profile & Security -->
+				<div class="space-y-6">
+					<section class="rounded-2xl border border-white/5 bg-surface-container p-6 shadow-xl">
+						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Profile</p>
+						<h2 class="mt-2 text-2xl font-bold text-on-surface">{data.account.email}</h2>
+						<p class="mt-2 text-sm text-on-surface-variant">Created {new Date(data.account.created_at).toLocaleString()}</p>
 
-					<form method="POST" action="?/profile" class="mt-6 space-y-4" use:enhance>
-						<div>
-							<label class="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant" for="email">Email</label>
-							<input
-								id="email"
-								name="email"
-								type="email"
-								value={data.account.email}
-								class="w-full rounded-lg border-0 bg-surface-container-high p-3 text-sm text-on-surface"
-								required
-							/>
+						<form method="POST" action="?/profile" class="mt-6 space-y-4" use:enhance>
+							<div>
+								<label class="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant" for="email">Email</label>
+								<input
+									id="email"
+									name="email"
+									type="email"
+									value={data.account.email}
+									class="w-full rounded-lg border-0 bg-surface-container-high p-3 text-sm text-on-surface"
+									required
+								/>
+							</div>
+							<div>
+								<label class="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant" for="profile-current-password">Current password</label>
+								<input
+									id="profile-current-password"
+									name="current_password"
+									type="password"
+									class="w-full rounded-lg border-0 bg-surface-container-high p-3 text-sm text-on-surface"
+									required
+								/>
+							</div>
+							{#if form?.profileMessage}
+								<p class="text-sm text-error">{form.profileMessage}</p>
+							{/if}
+							<button class="rounded-md border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/20" type="submit">
+								Update email
+							</button>
+						</form>
+					</section>
+
+					<section class="rounded-2xl border border-white/5 bg-surface-container p-6 shadow-xl">
+						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Security</p>
+						<h2 class="mt-2 text-2xl font-bold text-on-surface">Change password</h2>
+						<p class="mt-2 text-sm text-on-surface-variant">Use a new password with at least 8 characters.</p>
+
+						<form method="POST" action="?/password" class="mt-6 space-y-4" use:enhance>
+							<div>
+								<label class="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant" for="password-current-password">Current password</label>
+								<input
+									id="password-current-password"
+									name="current_password"
+									type="password"
+									class="w-full rounded-lg border-0 bg-surface-container-high p-3 text-sm text-on-surface"
+									required
+								/>
+							</div>
+							<div>
+								<label class="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant" for="new-password">New password</label>
+								<input
+									id="new-password"
+									name="new_password"
+									type="password"
+									class="w-full rounded-lg border-0 bg-surface-container-high p-3 text-sm text-on-surface"
+									required
+								/>
+							</div>
+							{#if form?.passwordMessage}
+								<p class="text-sm text-error">{form.passwordMessage}</p>
+							{/if}
+							<button class="rounded-md border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/20" type="submit">
+								Update password
+							</button>
+						</form>
+					</section>
+				</div>
+
+				<!-- Right Column: Training Maxes -->
+				<section class="rounded-2xl border border-white/5 bg-surface-container p-6 shadow-xl flex flex-col justify-between">
+					<div>
+						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Base Performance</p>
+						<h2 class="mt-2 text-2xl font-bold text-on-surface">Training Maxes</h2>
+						<p class="mt-2 text-sm text-on-surface-variant">Set baseline performance loads used to calculate dynamic routine progressions (e.g. 5/3/1 wave percentages).</p>
+
+						<!-- TM List -->
+						<div class="mt-6 space-y-3 overflow-y-auto max-h-[300px] pr-1">
+							{#if trainingMaxes.length === 0}
+								<div class="rounded-xl border border-dashed border-outline-variant/30 py-8 text-center text-sm text-on-surface-variant">
+									No training maxes defined yet. Add one below.
+								</div>
+							{:else}
+								<div class="divide-y divide-outline-variant/10">
+									{#each trainingMaxes as tm}
+										<div class="flex items-center justify-between py-3">
+											{#if editingExerciseName === tm.exercise_name}
+												<div class="flex-1 mr-4">
+													<p class="text-sm font-semibold text-on-surface">{tm.exercise_name}</p>
+													<div class="mt-2 flex gap-2">
+														<input
+															type="number"
+															step="0.5"
+															class="w-24 rounded bg-surface-container-high px-2 py-1 text-sm text-on-surface outline-none"
+															bind:value={editingValue}
+														/>
+														<select
+															class="rounded bg-surface-container-high px-2 py-1 text-sm text-on-surface outline-none"
+															bind:value={editingUnit}
+														>
+															<option value="kg">kg</option>
+															<option value="lb">lb</option>
+														</select>
+														<button
+															class="rounded bg-primary/20 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/30"
+															onclick={() => editingValue !== undefined && handleSaveTM(tm.exercise_name, editingValue, editingUnit)}
+														>
+															Save
+														</button>
+														<button
+															class="rounded bg-surface-container-highest px-3 py-1 text-xs font-semibold text-on-surface hover:bg-surface-variant"
+															onclick={() => editingExerciseName = null}
+														>
+															Cancel
+														</button>
+													</div>
+												</div>
+											{:else}
+												<div>
+													<p class="text-sm font-semibold text-on-surface">{tm.exercise_name}</p>
+													<p class="text-[10px] text-on-surface-variant">Updated {new Date(tm.updated_at).toLocaleDateString()}</p>
+												</div>
+												<div class="flex items-center gap-4">
+													<span class="text-lg font-bold text-secondary">{tm.value} {tm.unit}</span>
+													<button
+														class="text-xs font-semibold text-primary hover:underline"
+														onclick={() => {
+															editingExerciseName = tm.exercise_name;
+															editingValue = tm.value;
+															editingUnit = tm.unit as 'kg' | 'lb';
+														}}
+													>
+														Edit
+													</button>
+												</div>
+											{/if}
+										</div>
+									{/each}
+								</div>
+							{/if}
 						</div>
-						<div>
-							<label class="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant" for="profile-current-password">Current password</label>
+					</div>
+
+					<!-- Form: Add or Update TM -->
+					<div class="mt-6 border-t border-outline-variant/10 pt-6">
+						<p class="text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">Add / Update Training Max</p>
+						<div class="mt-4 grid gap-3 grid-cols-[1fr_90px_65px]">
 							<input
-								id="profile-current-password"
-								name="current_password"
-								type="password"
-								class="w-full rounded-lg border-0 bg-surface-container-high p-3 text-sm text-on-surface"
-								required
+								type="text"
+								placeholder="e.g. Squat"
+								class="rounded-lg bg-surface-container-high p-3 text-sm text-on-surface outline-none focus:ring-1 focus:ring-primary/50"
+								bind:value={newExerciseName}
 							/>
+							<input
+								type="number"
+								step="0.5"
+								placeholder="Weight"
+								class="rounded-lg bg-surface-container-high p-3 text-sm text-on-surface outline-none focus:ring-1 focus:ring-primary/50"
+								bind:value={newValue}
+							/>
+							<select
+								class="rounded-lg bg-surface-container-high p-3 text-sm text-on-surface outline-none"
+								bind:value={newUnit}
+							>
+								<option value="kg">kg</option>
+								<option value="lb">lb</option>
+							</select>
 						</div>
-						{#if form?.profileMessage}
-							<p class="text-sm text-error">{form.profileMessage}</p>
+
+						{#if saveError}
+							<p class="mt-2 text-xs text-error">{saveError}</p>
 						{/if}
-						<button class="rounded-md border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/20" type="submit">
-							Update email
-						</button>
-					</form>
-				</section>
 
-				<section class="rounded-2xl border border-white/5 bg-surface-container p-6 shadow-xl">
-					<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Security</p>
-					<h2 class="mt-2 text-2xl font-bold text-on-surface">Change password</h2>
-					<p class="mt-2 text-sm text-on-surface-variant">Use a new password with at least 8 characters.</p>
-
-					<form method="POST" action="?/password" class="mt-6 space-y-4" use:enhance>
-						<div>
-							<label class="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant" for="password-current-password">Current password</label>
-							<input
-								id="password-current-password"
-								name="current_password"
-								type="password"
-								class="w-full rounded-lg border-0 bg-surface-container-high p-3 text-sm text-on-surface"
-								required
-							/>
-						</div>
-						<div>
-							<label class="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant" for="new-password">New password</label>
-							<input
-								id="new-password"
-								name="new_password"
-								type="password"
-								class="w-full rounded-lg border-0 bg-surface-container-high p-3 text-sm text-on-surface"
-								required
-							/>
-						</div>
-						{#if form?.passwordMessage}
-							<p class="text-sm text-error">{form.passwordMessage}</p>
-						{/if}
-						<button class="rounded-md border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/20" type="submit">
-							Update password
+						<button
+							class="mt-4 w-full rounded-md border border-primary/20 bg-primary/10 py-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
+							type="button"
+							disabled={isSaving || !newExerciseName || newValue === undefined}
+							onclick={() => newValue !== undefined && handleSaveTM(newExerciseName, newValue, newUnit)}
+						>
+							{isSaving ? 'Saving...' : 'Add / Update'}
 						</button>
-					</form>
+					</div>
 				</section>
 
 				<section class="rounded-2xl border border-error/20 bg-error/10 p-6 shadow-xl lg:col-span-2">
@@ -128,3 +309,4 @@
 		{/if}
 	</div>
 </div>
+

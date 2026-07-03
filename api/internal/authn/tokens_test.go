@@ -10,7 +10,7 @@ func TestSignAndParseToken(t *testing.T) {
 	t.Setenv("JWT_ISSUER", "repengine-api")
 	t.Setenv("JWT_AUDIENCE", "repengine-web")
 
-	now := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
+	now := time.Now().UTC()
 	token, err := SignToken(42, 3, now)
 	if err != nil {
 		t.Fatalf("SignToken returned error: %v", err)

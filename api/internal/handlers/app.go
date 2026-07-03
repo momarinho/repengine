@@ -6,6 +6,7 @@ import (
 	authnsvc "github.com/momarinho/rep_engine/internal/authn"
 	progressionstatesvc "github.com/momarinho/rep_engine/internal/progression_states"
 	templatesvc "github.com/momarinho/rep_engine/internal/templates"
+	trainingmaxesvc "github.com/momarinho/rep_engine/internal/training_maxes"
 	workflowsvc "github.com/momarinho/rep_engine/internal/workflows"
 	workoutsessionsvc "github.com/momarinho/rep_engine/internal/workout_sessions"
 )
@@ -43,6 +44,12 @@ type progressionStateService interface {
 	ListProgressionStates(ctx context.Context, in progressionstatesvc.ListProgressionStatesInput) ([]progressionstatesvc.ProgressionState, error)
 }
 
+type trainingMaxService interface {
+	UpsertTrainingMax(ctx context.Context, in trainingmaxesvc.UpsertTrainingMaxInput) (trainingmaxesvc.TrainingMax, error)
+	GetTrainingMax(ctx context.Context, in trainingmaxesvc.GetTrainingMaxInput) (trainingmaxesvc.TrainingMax, error)
+	ListTrainingMaxes(ctx context.Context, in trainingmaxesvc.ListTrainingMaxesInput) ([]trainingmaxesvc.TrainingMax, error)
+}
+
 type workoutSessionService interface {
 	ListSessions(ctx context.Context, in workoutsessionsvc.ListSessionsInput) (workoutsessionsvc.PaginatedWorkoutSessions, error)
 	StartSession(ctx context.Context, in workoutsessionsvc.StartSessionInput) (workoutsessionsvc.WorkoutSession, error)
@@ -59,6 +66,7 @@ type Dependencies struct {
 	Workflows       workflowService
 	Templates       templateService
 	Progression     progressionStateService
+	TrainingMaxes   trainingMaxService
 	WorkoutSessions workoutSessionService
 	NodeTypes       map[string]NodeType
 }
@@ -68,6 +76,7 @@ type App struct {
 	workflows       workflowService
 	templates       templateService
 	progression     progressionStateService
+	trainingMaxes   trainingMaxService
 	workoutSessions workoutSessionService
 	nodeTypes       map[string]NodeType
 }
@@ -83,6 +92,7 @@ func NewApp(deps Dependencies) *App {
 		workflows:       deps.Workflows,
 		templates:       deps.Templates,
 		progression:     deps.Progression,
+		trainingMaxes:   deps.TrainingMaxes,
 		workoutSessions: deps.WorkoutSessions,
 		nodeTypes:       nodeTypes,
 	}

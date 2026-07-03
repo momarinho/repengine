@@ -6,6 +6,7 @@
 	import type { PageData } from './$types';
 	import type { PlayerBlock, PlayerRoutine, PlayerSection, WaveWeek } from '$lib/player/types';
 	import type { WorkoutSession, WorkoutSetLog } from '$lib/workout-sessions/types';
+	import type { TrainingMax } from '$lib/training-maxes/types';
 
 	type SessionActivityKind = 'set' | 'round' | 'block' | 'timer';
 
@@ -124,6 +125,24 @@
 		}, {})
 	);
 
+	const trainingMaxesByExercise = $derived(
+		(initialData.trainingMaxes ?? []).reduce<Record<string, TrainingMax>>((acc, tm) => {
+			acc[tm.exercise_name.toLowerCase()] = tm;
+			return acc;
+		}, {})
+	);
+
+	function calculateCalculatedLoad(exerciseName: string | undefined, intensityStr: string | undefined): string {
+		if (!exerciseName || !intensityStr) return '';
+		const tm = trainingMaxesByExercise[exerciseName.toLowerCase()];
+		if (!tm) return '';
+		const percentage = Number.parseFloat(intensityStr.replace('%', ''));
+		if (Number.isNaN(percentage) || percentage <= 0) return '';
+		const calculated = tm.value * (percentage / 100);
+		const rounded = Number.isInteger(calculated) ? String(calculated) : calculated.toFixed(1);
+		return `${rounded} ${tm.unit}`;
+	}
+
 	function getLastSessionLogs(block: PlayerBlock): WorkoutSetLog[] {
 		if (!block) return [];
 		for (const session of sessionHistory) {
@@ -172,6 +191,8 @@
 		}, {});
 	});
 	const currentBlock = $derived(routine?.blocks[currentBlockIndex] ?? null);
+	const currentBlockSets = $derived(currentBlock ? getResolvedPrescribedSets(currentBlock) : 1);
+	const currentBlockReps = $derived(currentBlock ? getResolvedPrescribedReps(currentBlock) : '5');
 	const currentProgressionState = $derived(
 		currentBlock?.workflowBlockID ? progressionStateByBlockID[currentBlock.workflowBlockID] ?? null : null
 	);
@@ -490,6 +511,27 @@
 		return '';
 	}
 
+	function getResolvedPrescribedSets(block: PlayerBlock): number {
+		const progression = getBlockProgressionState(block);
+		if (progression?.state_type === 'linear' && typeof progression.metadata?.sets_planned === 'number') {
+			return progression.metadata.sets_planned;
+		}
+		return block.sets ?? 3;
+	}
+
+	// Helper for typescript compilation of metadata
+	function isMetadataObject(meta: unknown): meta is Record<string, unknown> {
+		return typeof meta === 'object' && meta !== null;
+	}
+
+	function getResolvedPrescribedReps(block: PlayerBlock): string {
+		const progression = getBlockProgressionState(block);
+		if (progression?.state_type === 'linear' && isMetadataObject(progression.metadata) && typeof progression.metadata.reps_planned === 'string') {
+			return progression.metadata.reps_planned;
+		}
+		return block.reps ?? '5';
+	}
+
 	function getProgressionSummary(state: ProgressionState | null): string | null {
 		return state?.summary?.trim() ? state.summary : null;
 	}
@@ -617,8 +659,9 @@
 
 		switch (block.node_type_slug) {
 			case 'exercise':
-			case 'linear_progression':
 				return getCurrentSet(block) >= (block.sets ?? 1) ? 'Complete Exercise' : 'Log Set';
+			case 'linear_progression':
+				return getCurrentSet(block) >= getResolvedPrescribedSets(block) ? 'Complete Exercise' : 'Log Set';
 			case 'superset':
 				return getCurrentSet(block) >= (block.sets ?? 1) ? 'Complete Superset' : 'Log Set';
 			case 'rest':
@@ -737,7 +780,7 @@
 			actualRIR: string;
 		}
 	): Record<string, unknown> {
-		let reps = block.reps ?? '';
+		let reps = getResolvedPrescribedReps(block);
 		let load = getResolvedPrescribedLoad(block) || '';
 		if (block.node_type_slug === 'superset') {
 			reps = `${block.data?.reps_a || '0'}/${block.data?.reps_b || '0'}`;
@@ -1055,11 +1098,12 @@
 					'set',
 					`Set ${currentSet}`,
 					actual.actualReps || actual.actualLoad || actual.actualRPE || actual.actualRIR
-						? `${actual.actualReps || block.reps || '-'} reps${actual.actualLoad ? ` @ ${actual.actualLoad}` : ''}${actual.actualRPE ? ` • RPE ${actual.actualRPE}` : ''}${actual.actualRIR ? ` • RIR ${actual.actualRIR}` : ''}`.trim()
-						: `${block.reps ?? '-'} reps${getResolvedPrescribedLoad(block) ? ` @ ${getResolvedPrescribedLoad(block)}` : ''}`.trim()
+						? `${actual.actualReps || getResolvedPrescribedReps(block) || '-'} reps${actual.actualLoad ? ` @ ${actual.actualLoad}` : ''}${actual.actualRPE ? ` • RPE ${actual.actualRPE}` : ''}${actual.actualRIR ? ` • RIR ${actual.actualRIR}` : ''}`.trim()
+						: `${getResolvedPrescribedReps(block) ?? '-'} reps${getResolvedPrescribedLoad(block) ? ` @ ${getResolvedPrescribedLoad(block)}` : ''}`.trim()
 				);
-				if (currentSet >= (block.sets ?? 1)) {
-					completeCurrentBlock(block, `${block.sets ?? 1} sets logged`);
+				const targetSets = getResolvedPrescribedSets(block);
+				if (currentSet >= targetSets) {
+					completeCurrentBlock(block, `${targetSets} sets logged`);
 					return;
 				}
 
@@ -1700,13 +1744,13 @@
 								<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Current set</span>
 								<div class="flex items-baseline gap-1">
 									<span class="font-display text-5xl font-bold text-primary">{currentExerciseSet}</span>
-									<span class="text-xl font-light text-on-surface-variant">/ {currentBlock.sets}</span>
+									<span class="text-xl font-light text-on-surface-variant">/ {currentBlockSets}</span>
 								</div>
 							</div>
 
 							<div class="space-y-1">
 								<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Target reps</span>
-								<div class="font-display text-5xl font-bold">{currentBlock.reps}</div>
+								<div class="font-display text-5xl font-bold">{currentBlockReps}</div>
 							</div>
 
 							<div class="col-span-2 space-y-1 md:col-span-1">
@@ -1738,7 +1782,7 @@
 							<div>
 								<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Set completion</p>
 								<div class="mt-3 flex gap-2">
-									{#each Array(currentBlock.sets ?? 0) as _, index}
+									{#each Array(currentBlockSets ?? 0) as _, index}
 										<div class={`h-2 flex-1 rounded-full ${index < currentExerciseSet - 1 ? 'bg-primary' : 'bg-surface-variant'}`}></div>
 									{/each}
 								</div>
@@ -1792,7 +1836,7 @@
 								<input
 									id="actual-reps"
 									class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-									placeholder={currentBlock.reps ?? 'e.g. 8'}
+									placeholder={currentBlockReps ?? 'e.g. 8'}
 									value={actualRepsByBlock[currentBlock.id] ?? ''}
 									oninput={(event) => {
 										actualRepsByBlock = {
@@ -2152,7 +2196,13 @@
 								</div>
 								<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
 									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Set prescription</p>
-									<p class="mt-2 text-lg font-semibold text-on-surface">{currentWaveSet?.reps} • {currentWaveSet?.intensity}% • RPE {currentWaveSet?.rpe}</p>
+									<p class="mt-2 text-lg font-semibold text-on-surface">
+										{currentWaveSet?.reps} reps • {currentWaveSet?.intensity}%
+										{#if calculateCalculatedLoad(currentBlock?.data?.exercise_name as string, currentWaveSet?.intensity)}
+											<span class="text-secondary font-bold">({calculateCalculatedLoad(currentBlock?.data?.exercise_name as string, currentWaveSet?.intensity)})</span>
+										{/if}
+										• RPE {currentWaveSet?.rpe}
+									</p>
 								</div>
 							</div>
 
@@ -2168,8 +2218,8 @@
 											<div class={`h-2 flex-1 rounded-full ${index < currentWaveSetIndex ? 'bg-secondary' : 'bg-surface-variant'}`}></div>
 										{/each}
 									</div>
+								</div>
 							</div>
-						</div>
 
 							{#if isRestingBetweenSets && intraSetRest}
 								<div class="rounded-xl border border-secondary/20 bg-secondary/10 p-5">
@@ -2204,7 +2254,7 @@
 									<input
 										id="wave-actual-load"
 										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-										placeholder="e.g. 140 kg"
+										placeholder={calculateCalculatedLoad(currentBlock?.data?.exercise_name as string, currentWaveSet?.intensity) || 'e.g. 140 kg'}
 										value={actualLoadByBlock[currentBlock.id] ?? ''}
 										oninput={(event) => {
 											actualLoadByBlock = {

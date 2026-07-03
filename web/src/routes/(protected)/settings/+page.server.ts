@@ -13,11 +13,15 @@ export const load = (async ({ cookies, fetch }) => {
 	const token = cookies.get('token');
 	const response = await apiFetch(fetch, '/auth/me', token, { method: 'GET' });
 	if (!response.ok) {
-		return { account: null };
+		return { account: null, trainingMaxes: [] };
 	}
 
+	const tmsResponse = await apiFetch(fetch, '/training-maxes', token, { method: 'GET' });
+	const trainingMaxes = tmsResponse.ok ? await safeJson<unknown[]>(tmsResponse) : [];
+
 	return {
-		account: await safeJson<Account>(response)
+		account: await safeJson<Account>(response),
+		trainingMaxes: trainingMaxes ?? []
 	};
 }) satisfies PageServerLoad;
 
