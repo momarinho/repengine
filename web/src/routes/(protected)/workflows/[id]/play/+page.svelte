@@ -1209,7 +1209,15 @@
 		}
 	): void {
 		const duration = block.restSeconds ?? 0;
-		if (duration <= 0) return;
+		if (duration <= 0) {
+			if (advance?.type === 'set') {
+				currentSetByBlock = { ...currentSetByBlock, [block.id]: advance.value };
+			}
+			if (advance?.type === 'wave_set') {
+				waveSetByBlock = { ...waveSetByBlock, [block.id]: advance.value };
+			}
+			return;
+		}
 
 		intraSetRest = {
 			blockID: block.id,

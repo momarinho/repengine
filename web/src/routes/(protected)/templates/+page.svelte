@@ -6,7 +6,8 @@
 	const filters = [
 		{ key: '', label: 'All Templates' },
 		{ key: 'strength', label: 'Strength' },
-		{ key: 'hypertrophy', label: 'Hypertrophy' }
+		{ key: 'hypertrophy', label: 'Hypertrophy' },
+		{ key: 'hybrid', label: 'Hybrid' }
 	];
 
 	function metadataValue(metadata: Record<string, unknown>, key: string): string | null {

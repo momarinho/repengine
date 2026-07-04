@@ -108,7 +108,11 @@ func SeedNodeTypes(ctx context.Context) error {
 				"load_unit": "kg",
 				"increment": 2.5,
 				"progression_rule": "add_each_session",
-				"rest_seconds": 120
+				"rest_seconds": 120,
+				"fail_sequence": "",
+				"reset_percent": 0.85,
+				"rounding_precision": 2.5,
+				"notes": ""
 			}`,
 		},
 		{
@@ -326,6 +330,32 @@ func linearProgressionBlock(exercise, reps, loadUnit string, sets int, startLoad
 	}
 }
 
+func gzclpT1Block(exercise string, startLoad float64, loadUnit string, increment float64, restSeconds int, notes string) templateBlockSeed {
+	return templateBlockSeed{
+		NodeTypeSlug: "linear_progression",
+		Data: map[string]any{
+			"exercise_name":      exercise,
+			"sets":               3,
+			"reps":               "5",
+			"start_load":         startLoad,
+			"load_unit":          loadUnit,
+			"increment":          increment,
+			"progression_rule":   "add_each_session",
+			"rest_seconds":       restSeconds,
+			"fail_sequence":      "3x5 -> 5x3 -> 6x2",
+			"reset_percent":      0.85,
+			"rounding_precision": 2.5,
+			"notes":              notes,
+		},
+	}
+}
+
+func linearProgressionBlockWithNotes(exercise, reps, loadUnit string, sets int, startLoad, increment float64, restSeconds int, notes string) templateBlockSeed {
+	block := linearProgressionBlock(exercise, reps, loadUnit, sets, startLoad, increment, restSeconds)
+	block.Data["notes"] = notes
+	return block
+}
+
 func restBlock(duration int) templateBlockSeed {
 	return templateBlockSeed{
 		NodeTypeSlug: "rest",
@@ -338,260 +368,111 @@ func restBlock(duration int) templateBlockSeed {
 func SeedTemplates(ctx context.Context) error {
 	seeds := []templateSeed{
 		{
-			Name:        "5/3/1",
-			Description: "Jim Wendler 5/3/1 base template for main barbell lifts.",
+			Name:        "Powerbuilding LP & Supersets",
+			Description: "A structured 3-day split testing linear progression, standard supersets, timed mobility, and rest blocks.",
 			Category:    "strength",
+			IsOfficial:  true,
+			Metadata: map[string]any{
+				"duration":  "6 weeks",
+				"frequency": "3 days/week",
+				"level":     "intermediate",
+			},
+			Blocks: []templateBlockSeed{
+				sectionBlock("Day 1 - Upper Body Push", "Focusing on Barbell Bench Press and supersets.", "day"),
+				linearProgressionBlock("Barbell Bench Press", "5", "kg", 3, 60.0, 2.5, 180),
+				restBlock(120),
+				supersetBlock("Barbell Overhead Press", "Lat Pulldown", "8", "10", 3, 90),
+				restBlock(90),
+				exerciseBlock("Triceps Pushdown", "12", 3),
+
+				sectionBlock("Day 2 - Lower Body & Core", "Focusing on Squats, Romanian Deadlifts, and timed core finisher.", "day"),
+				linearProgressionBlock("Back Squat", "5", "kg", 3, 80.0, 5.0, 180),
+				restBlock(120),
+				exerciseBlock("Romanian Deadlift", "8", 3),
+				exerciseBlock("Hanging Leg Raise", "15", 3),
+				timedExerciseBlock("Plank Hold", 60),
+			},
+		},
+		{
+			Name:        "Conjugate Method & Waves",
+			Description: "An advanced full-body program combining multi-week wave progressions, hybrid supersets, and timed skill work.",
+			Category:    "hybrid",
 			IsOfficial:  true,
 			Metadata: map[string]any{
 				"duration":  "4 weeks",
 				"frequency": "4 days/week",
-				"level":     "intermediate",
+				"level":     "advanced",
 			},
 			Blocks: []templateBlockSeed{
-				{
-					NodeTypeSlug: "section",
-					Data: map[string]any{
-						"title":     "Day 1 - Squat",
-						"subtitle":  "Main lower-body strength day",
-						"kind":      "day",
-						"collapsed": false,
-					},
-				},
-				{
+				sectionBlock("Day 1 - Max Effort Pull", "Heavy deadlift wave loading and loaded pull-up supersets.", "day"),
+				templateBlockSeed{
 					NodeTypeSlug: "wave",
-					Data:         fiveThreeOneWaveBlock("Squat", 120).Data,
-				},
-				{
-					NodeTypeSlug: "rest",
 					Data: map[string]any{
-						"duration": 120,
-					},
-				},
-				{
-					NodeTypeSlug: "exercise",
-					Data: map[string]any{
-						"exercise_name": "Romanian Deadlift",
-						"sets":          3,
-						"reps":          "8",
-					},
-				},
-				{
-					NodeTypeSlug: "section",
-					Data: map[string]any{
-						"title":     "Day 2 - Bench Press",
-						"subtitle":  "Main upper-body strength day",
-						"kind":      "day",
-						"collapsed": false,
-					},
-				},
-				fiveThreeOneWaveBlock("Bench Press", 120),
-				{
-					NodeTypeSlug: "rest",
-					Data: map[string]any{
-						"duration": 120,
-					},
-				},
-				{
-					NodeTypeSlug: "exercise",
-					Data: map[string]any{
-						"exercise_name": "Barbell Row",
-						"sets":          3,
-						"reps":          "10",
-					},
-				},
-			},
-		},
-		{
-			Name:        "GZCLP",
-			Description: "Linear progression template with T1, T2 and T3 structure.",
-			Category:    "strength",
-			IsOfficial:  true,
-			Metadata: map[string]any{
-				"duration":  "12 weeks",
-				"frequency": "4 days/week",
-				"level":     "beginner",
-			},
-			Blocks: []templateBlockSeed{
-				{
-					NodeTypeSlug: "section",
-					Data: map[string]any{
-						"title":     "Day 1 - T1 Main Lift",
-						"subtitle":  "Primary lift progression",
-						"kind":      "day",
-						"collapsed": false,
-					},
-				},
-				{
-					NodeTypeSlug: "linear_progression",
-					Data: map[string]any{
-						"exercise_name":    "Squat",
-						"sets":             5,
-						"reps":             "3",
-						"start_load":       45,
-						"load_unit":        "lb",
-						"increment":        5,
-						"progression_rule": "add_each_session",
+						"exercise_name":    "Deadlift",
+						"active_week":      1,
 						"rest_seconds":     180,
+						"week_1_reps":      "5/5/5+",
+						"week_1_intensity": "65/70/75",
+						"week_1_rpe":       "7/8/9",
+						"week_2_reps":      "3/3/3+",
+						"week_2_intensity": "70/75/80",
+						"week_2_rpe":       "8/8/9",
+						"week_3_reps":      "5/3/1+",
+						"week_3_intensity": "75/80/85",
+						"week_3_rpe":       "8/9/9",
+						"week_4_reps":      "5/5/5",
+						"week_4_intensity": "40/50/60",
+						"week_4_rpe":       "6/6/6",
 					},
 				},
-				{
-					NodeTypeSlug: "rest",
-					Data: map[string]any{
-						"duration": 180,
-					},
-				},
-				{
-					NodeTypeSlug: "section",
-					Data: map[string]any{
-						"title":     "T2 Secondary Lift",
-						"subtitle":  "Supplemental strength volume",
-						"kind":      "section",
-						"collapsed": false,
-					},
-				},
-				{
-					NodeTypeSlug: "linear_progression",
-					Data: map[string]any{
-						"exercise_name":    "Bench Press",
-						"sets":             3,
-						"reps":             "10",
-						"start_load":       45,
-						"load_unit":        "lb",
-						"increment":        5,
-						"progression_rule": "add_each_session",
-						"rest_seconds":     120,
-					},
-				},
-				{
-					NodeTypeSlug: "rest",
-					Data: map[string]any{
-						"duration": 90,
-					},
-				},
-				{
-					NodeTypeSlug: "section",
-					Data: map[string]any{
-						"title":     "T3 Accessories",
-						"subtitle":  "Higher-rep accessory work",
-						"kind":      "section",
-						"collapsed": false,
-					},
-				},
-				{
-					NodeTypeSlug: "exercise",
-					Data: map[string]any{
-						"exercise_name": "Lat Pulldown",
-						"sets":          3,
-						"reps":          "15",
-					},
-				},
+				restBlock(120),
+				hybridSupersetBlock("Weighted Pull-Up", "Ring Dips", "5", "8", 4, "linear", "none", 10.0, 0.0, 120),
+				timedExerciseBlock("Crow Pose Practice", 300),
+
+				sectionBlock("Day 2 - Rest & Mobility", "Active recovery focusing on wrists, shoulders, and hips.", "day"),
+				timedExerciseBlock("Wrist & Shoulder Mobility", 480),
 			},
 		},
 		{
-			Name:        "Hybrid Calisthenics + Weights",
-			Description: "Wave progression plan combining weighted compounds with calisthenics rep and skill progressions.",
+			Name:        "3-Day Hybrid Hypertrophy GZCLP",
+			Description: "Customized 3-day split using weighted bodyweight T1 progressions, unilateral leg focus, and high-volume T2 builders.",
 			Category:    "hybrid",
 			IsOfficial:  true,
 			Metadata: map[string]any{
-				"duration":  "6 weeks + 1 deload week",
-				"frequency": "4 days/week",
-				"level":     "intermediate",
-				"mesocycle": "6 weeks, then 1 deload week",
-				"schedule":  "Mon Upper Push, Tue Lower Body, Thu Upper Pull, Fri Lower Power",
-				"skill_goals": []string{
-					"Crow Pose",
-					"Front Lever",
-					"Handstand Push-Up",
-					"Pistol Squat",
-				},
-			},
-			Blocks: []templateBlockSeed{
-				sectionBlock("Day 1 - Upper Push", "Monday. Wave-loaded pressing plus push-up and crow pose progressions.", "day"),
-				hybridWaveBlock("Barbell Overhead Press", 180),
-				restBlock(120),
-				hybridWaveBlock("Weighted Ring Dips", 180),
-				restBlock(90),
-				exerciseBlockWithNotes("Push-Up Variation", "AMRAP", 3, "Advance variant at 20 clean reps. Ladder: Standard -> Archer -> Ring Push-Up -> Weighted -> Pseudo Planche."),
-				timedExerciseBlock("Crow Pose Practice", 600),
-
-				sectionBlock("Day 2 - Lower Body", "Tuesday. Squat wave loading with hinge progression and lower-body skill work.", "day"),
-				hybridWaveBlock("Back Squat", 180),
-				restBlock(120),
-				linearProgressionBlock("Romanian Deadlift", "8-10", "kg", 3, 60, 2.5, 120),
-				restBlock(90),
-				exerciseBlockWithNotes("Pistol Squat Progression", "5/leg", 3, "Advance variation weekly. Ladder: Assisted band/TRX -> Box Pistol -> Full Pistol -> Weighted Pistol."),
-				exerciseBlockWithNotes("Nordic Hamstring Curl", "6", 3, "Eccentric focus with 5-second negative."),
-
-				sectionBlock("Day 3 - Rest / Mobility", "Wednesday. Active recovery for wrists, hips, hamstrings, and thoracic spine.", "day"),
-				timedExerciseBlock("Wrist Prep + Wrist Circles", 300),
-				timedExerciseBlock("Hip Flexor + Hamstring Stretch", 480),
-				timedExerciseBlock("Thoracic Spine Mobility", 300),
-
-				sectionBlock("Day 4 - Upper Pull", "Thursday. Pull-up wave loading with horizontal pulling and front lever skill work.", "day"),
-				hybridWaveBlock("Weighted Pull-Up", 180),
-				restBlock(120),
-				linearProgressionBlock("Barbell / Dumbbell Row", "8-10", "kg", 3, 40, 2.5, 120),
-				restBlock(90),
-				exerciseBlock("Ring Rows", "12-15", 3),
-				timedExerciseBlock("Front Lever Progression", 480),
-
-				sectionBlock("Day 5 - Lower Power + Posterior Chain", "Friday. Deadlift wave loading with unilateral strength and hamstring control.", "day"),
-				hybridWaveBlock("Deadlift", 210),
-				restBlock(150),
-				linearProgressionBlock("Bulgarian Split Squat", "8-10/leg", "kg", 3, 20, 2.5, 120),
-				restBlock(90),
-				exerciseBlockWithNotes("Nordic Hamstring Curl", "6", 3, "Eccentric focus with 5-second negative."),
-
-				sectionBlock("Key Principles", "Use fixed sets, protect skill quality, and deload every 7th week.", "section"),
-				exerciseBlockWithNotes("Wave Loading Rules", "Fixed sets", 1, "Wave load only primary compounds: OHP, Ring Dips, Back Squat, Pull-Ups, Deadlift. Each week climbs set by set, e.g. 65/70/75 -> 70/75/80 -> 75/80/85, then repeats slightly heavier before the deload."),
-				exerciseBlockWithNotes("Calisthenics Skill Rules", "Technical quality", 1, "Stop crow pose, pistol, and front lever work when form breaks. No grinding skill reps."),
-				exerciseBlockWithNotes("Push-Up Finisher Principle", "Hypertrophy", 1, "After ring dips, use push-up variation as hypertrophy work without adding another heavy press."),
-			},
-		},
-		{
-			Name:        "Upper/Lower (Pull & Dip Focus)",
-			Description: "An Upper/Lower split program featuring Barbell Overhead Press as a solo T1 main lift on Day 3, alongside Weighted Pull-Ups (Day 1) and Weighted Dips (Day 3) as weighted compound exercises, using native Pull/Push supersets for accessories, followed by Abs and Arms, with a repeating Lower day structure.",
-			Category:    "hypertrophy",
-			IsOfficial:  true,
-			Metadata: map[string]any{
 				"duration":  "8 weeks",
-				"frequency": "4 days/week",
-				"level":     "intermediate",
+				"frequency": "3 days/week",
+				"level":     "advanced",
 			},
 			Blocks: []templateBlockSeed{
-				sectionBlock("Day 1 - Upper (Pull Focus / Supersets)", "Weighted pull-up main lift, alternating pull + push supersets, abs, and arms.", "day"),
-				hybridSupersetBlock("Weighted Pull-Up", "Dumbbell Bench Press", "5", "8-10", 4, "linear", "none", 10.0, 0.0, 120),
-				hybridSupersetBlock("Barbell Row", "Incline Dumbbell Fly", "8-10", "10-12", 3, "linear", "none", 50.0, 0.0, 90),
-				exerciseBlock("Hanging Leg Raise (Abs)", "12-15", 3),
-				restBlock(60),
-				exerciseBlock("Bicep Curl (Arms)", "10-12", 3),
-
-				sectionBlock("Day 2 - Lower (Squat Focus)", "Squat progression with posterior chain accessories.", "day"),
-				linearProgressionBlock("Back Squat", "6-8", "kg", 4, 60, 2.5, 180),
-				restBlock(180),
-				linearProgressionBlock("Romanian Deadlift", "8-10", "kg", 3, 60, 2.5, 120),
+				sectionBlock("Day 1: Heavy Push & Posterior Chain", "Focusing on weighted dips, hamstrings stretch, and high-volume pull-ups.", "day"),
+				gzclpT1Block("Weighted Ring Dips", 10.0, "kg", 2.0, 180, "Use your dip belt. Load heavily to drive chest and tricep tension."),
 				restBlock(120),
-				exerciseBlock("Leg Press", "10-12", 3),
+				linearProgressionBlockWithNotes("Barbell Romanian Deadlift", "10", "kg", 3, 40.0, 2.5, 120, "Controlled Romanian Deadlift with a 3-second eccentric phase focusing on hamstring stretch."),
 				restBlock(90),
-				exerciseBlock("Standing Calf Raise", "12-15", 4),
-
-				sectionBlock("Day 3 - Upper (Dip Focus / Supersets)", "Barbell overhead press main lift, alternating pull + push supersets with weighted dips, abs, and arms.", "day"),
-				linearProgressionBlock("Barbell Overhead Press", "5", "kg", 4, 30, 2.5, 180),
-				restBlock(180),
-				hybridSupersetBlock("Lat Pulldown", "Weighted Dip", "8-10", "5", 4, "none", "linear", 0.0, 15.0, 120),
-				supersetBlock("Chest-Supported Row", "Incline Dumbbell Press", "10-12", "8-10", 3, 90),
-				exerciseBlock("Cable Crunch (Abs)", "12-15", 3),
-				restBlock(60),
-				exerciseBlock("Lateral Raise (Arms)", "12-15", 3),
-
-				sectionBlock("Day 4 - Lower (Deadlift Focus)", "Deadlift main lift with repeating squat and leg accessories.", "day"),
-				linearProgressionBlock("Deadlift", "5", "kg", 3, 80, 5.0, 210),
-				restBlock(210),
-				linearProgressionBlock("Back Squat", "8-10", "kg", 3, 50, 2.5, 150),
-				restBlock(150),
-				exerciseBlock("Leg Press", "12-15", 3),
+				exerciseBlockWithNotes("Bodyweight Pull-Up", "AMRAP", 3, "Accumulate volume for lat width, keeping 1-2 reps in reserve."),
 				restBlock(90),
-				exerciseBlock("Standing Calf Raise", "12-15", 4),
+				exerciseBlock("Ring Tricep Extension", "15+", 3),
+				exerciseBlock("Hanging Toes-to-Rings", "12-15", 3),
+
+				sectionBlock("Day 2: Heavy Quads & Shoulder Mass", "Focusing on unilateral squats, high-volume OHP, and back work.", "day"),
+				gzclpT1Block("Barbell Bulgarian Split Squat", 20.0, "kg", 2.5, 180, "Clean bar, press overhead, rest on back. Functions like a 100kg bilateral squat."),
+				restBlock(120),
+				linearProgressionBlockWithNotes("Barbell Overhead Press", "8-10", "kg", 3, 40.0, 2.5, 120, "Higher rep range close to failure for shoulder mass."),
+				restBlock(90),
+				exerciseBlockWithNotes("Ring Inverted Row", "10-12", 3, "Elevate feet parallel to the floor. Focus on squeezing shoulder blades."),
+				restBlock(90),
+				exerciseBlock("Ring Face Pull", "15+", 3),
+				exerciseBlock("Ring Rollout", "AMRAP", 3),
+
+				sectionBlock("Day 3: Heavy Pull & Quad Volume", "Focusing on weighted pull-ups, front/Zercher squats, and chest stretch.", "day"),
+				gzclpT1Block("Weighted Pull-Up", 10.0, "kg", 2.0, 180, "Strap plates to waist. Progressively add weight weekly."),
+				restBlock(120),
+				linearProgressionBlockWithNotes("Barbell Zercher Squat", "10-12", "kg", 3, 40.0, 2.5, 120, "Hold in elbow crooks or front rack to target quads and core deeply."),
+				restBlock(90),
+				exerciseBlockWithNotes("Deficit Ring Push-Up", "10-12", 3, "Lower rings close to floor. Instability creates deep chest stretch."),
+				restBlock(90),
+				exerciseBlock("Ring Bicep Curl", "15+", 3),
+				timedExerciseBlock("Pallof Press or RKC Plank Hold", 45),
 			},
 		},
 	}
@@ -601,6 +482,11 @@ func SeedTemplates(ctx context.Context) error {
 		return fmt.Errorf("begin template seed tx: %w", err)
 	}
 	defer tx.Rollback(ctx)
+
+	// Clean up existing official templates first to ensure we start fresh
+	if _, err := tx.Exec(ctx, `DELETE FROM templates WHERE is_official = TRUE`); err != nil {
+		return fmt.Errorf("clear existing official templates: %w", err)
+	}
 
 	for _, seed := range seeds {
 		templateID, err := upsertTemplateSeed(ctx, tx, seed)

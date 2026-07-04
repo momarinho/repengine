@@ -16,8 +16,12 @@ export const actions = {
 		});
 
 		if (!res.ok) {
-			const body = await res.json();
-			return fail(401, { message: body.error || 'invalid credentials' });
+			let message = 'invalid credentials';
+			try {
+				const body = await res.json();
+				message = body.message || body.error || message;
+			} catch (_) {}
+			return fail(401, { message });
 		}
 
 		const body = await res.json();
@@ -48,8 +52,12 @@ export const actions = {
 		});
 
 		if (!res.ok) {
-			const body = await res.json();
-			return fail(400, { message: body.error || 'registration failed' });
+			let message = 'registration failed';
+			try {
+				const body = await res.json();
+				message = body.message || body.error || message;
+			} catch (_) {}
+			return fail(400, { message });
 		}
 
 		throw redirect(303, '/login');

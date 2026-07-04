@@ -159,7 +159,7 @@ func TestServiceCloneTemplate_CompletesAndFillsWorkflowID(t *testing.T) {
 	service, repo, pool := newIntegrationTemplateDeps(t)
 
 	userID := createTemplateTestUser(t, pool, "clone-complete")
-	templateID := templateIDByName(t, pool, "5/3/1")
+	templateID := templateIDByName(t, pool, "Powerbuilding LP & Supersets")
 
 	job, err := service.CloneTemplate(ctx, CloneTemplateInput{
 		UserID:         userID,
@@ -189,7 +189,7 @@ func TestServiceCloneTemplate_SameIdempotencyKeyDoesNotDuplicate(t *testing.T) {
 	service, repo, pool := newIntegrationTemplateDeps(t)
 
 	userID := createTemplateTestUser(t, pool, "clone-idempotent")
-	templateID := templateIDByName(t, pool, "GZCLP")
+	templateID := templateIDByName(t, pool, "Conjugate Method & Waves")
 	key := fmt.Sprintf("same-key-%d", time.Now().UnixNano())
 
 	job1, err := service.CloneTemplate(ctx, CloneTemplateInput{
@@ -223,7 +223,7 @@ func TestServiceCloneTemplate_SameIdempotencyKeyDoesNotDuplicate(t *testing.T) {
 		t.Fatalf("expected 1 clone job, got %d", got)
 	}
 
-	if got := countUserWorkflowsByName(t, pool, userID, "GZCLP"); got != 1 {
+	if got := countUserWorkflowsByName(t, pool, userID, "Conjugate Method & Waves"); got != 1 {
 		t.Fatalf("expected 1 workflow cloned for user, got %d", got)
 	}
 }

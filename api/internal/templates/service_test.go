@@ -200,7 +200,7 @@ func TestServiceListTemplates_FilterByCategory(t *testing.T) {
 			gotCategory = category
 			gotLimit = limit
 			return PaginatedTemplates{
-				Data: []Template{{ID: 1, Name: "5/3/1", Category: "strength"}},
+				Data: []Template{{ID: 1, Name: "Powerbuilding LP & Supersets", Category: "strength"}},
 			}, nil
 		},
 	}
@@ -307,7 +307,7 @@ func TestServiceCloneTemplate_ReturnsExistingJobForSameIdempotencyKey(t *testing
 
 	repo := &fakeRepo{
 		getTemplateByIDFunc: func(ctx context.Context, templateID int) (Template, error) {
-			return Template{ID: templateID, Name: "5/3/1"}, nil
+			return Template{ID: templateID, Name: "Powerbuilding LP & Supersets"}, nil
 		},
 		findCloneJobByKeyFunc: func(ctx context.Context, templateID, userID int, key string) (CloneJob, error) {
 			return existing, nil

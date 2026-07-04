@@ -18,3 +18,7 @@ web/cookies.txt
 
 # Docker / logs
 *.log
+
+# Local files/notes
+.local/
+
