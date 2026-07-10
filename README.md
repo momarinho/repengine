@@ -26,19 +26,32 @@ graph TD
 
 This project is built using production-grade patterns, focusing on security, concurrency safety, data integrity, and high performance.
 
-### 🛡️ 1. Concurrency & Data Integrity
+### 📊 1. Native SVG Analytics Engine (No Bloat)
+*   **Custom Vector Charts**: Built a native SVG-based chart renderer using Svelte 5 runes (`$derived`, `$state`) to compute coordinate projection scales on the fly.
+*   **Zero Dependencies**: Completely avoids loading heavy chart libraries (like Chart.js or D3), keeping the client bundle light and performant.
+*   **Interactive Tooltips**: Supports mouse tracking to trigger tooltips displaying precise workout volume and RPE progression.
+
+### 🔄 2. In-Memory Undo/Redo Engine
+*   **Transactional History Stack**: Implemented a localized state manager in the editor using Svelte 5 to store deep-cloned snapshots of routine blocks.
+*   **Shortcut Bindings**: Intercepts keyboard events for `Ctrl+Z` / `Cmd+Z` (Undo) and `Ctrl+Y` / `Cmd+Y` / `Ctrl+Shift+Z` (Redo).
+*   **Visual Indicators**: Features polished, reactive action buttons in the workspace header that disable dynamically based on stack depth.
+
+### 🧪 3. Playwright E2E Test Suite
+*   **Full User Lifecycle Test**: Automates verification of critical paths: user registration, session-only login, workflow template design, real-time logging execution with rest-skipping simulation, and database persistence assertion on the history dashboard.
+*   **Resilience & Stability**: Configured to run headlessly under Docker or local CI pipelines, protecting core features from regressions.
+
+### 📖 4. Interactive API Documentation
+*   **Embedded Spec Serving**: Serves the OpenAPI 3.0 specification (`openapi.yaml`) embedded directly into the Go binary using `go:embed`.
+*   **Styled Swagger UI**: Integrated Swagger UI available at `/docs`, custom-themed using CSS filters to match RepEngine's dark-mode design system.
+
+### 🛡️ 5. Concurrency & Data Integrity
 *   **Optimistic Concurrency Control**: Edit conflicts in the block editor are prevented using timestamp comparisons (`updated_at`). If two editors update the same routine concurrently, the API rejects the slower request with a `409 Conflict` status, returning the server's current timestamp to allow client-side reconciliation.
 *   **PostgreSQL Advisory Locks**: Schema migrations are applied automatically at boot via an embedded file system (`go:embed`). Execution is serialized across multiple application instances using transactional advisory locks to prevent concurrent schema corruption during rolling deployments.
 *   **Relational Hardening**: Tight database schema constraints (`CHECK` blocks, cascading foreign keys, unified numeric metrics) maintain raw entry history while computing clean, normalized columns for progression logic.
 
-### 🔒 2. Security & Hardening
+### 🔒 6. Security & Hardening
 *   **Secure Authentication**: Custom stateless JWT authentication with issuer/audience claims validation, secure-only cookies, token-revocation storage upon logout, and brute-force protection through rate limiters on registration/login endpoints.
 *   **Least Privilege Execution**: Final production Docker containers drop root privileges and run under a minimal, dedicated `appuser` (using Alpine Linux), minimizing attack surfaces in host environments.
-
-### ⚡ 3. Performance & Resource Optimization
-*   **Ultra-low Latency**: Powered by Go Fiber and `pgxpool`, the API services workflow lookups and modifications under **~4ms** average latency (validated via local benchmarks of 80 runs).
-*   **Thread-safe Process Cache**: Static node type schemas are parsed once at startup and stored in a thread-safe local cache, eliminating database overhead for read-heavy schema validations.
-*   **Multi-Stage Builds**: Docker images utilize multi-stage compilations to keep final runtime packages under 25MB (Go API) and 90MB (SvelteKit Runner), caching intermediate dependencies optimally.
 
 ---
 
@@ -56,14 +69,12 @@ This project is built using production-grade patterns, focusing on security, con
 ### Implemented
 *   **Block-Based Editor**: Contextual block insertion supporting linear progression, wave loading, repeats, rest intervals, and timed exercises.
 *   **Active Workout Player**: Real-time section execution, interactive timer/rest tracker, and set-by-set input logging (Load, Reps, RPE, RIR).
-*   **Smart Progression Suggestions**: Real-time suggestion engine adjusting target loads/reps for linear and wave progression nodes based on completed set difficulty (Sprint 7).
-*   **Version History & Restore**: Automatic serialization of workflow snapshots with restore capabilities and rollback mechanisms (Sprint 14).
+*   **Smart Progression Suggestions**: Real-time suggestion engine adjusting target loads/reps for linear and wave progression nodes based on completed set difficulty.
+*   **Version History & Restore**: Automatic serialization of workflow snapshots with restore capabilities and rollback mechanisms.
 *   **Account Settings**: Password resets, email/profile updates, and complete session invalidation on credential updates.
-
-### Roadmap & Planned Features
-*   **Sprint 15.5 — Cloud Infrastructure**: Managed database integration (OCI/AWS RDS), private networks, secret management, and remote migrations runbook.
-*   **Sprint 16 — Observability**: Grafana dashboards, Nginx rate-limiting headers, CSP enforcement, and auto-TLS certificates.
-*   **Sprint 17 — Offline First & PWA**: Service Workers offline support, background set logging sync, and client undo/redo history stack.
+*   **Interactive API Docs**: Dynamic Swagger UI embedded directly into the Go binary at `/docs`.
+*   **Progression Analytics**: Custom-built responsive SVG charts displaying training volume and RPE changes over time.
+*   **Editor History Actions**: Built-in Undo/Redo stack with full Svelte 5 integration and hotkeys.
 
 ---
 
@@ -78,36 +89,8 @@ docker compose -f docker-compose.dev.yml up --build
 ```
 
 *   **Web App**: [http://localhost:3000](http://localhost:3000)
-*   **API Service**: [http://localhost:8080](http://localhost:8080)
+*   **API Service / Docs**: [http://localhost:8080/docs](http://localhost:8080/docs)
 *   **API Healthcheck**: `curl http://localhost:8080/health`
-
-### Without Docker
-
-#### Prerequisites
-*   Go 1.25+
-*   Node.js 20+
-*   Running PostgreSQL instance
-
-#### 1. Setup API
-Create `api/.env`:
-```env
-DATABASE_URL=postgres://rep:rep@localhost:5432/repengine
-JWT_SECRET=your-development-secret-key
-```
-
-Run the backend server:
-```bash
-cd api
-go run ./cmd/server
-```
-
-#### 2. Setup Frontend
-Run the SvelteKit development server:
-```bash
-cd web
-npm install
-npm run dev
-```
 
 ---
 
@@ -118,12 +101,17 @@ Execute unit tests from `api/`:
 ```bash
 CGO_ENABLED=0 go test ./...
 ```
-*Note: Integration tests require a live database connection string specified in `DATABASE_URL`.*
 
 ### Frontend Checks
 Validate TypeScript and Svelte syntax from `web/`:
 ```bash
 npm run check
+```
+
+### E2E Integration Tests (Playwright)
+Run end-to-end tests from `web/`:
+```bash
+npx playwright test
 ```
 
 ### Performance Benchmark
