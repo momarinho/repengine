@@ -53,6 +53,20 @@
 	let queuedSave = $state<{ source: 'autosave' | 'manual'; createVersion: boolean } | null>(null);
 	let sectionCollapseState = $state<Record<string, boolean>>({});
 	let restoringVersionID = $state<number | null>(null);
+	let undoStack = $state<Array<{
+		title: string;
+		description: string;
+		isPublic: boolean;
+		blocks: DraftBlock[];
+		selectedBlockId: string | null;
+	}>>([]);
+	let redoStack = $state<Array<{
+		title: string;
+		description: string;
+		isPublic: boolean;
+		blocks: DraftBlock[];
+		selectedBlockId: string | null;
+	}>>([]);
 
 	const hasWorkflow = $derived(Boolean(workflow));
 	const selectedBlock = $derived(blocks.find((block) => block.client_id === selectedBlockId) ?? null);
@@ -122,6 +136,7 @@
 	}
 
 	function updateBlockField(clientId: string, key: string, value: unknown): void {
+		recordHistory();
 		setBlockData(clientId, (current) => {
 			if (value === '' || value === null || Number.isNaN(value)) {
 				delete current[key];
@@ -191,6 +206,7 @@
 	}
 
 	function addBlock(nodeType: NodeType): void {
+		recordHistory();
 		const insertIndex = normalizeInsertIndex(addBlockInsertIndex);
 		const newBlock = defaultBlockForNodeType(nodeType, insertIndex);
 		const nextBlocks = [...blocks];
@@ -203,6 +219,7 @@
 	function removeSelectedBlock(): void {
 		if (!selectedBlockId) return;
 
+		recordHistory();
 		const nextBlocks = blocks.filter((block) => block.client_id !== selectedBlockId);
 		blocks = nextBlocks.map((block, index) => ({ ...block, position: index }));
 		selectedBlockId = blocks[0]?.client_id ?? null;
@@ -213,6 +230,7 @@
 		const nextIndex = index + direction;
 		if (index < 0 || nextIndex < 0 || nextIndex >= blocks.length) return;
 
+		recordHistory();
 		const next = [...blocks];
 		const [moved] = next.splice(index, 1);
 		next.splice(nextIndex, 0, moved);
@@ -238,6 +256,7 @@
 			return;
 		}
 
+		recordHistory();
 		const next = [...blocks];
 		const [moved] = next.splice(from, 1);
 		next.splice(to, 0, moved);
@@ -380,6 +399,83 @@
 		restoringVersionID = null;
 	}
 
+	function captureState() {
+		return {
+			title,
+			description,
+			isPublic,
+			blocks: structuredClone(blocks),
+			selectedBlockId
+		};
+	}
+
+	function recordHistory() {
+		const currentState = captureState();
+		if (undoStack.length > 0) {
+			const last = undoStack[undoStack.length - 1];
+			if (
+				last.title === currentState.title &&
+				last.description === currentState.description &&
+				last.isPublic === currentState.isPublic &&
+				JSON.stringify(last.blocks) === JSON.stringify(currentState.blocks)
+			) {
+				return;
+			}
+		}
+		undoStack = [...undoStack, currentState];
+		if (undoStack.length > 30) {
+			undoStack = undoStack.slice(1);
+		}
+		redoStack = [];
+	}
+
+	function undo() {
+		if (undoStack.length === 0) return;
+		const currentState = captureState();
+		redoStack = [...redoStack, currentState];
+
+		const previousState = undoStack[undoStack.length - 1];
+		undoStack = undoStack.slice(0, -1);
+
+		title = previousState.title;
+		description = previousState.description;
+		isPublic = previousState.isPublic;
+		blocks = previousState.blocks;
+		selectedBlockId = previousState.selectedBlockId;
+	}
+
+	function redo() {
+		if (redoStack.length === 0) return;
+		const currentState = captureState();
+		undoStack = [...undoStack, currentState];
+
+		const nextState = redoStack[redoStack.length - 1];
+		redoStack = redoStack.slice(0, -1);
+
+		title = nextState.title;
+		description = nextState.description;
+		isPublic = nextState.isPublic;
+		blocks = nextState.blocks;
+		selectedBlockId = nextState.selectedBlockId;
+	}
+
+	function handleKeyDown(event: KeyboardEvent) {
+		const isMod = event.ctrlKey || event.metaKey;
+		if (isMod && !event.altKey) {
+			if (event.key.toLowerCase() === 'z') {
+				event.preventDefault();
+				if (event.shiftKey) {
+					redo();
+				} else {
+					undo();
+				}
+			} else if (event.key.toLowerCase() === 'y') {
+				event.preventDefault();
+				redo();
+			}
+		}
+	}
+
 	$effect(() => {
 		if (ignoreAutosave || !workflow) {
 			return;
@@ -452,6 +548,8 @@
 	<title>{workflow ? `${workflow.name} - Block Editor` : 'Block Editor'}</title>
 </svelte:head>
 
+<svelte:window onkeydown={handleKeyDown} />
+
 {#if !hasWorkflow}
 	<div class="min-h-screen bg-background px-6 py-10">
 		<div class="mx-auto max-w-5xl">
@@ -482,11 +580,13 @@
 								class="w-full min-w-0 border-0 bg-transparent px-0 text-2xl font-semibold text-on-surface outline-none"
 								bind:value={title}
 								placeholder="Untitled Routine"
+								onfocus={() => recordHistory()}
 							/>
 							<input
 								class="mt-1 w-full min-w-0 border-0 bg-transparent px-0 text-sm text-on-surface-variant outline-none"
 								bind:value={description}
 								placeholder="Add a routine description"
+								onfocus={() => recordHistory()}
 							/>
 						</div>
 					</div>
@@ -500,6 +600,26 @@
 						<span class="material-symbols-outlined text-base">play_circle</span>
 						Play
 					</a>
+					<div class="inline-flex h-11 items-center rounded-md border border-outline-variant/20 bg-surface-container-low p-1">
+						<button
+							type="button"
+							class="flex h-9 w-9 items-center justify-center rounded text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface disabled:opacity-40"
+							onclick={undo}
+							disabled={undoStack.length === 0}
+							title="Undo (Ctrl+Z)"
+						>
+							<span class="material-symbols-outlined text-[20px]">undo</span>
+						</button>
+						<button
+							type="button"
+							class="flex h-9 w-9 items-center justify-center rounded text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface disabled:opacity-40"
+							onclick={redo}
+							disabled={redoStack.length === 0}
+							title="Redo (Ctrl+Y)"
+						>
+							<span class="material-symbols-outlined text-[20px]">redo</span>
+						</button>
+					</div>
 					<div class={`rounded-md border border-outline-variant/20 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] ${statusTone(saveState)}`}>
 						{saveState === 'idle' ? 'Ready' : saveState}
 					</div>
