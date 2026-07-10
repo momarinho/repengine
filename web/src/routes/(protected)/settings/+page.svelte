@@ -1,9 +1,27 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { enhance } from '$app/forms';
 	import type { PageData } from './$types';
 	import type { TrainingMax } from '$lib/training-maxes/types';
 
 	let { data, form }: { data: PageData; form: any } = $props();
+
+	let currentTheme = $state<'light' | 'dark'>('dark');
+	if (browser) {
+		currentTheme = (localStorage.getItem('theme') as 'light' | 'dark') || 'dark';
+	}
+
+	function setTheme(theme: 'light' | 'dark') {
+		currentTheme = theme;
+		if (browser) {
+			localStorage.setItem('theme', theme);
+			if (theme === 'dark') {
+				document.documentElement.classList.add('dark');
+			} else {
+				document.documentElement.classList.remove('dark');
+			}
+		}
+	}
 
 	let trainingMaxes = $state<TrainingMax[]>((data.trainingMaxes as TrainingMax[]) ?? []);
 	let isSaving = $state(false);
@@ -161,6 +179,31 @@
 								Update password
 							</button>
 						</form>
+					</section>
+
+					<section class="rounded-2xl border border-white/5 bg-surface-container p-6 shadow-xl">
+						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Interface</p>
+						<h2 class="mt-2 text-2xl font-bold text-on-surface">Theme preference</h2>
+						<p class="mt-2 text-sm text-on-surface-variant font-body">Choose your visual theme for the application.</p>
+
+						<div class="mt-6 flex gap-4">
+							<button
+								type="button"
+								class="flex-1 rounded-lg border p-4 text-center transition-colors {currentTheme === 'dark' ? 'border-primary bg-primary/10 text-primary' : 'border-outline-variant/30 bg-surface-container-high text-on-surface hover:bg-surface-container-highest'}"
+								onclick={() => setTheme('dark')}
+							>
+								<span class="material-symbols-outlined block mb-1">dark_mode</span>
+								<span class="text-sm font-semibold font-label">Dark theme</span>
+							</button>
+							<button
+								type="button"
+								class="flex-1 rounded-lg border p-4 text-center transition-colors {currentTheme === 'light' ? 'border-primary bg-primary/10 text-primary' : 'border-outline-variant/30 bg-surface-container-high text-on-surface hover:bg-surface-container-highest'}"
+								onclick={() => setTheme('light')}
+							>
+								<span class="material-symbols-outlined block mb-1">light_mode</span>
+								<span class="text-sm font-semibold font-label">Light theme</span>
+							</button>
+						</div>
 					</section>
 				</div>
 

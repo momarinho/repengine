@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import AnalyticsChart from '$lib/components/AnalyticsChart.svelte';
 	import type { PageData } from './$types';
 	import type { WorkoutSession, WorkoutSetLog } from '$lib/workout-sessions/types';
 
@@ -205,6 +206,12 @@
 							<p class="mt-2 text-xs text-on-surface-variant">{formatDate(data.analytics.last_completed_at)}</p>
 						{/if}
 					</div>
+				</div>
+			{/if}
+
+			{#if sessions.length > 0}
+				<div class="mb-8">
+					<AnalyticsChart {sessions} />
 				</div>
 			{/if}
 

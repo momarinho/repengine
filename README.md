@@ -2,331 +2,141 @@
 
 [![CI](https://github.com/momarinho/repengine/actions/workflows/ci.yml/badge.svg)](https://github.com/momarinho/repengine/actions/workflows/ci.yml)
 [![Docker](https://github.com/momarinho/repengine/actions/workflows/docker.yml/badge.svg)](https://github.com/momarinho/repengine/actions/workflows/docker.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-RepEngine is a full-stack training routine builder with a Go API, a SvelteKit frontend, and PostgreSQL.
+**RepEngine** is a high-performance, full-stack workout routine builder and player. It features a custom block-based editor, asynchronous templates cloning, real-time training execution tracking, and automatic progression/autoregulation recommendations based on logged set history (RPE/RIR).
 
-The project currently delivers:
+Designed as a modern local-first-friendly SaaS web application, it bridges the gap between complex training block configurations and frictionless physical execution in the gym.
 
-- authenticated workflow management
-- a block-based workout editor
-- workflow versioning
-- official templates with async clone jobs
-- a persistent workout player for section-based execution
-- basic progression state and autoregulation suggestions
-- schema hardening for workout/session/progression data
-- account settings, password reset, and workflow history
+---
 
-The workout player now creates persistent workout sessions and set logs in the backend, keeps local browser state for in-progress UX, and derives simple next-session progression suggestions from real logs.
+## 🏗️ System Architecture
 
-## Stack
+```mermaid
+graph TD
+    Client[SvelteKit Client] -- REST / Auth Cookie --> API[Go Fiber API]
+    API -- pgxpool --> DB[(PostgreSQL 16)]
+    API -- Background Worker --> Queue[Clone Jobs Engine]
+    Queue -- Async Clone --> DB
+```
 
-- Backend: Go, Fiber, pgx/pgxpool, JWT, bcrypt, slog
-- Frontend: SvelteKit (Svelte 5), TypeScript, Tailwind
-- Database: PostgreSQL 16
-- Dev environment: Docker Compose
+---
 
-## Current Product Surface
+## 🚀 Key Engineering & Architecture Showcases
+
+This project is built using production-grade patterns, focusing on security, concurrency safety, data integrity, and high performance.
+
+### 🛡️ 1. Concurrency & Data Integrity
+*   **Optimistic Concurrency Control**: Edit conflicts in the block editor are prevented using timestamp comparisons (`updated_at`). If two editors update the same routine concurrently, the API rejects the slower request with a `409 Conflict` status, returning the server's current timestamp to allow client-side reconciliation.
+*   **PostgreSQL Advisory Locks**: Schema migrations are applied automatically at boot via an embedded file system (`go:embed`). Execution is serialized across multiple application instances using transactional advisory locks to prevent concurrent schema corruption during rolling deployments.
+*   **Relational Hardening**: Tight database schema constraints (`CHECK` blocks, cascading foreign keys, unified numeric metrics) maintain raw entry history while computing clean, normalized columns for progression logic.
+
+### 🔒 2. Security & Hardening
+*   **Secure Authentication**: Custom stateless JWT authentication with issuer/audience claims validation, secure-only cookies, token-revocation storage upon logout, and brute-force protection through rate limiters on registration/login endpoints.
+*   **Least Privilege Execution**: Final production Docker containers drop root privileges and run under a minimal, dedicated `appuser` (using Alpine Linux), minimizing attack surfaces in host environments.
+
+### ⚡ 3. Performance & Resource Optimization
+*   **Ultra-low Latency**: Powered by Go Fiber and `pgxpool`, the API services workflow lookups and modifications under **~4ms** average latency (validated via local benchmarks of 80 runs).
+*   **Thread-safe Process Cache**: Static node type schemas are parsed once at startup and stored in a thread-safe local cache, eliminating database overhead for read-heavy schema validations.
+*   **Multi-Stage Builds**: Docker images utilize multi-stage compilations to keep final runtime packages under 25MB (Go API) and 90MB (SvelteKit Runner), caching intermediate dependencies optimally.
+
+---
+
+## 🛠️ Tech Stack
+
+*   **Backend**: Go (v1.25), Fiber framework, `pgx/pgxpool` (native PostgreSQL driver), JWT, `slog` (structured logging), Prometheus metrics.
+*   **Frontend**: SvelteKit (Svelte 5 runes), TypeScript, TailwindCSS, `localStorage` local runtime state.
+*   **Database**: PostgreSQL 16.
+*   **CI/CD & DevOps**: GitHub Actions (Linting, Tests, Docker Build & Push), Docker Compose, Nginx (TLS Termination).
+
+---
+
+## 🎮 Current Feature Surface
 
 ### Implemented
+*   **Block-Based Editor**: Contextual block insertion supporting linear progression, wave loading, repeats, rest intervals, and timed exercises.
+*   **Active Workout Player**: Real-time section execution, interactive timer/rest tracker, and set-by-set input logging (Load, Reps, RPE, RIR).
+*   **Smart Progression Suggestions**: Real-time suggestion engine adjusting target loads/reps for linear and wave progression nodes based on completed set difficulty (Sprint 7).
+*   **Version History & Restore**: Automatic serialization of workflow snapshots with restore capabilities and rollback mechanisms (Sprint 14).
+*   **Account Settings**: Password resets, email/profile updates, and complete session invalidation on credential updates.
 
-- Auth: register, login, logout
-- Auth account management: current account read/update/delete and password reset flow
-- Auth security hardening: secure cookies by environment, logout token invalidation, CORS, auth rate limiting, register validation, JWT issuer/audience claims
-- Node types API
-- Workflow CRUD
-- Workflow version history
-- Block editor with `section`, `exercise`, `linear_progression`, `wave`, `repeat`, `rest`, and `exercise_timed`
-- Contextual block insertion in the editor (start of routine, after selected, below any block)
-- Templates catalog
-- Template cloning with clone-job polling
-- Workout player V1
-- Workout player 5.5 local runtime
-- Workout sessions and set logging
-- Session reliability hardening
-- Progression states and simple autoregulation
-- Schema hardening with constraints, FK cleanup, and canonical numeric metrics
-- Workout history, basic volume analytics, and post-session log editing
-- Workflow version restore
+### Roadmap & Planned Features
+*   **Sprint 15.5 — Cloud Infrastructure**: Managed database integration (OCI/AWS RDS), private networks, secret management, and remote migrations runbook.
+*   **Sprint 16 — Observability**: Grafana dashboards, Nginx rate-limiting headers, CSP enforcement, and auto-TLS certificates.
+*   **Sprint 17 — Offline First & PWA**: Service Workers offline support, background set logging sync, and client undo/redo history stack.
 
-### Workout player 6 / 6.5 / 7
+---
 
-The player already supports:
+## 🏃 Running Locally
 
-- choosing a section to execute
-- persistent workout session creation
-- persistent set / round logging
-- local runtime state for in-progress UX
-- local notes per block
-- actual reps / load / RPE / RIR entry
-- timers and intra-set rest
-- session completion summary
-- workout history by workflow
-- browser persistence via `localStorage`
-- session resume / active-session reuse
-- active session abandonment
-- duplicate log protection for repeated clicks / retries
-- progression state by workflow block
-- simple next-session suggestions for `linear_progression`
-- simple week / intensity adjustment suggestions for `wave`
-- simple skill progression suggestions for skill-like `exercise` / `exercise_timed` blocks
+### With Docker (Recommended)
 
-The player still does not support:
-
-- complex autoregulation
-- sophisticated training-max logic
-- advanced analytics / charts
-- mobile / offline sync
-
-## Running locally
-
-### With Docker
+Start the entire stack (Database, API, and Web App):
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-Services:
-
-- Web: `http://localhost:3000`
-- API: `http://localhost:8080`
-- Postgres: `localhost:5432`
-
-Health check:
-
-```bash
-curl http://localhost:8080/health
-```
+*   **Web App**: [http://localhost:3000](http://localhost:3000)
+*   **API Service**: [http://localhost:8080](http://localhost:8080)
+*   **API Healthcheck**: `curl http://localhost:8080/health`
 
 ### Without Docker
 
-API environment lives in `api/.env` or shell env vars:
+#### Prerequisites
+*   Go 1.25+
+*   Node.js 20+
+*   Running PostgreSQL instance
 
+#### 1. Setup API
+Create `api/.env`:
 ```env
 DATABASE_URL=postgres://rep:rep@localhost:5432/repengine
-JWT_SECRET=your-secret-key-here
+JWT_SECRET=your-development-secret-key
 ```
 
-Run the API:
-
+Run the backend server:
 ```bash
 cd api
 go run ./cmd/server
 ```
 
-Run the frontend:
-
+#### 2. Setup Frontend
+Run the SvelteKit development server:
 ```bash
 cd web
 npm install
 npm run dev
 ```
 
-## Available API
+---
 
-### Auth
+## 🧪 Validation & Tests
 
-- `POST /auth/register`
-- `POST /auth/login`
-- `POST /auth/logout`
-- `GET /auth/me`
-- `PUT /auth/me`
-- `DELETE /auth/me`
-- `POST /auth/password-reset/request`
-- `POST /auth/password-reset/confirm`
-
-### Node Types
-
-- `GET /node-types`
-- `GET /node-types/:slug`
-
-### Workflows
-
-- `GET /workflows`
-- `POST /workflows`
-- `GET /workflows/:id`
-- `PUT /workflows/:id`
-- `DELETE /workflows/:id`
-- `POST /workflows/:id/versions`
-- `GET /workflows/:id/versions`
-- `POST /workflows/:id/versions/:versionId/restore`
-- `GET /workflows/:id/sessions`
-- `POST /workflows/:id/sessions`
-- `GET /workflows/:id/progression-states`
-- `GET /workflows/:id/analytics`
-
-### Workout Sessions
-
-- `GET /workout-sessions/:id`
-- `POST /workout-sessions/:id/logs`
-- `PUT /workout-sessions/:id/logs/:logId`
-- `POST /workout-sessions/:id/complete`
-- `POST /workout-sessions/:id/abandon`
-
-### Templates
-
-- `GET /templates`
-- `GET /templates/:id`
-- `POST /templates/:id/clone`
-
-### Clone Jobs
-
-- `GET /clone-jobs/:id`
-
-## Validation
-
-### Backend tests
-
-From `api/`:
-
-```bash
-go test ./...
-```
-
-If your local Go toolchain defaults to `cgo` and no C compiler is installed, run:
-
+### Backend Tests
+Execute unit tests from `api/`:
 ```bash
 CGO_ENABLED=0 go test ./...
 ```
+*Note: Integration tests require a live database connection string specified in `DATABASE_URL`.*
 
-Integration tests require a reachable PostgreSQL database.
-If `DATABASE_URL` is not exported, the tests attempt to load `api/.env`.
-
-### Frontend checks
-
-From `web/`:
-
+### Frontend Checks
+Validate TypeScript and Svelte syntax from `web/`:
 ```bash
 npm run check
 ```
 
-## Contributing and Release
-
-- contribution rules live in [`CONTRIBUTING.md`](./CONTRIBUTING.md)
-- project licensing lives in [`LICENSE`](./LICENSE)
-- the initial API contract lives in [`openapi/openapi.yaml`](./openapi/openapi.yaml)
-- container images are published by `.github/workflows/docker.yml`
-- image tags use `sha-<shortsha>` for every publish and `latest` on the default branch
-- recommended branch protection and PR policy are documented in `CONTRIBUTING.md`
-
-### Manual validation
-
-Recommended Sprint 14 validation:
-
-- start a section and confirm a session is created
-- log a few sets with `actual reps`, `actual load`, `actual RPE`, and `actual RIR`
-- reload during the workout and confirm the active session resumes
-- finish the section and confirm the session becomes `completed`
-- verify the session appears in workflow history
-- re-open the same workflow and confirm progression suggestions now appear on the relevant blocks
-- for `linear_progression`, confirm the suggested next load changes after an easy vs hard session
-- for `wave`, confirm the suggested week or intensity offset changes after an easy vs hard session
-- for skill-like blocks, confirm the suggestion can stay / advance / regress based on logged effort and reps
-- confirm auth register/login/logout still work and logout invalidates the previous token
-- create workflow versions back-to-back and confirm version numbers remain sequential
-- manually expire or revoke the auth token and confirm protected pages redirect back to `/login`
-- verify the dashboard `All / Private / Public` filter changes the visible routines
-- open the editor, make a change, confirm the UI shows unsaved state before autosave completes, and confirm manual save flushes immediately
-- resume a player session after reload and confirm timer/rest state resumes from persisted state
-- log in as a second user on the same browser profile and confirm player local persistence does not leak across users
-- open workflow history and confirm recent sessions, set logs, and basic analytics render
-- edit a persisted set log and confirm the updated values remain visible after reload
-- abandon an active session from the player and confirm it appears as `abandoned` in history
-- restore an older workflow version from the editor history tab and confirm blocks/title/settings revert to the snapshot
-- open `/settings`, change email or password, and confirm the current session is invalidated
-- request a password reset from `/forgot-password` and complete it from `/reset-password`
-
-### Workflow update benchmark
-
-From `api/`:
-
+### Performance Benchmark
+Run the workflow update benchmark from `api/` (requires a valid JWT):
 ```bash
 export BENCH_TOKEN='YOUR_JWT_TOKEN'
 go run ./cmd/bench_put_workflow
 ```
 
-Default benchmark settings:
+Latest local benchmark status: **PASS** (Avg: **4.10ms** / p95: **4.45ms**).
 
-- `BENCH_RUNS=80`
-- `BENCH_WARMUP=5`
+---
 
-Latest local result on `2026-05-02`:
+## 📄 License
 
-- runs: `80`
-- warmup: `5`
-- failures: `0`
-- avg: `4.10ms`
-- p50: `4.01ms`
-- p95: `4.45ms`
-- max: `6.10ms`
-
-Status: `PASS` (`p95 < 200ms`)
-
-## Status
-
-### Completed
-
-- Sprint 0: foundation
-- Sprint 1: auth
-- Sprint 1.5: API quality foundation
-- Sprint 2: node types API
-- Sprint 3: workflows CRUD, pagination, versioning
-- Sprint 4: block editor frontend
-- Sprint 5: templates and player V1
-- Sprint 5.5: local-first player runtime polish
-- Sprint 6: persistent workout sessions and set logging
-- Sprint 6.5: session reliability and log integrity
-- Sprint 7: autoregulation and progression state
-- Sprint 8: deploy hardening
-- Sprint 9: critical hotfix
-- Sprint 9.5: block editor insertion UX
-- Sprint 10: security hardening
-- Sprint 11: schema hardening
-- Sprint 12: API quality and tests
-- Sprint 13: frontend bug fixes
-- Sprint 14: account and history
-- Sprint 15: CI/CD
-
-### Not completed yet
-
-Features not yet started:
-
-- exercise autocomplete / search
-- undo/redo in the block editor
-- filter workflows by category (UI exists, backend field does not)
-- PWA / offline support / background sync for set logs
-- dark/light mode toggle (CSS tokens defined, toggle not wired)
-- complex autoregulation (training-max logic, readiness modeling)
-- analytics and charts
-- external database hosting for staging/production (for example OCI VM or managed PostgreSQL)
-
-## Roadmap
-
-| Sprint | Theme | Scope |
-|--------|-------|-------|
-| **15.5** | **Cloud Infrastructure** | External PostgreSQL host for staging/production (for example OCI VM or managed PostgreSQL), private networking, backup/restore, secret management, migration runbook |
-| **16** | **Observability** | Prometheus alerting rules, `node_exporter`, `postgres_exporter`, Grafana dashboard JSON, nginx rate limiting, CSP header, TLS certificate automation |
-| **17** | **Accessibility & PWA** | ARIA roles/labels, modal focus trap, keyboard drag-and-drop, undo/redo, Service Worker offline support, background sync |
-
-## Tech Debt
-
-Known issues that don't block current functionality but need to be addressed before scaling:
-
-- **Raw fitness fields remain text-first.** User-facing fields like `actual_load`, `actual_rpe`, and `current_load` remain `VARCHAR(50)` to preserve entries such as `100 kg`, ranges, and mixed notation. Sprint 11 added canonical numeric companion columns for analytics, but a future pass may still normalize the wider data model.
-- **No CI pipeline.** There are no automated build or test workflows. Broken changes can reach production silently. Sprint 15 addresses this.
-- **Node types are still loaded as process-local cache.** This is fine for current scale, but cache invalidation and runtime refresh are still manual.
-
-## Important Notes
-
-- SQL migration files live in `api/migrations/`. At startup, `internal/db/migrations.go` reads and applies them in order using an embedded FS (`//go:embed *.sql`). Applied versions are tracked in a `schema_migrations` table with a Postgres advisory lock to prevent concurrent execution. Migration files may include a `-- Down` section for documentation; the runner automatically strips everything from that marker onwards so rollback SQL is never executed during boot.
-- Session hardening includes active-session reuse, deduplicated set logging, and migration locking.
-- Sprint 7 progression is intentionally simple: it is based on completed logs plus `RPE/RIR`, not on advanced readiness modeling.
-- Sprint 8 introduced production Docker hardening: multi-stage Dockerfiles with non-root users, `docker-compose.prod.yml` and `docker-compose.staging.yml`, Nginx with TLS termination, Prometheus + Grafana, and operational scripts under `scripts/`.
-- Sprint 9.5 improved block editor UX: new blocks can be inserted at the start of the routine, after the selected block, or directly below any existing block instead of always appending to the end.
-- Sprint 10 hardened auth and API security with environment-aware secure cookies, logout-driven token invalidation, CORS policy enforcement, auth endpoint rate limiting, register input validation, and JWT issuer/audience claims.
-- Sprint 11 hardened the schema with status/outcome/state `CHECK` constraints, missing FKs, targeted indexes, and canonical numeric columns alongside the existing raw text fitness fields.
-- Sprint 12 moved auth into a dedicated service/repository layer, replaced handler package singletons with explicit dependency wiring, added handler-level Fiber tests, surfaced progression failures on session completion, and serialized workflow version creation to avoid duplicate version numbers.
-- Sprint 13 fixed protected-route token validation in SvelteKit, restored the workflow versions GET proxy, corrected the dashboard filter, scoped player local persistence by user with migration from the legacy key, resumed persisted timer/rest state correctly, and improved autosave UI semantics in the editor.
-- Sprint 14 added account settings, password reset tokens, workflow history and basic analytics pages, active-session abandonment, persisted set-log editing, and workflow version restore across the API and SvelteKit app.
-- Sprint 15 added GitHub Actions for CI and image publishing, migration smoke validation on fresh databases, repository contribution and PR policy docs, an MIT license, and an initial OpenAPI contract under `openapi/openapi.yaml`.
-- Planned infrastructure work keeps local development on Docker Compose while moving staging/production database hosting to dedicated cloud infrastructure such as an OCI VM or managed PostgreSQL.
-- The progression state `block_key` format is `sectionTitle::nodeTypeSlug::exerciseName::occurrence`. Renaming a section will orphan its progression history — this is a known limitation tracked in the roadmap.
+This project is open-source software licensed under the [MIT License](LICENSE).

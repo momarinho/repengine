@@ -131,6 +131,12 @@ func main() {
 
 	app.Get("/metrics", middleware.MetricsHandler())
 
+	app.Get("/swagger/openapi.yaml", h.GetOpenAPISpec)
+	app.Get("/docs", h.GetSwaggerUI)
+	app.Get("/swagger", func(c *fiber.Ctx) error {
+		return c.Redirect("/docs", 301)
+	})
+
 	app.Get("/health", func(c *fiber.Ctx) error {
 		ctx, cancel := context.WithTimeout(c.Context(), 2*time.Second)
 		defer cancel()
