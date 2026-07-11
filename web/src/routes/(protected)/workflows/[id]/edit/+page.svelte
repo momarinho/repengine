@@ -24,7 +24,12 @@
 
 	const { data }: { data: PageData } = $props();
 
-	const initialData = untrack(() => structuredClone(data)) as PageData;
+	const initialData = untrack(() => ({
+		workflow: data.workflow ? JSON.parse(JSON.stringify(data.workflow)) : null,
+		nodeTypes: data.nodeTypes ? JSON.parse(JSON.stringify(data.nodeTypes)) : [],
+		versions: data.versions ? JSON.parse(JSON.stringify(data.versions)) : [],
+		error: data.error
+	})) as PageData;
 	const workflow = initialData.workflow;
 	const nodeTypes = initialData.nodeTypes;
 	const initialVersions = initialData.versions;
@@ -130,7 +135,7 @@
 	function setBlockData(clientId: string, updater: (current: Record<string, unknown>) => Record<string, unknown>): void {
 		blocks = blocks.map((block, index) =>
 			block.client_id === clientId
-				? { ...block, position: index, data: updater(structuredClone(block.data)) }
+				? { ...block, position: index, data: updater(JSON.parse(JSON.stringify(block.data))) }
 				: { ...block, position: index }
 		);
 	}
@@ -404,7 +409,7 @@
 			title,
 			description,
 			isPublic,
-			blocks: structuredClone(blocks),
+			blocks: JSON.parse(JSON.stringify(blocks)),
 			selectedBlockId
 		};
 	}

@@ -14,7 +14,10 @@
 	};
 
 	const { data }: { data: PageData } = $props();
-	const initialData = untrack(() => structuredClone(data)) as PageData;
+	const initialData = untrack(() => ({
+		sessions: data.sessions ? JSON.parse(JSON.stringify(data.sessions)) : [],
+		error: data.error
+	})) as PageData;
 
 	let sessions = $state<WorkoutSession[]>([...(initialData.sessions ?? [])]);
 	let savingLogID = $state<number | null>(null);

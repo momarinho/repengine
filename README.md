@@ -10,6 +10,18 @@ Designed as a modern local-first-friendly SaaS web application, it bridges the g
 
 ---
 
+## 📷 Interface Showcase
+
+Here is a quick look at the RepEngine interface in action:
+
+| 🖥️ **Dashboard** | 🛠️ **Block-Based Editor** |
+|:---:|:---:|
+| ![Dashboard](docs/screenshots/1-dashboard.png) | ![Block-Based Editor](docs/screenshots/2-editor.png) |
+| ⚡ **Active Workout Player** | 📊 **Progression Analytics** |
+| ![Active Workout Player](docs/screenshots/3-player.png) | ![Progression Analytics](docs/screenshots/4-history-analytics.png) |
+
+---
+
 ## 🏗️ System Architecture
 
 ```mermaid

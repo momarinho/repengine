@@ -2,6 +2,13 @@ import { test, expect } from '@playwright/test';
 
 test.describe('RepEngine Workout Lifecycle E2E', () => {
 	test('Register, log in, create a routine, add a block, save, play, log, and view history', async ({ page }) => {
+		page.on('console', msg => {
+			console.log(`[BROWSER CONSOLE] [${msg.type()}] ${msg.text()}`);
+		});
+		page.on('pageerror', err => {
+			console.error(`[BROWSER EXCEPTION] ${err.message}`);
+		});
+
 		const uniqueSuffix = Date.now() + Math.floor(Math.random() * 1000);
 		const uniqueEmail = `e2e_test_${uniqueSuffix}@example.com`;
 		const password = 'password123';
@@ -27,6 +34,7 @@ test.describe('RepEngine Workout Lifecycle E2E', () => {
 		// 5. Lands on dashboard
 		await page.waitForURL('**/dashboard');
 		await expect(page.locator('h2')).toContainText('My Routines');
+		await page.screenshot({ path: '../docs/screenshots/1-dashboard.png' });
 
 		// 6. Create a new routine
 		await page.click('a[href="/dashboard/new"]');
@@ -45,7 +53,8 @@ test.describe('RepEngine Workout Lifecycle E2E', () => {
 		// Wait for Add Block modal
 		await page.waitForSelector('text=All available node types');
 		// Select "Linear Progression"
-		await page.click('text=Linear Progression');
+		await page.waitForTimeout(500);
+		await page.getByRole('button', { name: /Linear Progression/i }).first().click({ force: true });
 
 		// 10. Verify block is added and configure it
 		await expect(page.locator('li').locator('text=Linear Progression').first()).toBeVisible();
@@ -63,6 +72,7 @@ test.describe('RepEngine Workout Lifecycle E2E', () => {
 		
 		// 12. Wait for save to complete
 		await page.waitForTimeout(2000);
+		await page.screenshot({ path: '../docs/screenshots/2-editor.png' });
 
 		// 13. Open the player
 		await page.click('a:has-text("Play")');
@@ -73,6 +83,7 @@ test.describe('RepEngine Workout Lifecycle E2E', () => {
 		// Fill actual load to 102.5 and actual RPE to 8
 		await page.fill('#actual-load', '102.5');
 		await page.fill('#actual-rpe', '8');
+		await page.screenshot({ path: '../docs/screenshots/3-player.png' });
 
 		// 15. The player should auto-start or show sections.
 		// Since we have no sections, it starts playing block 1 immediately.
@@ -120,5 +131,6 @@ test.describe('RepEngine Workout Lifecycle E2E', () => {
 		// Assert that the load and routine name are present in the history details
 		await expect(page.locator('text=E2E Test Routine').first()).toBeVisible();
 		await expect(page.locator('text=102.5').first()).toBeVisible();
+		await page.screenshot({ path: '../docs/screenshots/4-history-analytics.png' });
 	});
 });

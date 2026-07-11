@@ -82,7 +82,7 @@
 			>
 				Browse Templates
 			</a>
-			<a href="/dashboard/new" class="btn-primary-gradient text-on-primary-fixed font-body font-semibold px-6 py-2.5 rounded-md flex items-center gap-2 hover:opacity-90 transition-opacity">
+			<a href="/dashboard/new" data-sveltekit-reload class="btn-primary-gradient text-on-primary-fixed font-body font-semibold px-6 py-2.5 rounded-md flex items-center gap-2 hover:opacity-90 transition-opacity">
 				<span class="material-symbols-outlined text-sm">add</span>
 				New Routine
 			</a>
@@ -119,7 +119,7 @@
 			<div class="text-center py-16">
 				<span class="material-symbols-outlined text-6xl text-on-surface-variant">folder_open</span>
 				<p class="mt-4 text-on-surface-variant font-body">No routines yet. Create your first one!</p>
-				<a href="/dashboard/new" class="btn-primary-gradient text-on-primary-fixed font-body font-semibold px-6 py-2.5 rounded-md inline-flex items-center gap-2 mt-6 hover:opacity-90 transition-opacity">
+				<a href="/dashboard/new" data-sveltekit-reload class="btn-primary-gradient text-on-primary-fixed font-body font-semibold px-6 py-2.5 rounded-md inline-flex items-center gap-2 mt-6 hover:opacity-90 transition-opacity">
 					<span class="material-symbols-outlined text-sm">add</span>
 					New Routine
 				</a>

@@ -67,7 +67,10 @@
 	};
 
 	const { data }: { data: PageData } = $props();
-	const initialData = untrack(() => structuredClone(data)) as PageData;
+	const initialData = untrack(() => ({
+		routine: data.routine ? JSON.parse(JSON.stringify(data.routine)) : null,
+		error: data.error
+	})) as PageData;
 	const routine: PlayerRoutine | null = initialData.routine;
 	const initialBlockIndex = routine?.initialBlockIndex ?? 0;
 	const hasSectionQuery = page.url.searchParams.has('section');
