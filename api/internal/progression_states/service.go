@@ -87,7 +87,11 @@ func (s *Service) ApplySessionProgression(ctx context.Context, in ApplySessionPr
 			})
 		}
 
-		state, ok := s.buildNextState(block, blockLogs, existingByKey[block.BlockKey], okState(existingByKey, block.BlockKey), in)
+		existingState, hasExisting := existingByKey[block.BlockKey]
+		if hasExisting {
+			s.syncProgressionStateWithBlock(&existingState, block)
+		}
+		state, ok := s.buildNextState(block, blockLogs, existingState, hasExisting, in)
 		if !ok {
 			continue
 		}
@@ -163,6 +167,7 @@ func (s *Service) ListProgressionStates(ctx context.Context, in ListProgressionS
 			continue
 		}
 		state.WorkflowBlockID = block.ID
+		s.syncProgressionStateWithBlock(&state, block)
 		state.Metadata = enrichStateMetadata(block, state.Metadata, waveHistoryByBlockID[block.ID])
 		ordered = append(ordered, state)
 	}
@@ -609,6 +614,76 @@ func progressionStateFromUpsert(in UpsertProgressionStateInput) ProgressionState
 		Summary:                  in.Summary,
 		Metadata:                 in.Metadata,
 	}
+}
+
+func (s *Service) syncProgressionStateWithBlock(state *ProgressionState, block resolvedWorkflowBlock) {
+	if state.NodeTypeSlug != "linear_progression" {
+		return
+	}
+	if state.Metadata == nil {
+		state.Metadata = make(map[string]any)
+	}
+
+	blockFailSeq := asString(block.Data["fail_sequence"])
+	stateFailSeq := asString(state.Metadata["fail_sequence"])
+
+	if blockFailSeq != stateFailSeq {
+		state.Metadata["fail_sequence"] = blockFailSeq
+		if blockFailSeq != "" {
+			steps := parseFailSequence(blockFailSeq)
+			if len(steps) > 0 {
+				state.Metadata["current_sequence_index"] = 0
+				state.Metadata["sets_planned"] = steps[0].Sets
+				state.Metadata["reps_planned"] = steps[0].Reps
+				lower, _ := parseRepRange(steps[0].Reps)
+				state.Metadata["target_reps_lower"] = lower
+			}
+		} else {
+			state.Metadata["current_sequence_index"] = 0
+			sets := intOrDefault(block.Data["sets"], 3)
+			reps := asString(block.Data["reps"])
+			state.Metadata["sets_planned"] = sets
+			state.Metadata["reps_planned"] = reps
+			lower, _ := parseRepRange(reps)
+			state.Metadata["target_reps_lower"] = lower
+		}
+	} else if blockFailSeq == "" {
+		blockSets := intOrDefault(block.Data["sets"], 3)
+		blockReps := asString(block.Data["reps"])
+
+		stateSets := intOrDefault(state.Metadata["sets_planned"], 3)
+		stateReps := asString(state.Metadata["reps_planned"])
+
+		if blockSets != stateSets || blockReps != stateReps {
+			state.Metadata["sets_planned"] = blockSets
+			state.Metadata["reps_planned"] = blockReps
+			lower, _ := parseRepRange(blockReps)
+			state.Metadata["target_reps_lower"] = lower
+		}
+	} else {
+		steps := parseFailSequence(blockFailSeq)
+		if len(steps) > 0 {
+			currIdx := intOrDefault(state.Metadata["current_sequence_index"], 0)
+			if currIdx < 0 || currIdx >= len(steps) {
+				currIdx = 0
+				state.Metadata["current_sequence_index"] = 0
+			}
+			expectedSets := steps[currIdx].Sets
+			expectedReps := steps[currIdx].Reps
+			actualSets := intOrDefault(state.Metadata["sets_planned"], 0)
+			actualReps := asString(state.Metadata["reps_planned"])
+			if actualSets != expectedSets || actualReps != expectedReps {
+				state.Metadata["sets_planned"] = expectedSets
+				state.Metadata["reps_planned"] = expectedReps
+				lower, _ := parseRepRange(expectedReps)
+				state.Metadata["target_reps_lower"] = lower
+			}
+		}
+	}
+
+	state.Metadata["increment"] = parseNumberValue(block.Data["increment"])
+	state.Metadata["load_unit"] = asString(block.Data["load_unit"])
+	state.Metadata["progression_rule"] = asString(block.Data["progression_rule"])
 }
 
 func enrichStateMetadata(

@@ -693,3 +693,154 @@ func intPtr(value int) *int {
 	return &value
 }
 
+func TestListProgressionStates_SynchronizesWithUpdatedBlockConfig(t *testing.T) {
+	ctx := context.Background()
+
+	repo := &fakeRepo{
+		userOwnsWorkflowFunc: func(ctx context.Context, userID, workflowID int) (bool, error) {
+			return true, nil
+		},
+		listWorkflowBlocksFunc: func(ctx context.Context, workflowID int) ([]workflowBlockConfig, error) {
+			return []workflowBlockConfig{
+				{
+					ID:           11,
+					NodeTypeSlug: "linear_progression",
+					Position:     1,
+					Data: map[string]any{
+						"exercise_name":    "Squat",
+						"sets":             5,
+						"reps":             "3",
+						"fail_sequence":    "5x3 -> 6x2",
+						"start_load":       100.0,
+						"load_unit":        "kg",
+						"increment":        2.5,
+						"progression_rule": "add_each_session",
+					},
+				},
+			}, nil
+		},
+		listProgressionStatesFunc: func(ctx context.Context, userID, workflowID int) ([]ProgressionState, error) {
+			return []ProgressionState{
+				{
+					ID:              1,
+					UserID:          2,
+					WorkflowID:      9,
+					WorkflowBlockID: 11,
+					BlockKey:        "::linear_progression::squat::1",
+					NodeTypeSlug:    "linear_progression",
+					StateType:       StateTypeLinear,
+					Metadata: map[string]any{
+						"fail_sequence":          "3x5 -> 5x3 -> 6x2",
+						"current_sequence_index": 0,
+						"sets_planned":           3,
+						"reps_planned":           "5",
+						"target_reps_lower":      5.0,
+						"increment":              2.5,
+						"load_unit":              "kg",
+						"progression_rule":       "add_each_session",
+					},
+				},
+			}, nil
+		},
+	}
+
+	service := NewService(repo)
+
+	states, err := service.ListProgressionStates(ctx, ListProgressionStatesInput{
+		UserID:     2,
+		WorkflowID: 9,
+	})
+	if err != nil {
+		t.Fatalf("ListProgressionStates returned error: %v", err)
+	}
+
+	if len(states) != 1 {
+		t.Fatalf("expected 1 progression state, got %d", len(states))
+	}
+
+	state := states[0]
+	if seq := asString(state.Metadata["fail_sequence"]); seq != "5x3 -> 6x2" {
+		t.Fatalf("expected fail_sequence to sync to \"5x3 -> 6x2\", got %q", seq)
+	}
+	if sets := intOrDefault(state.Metadata["sets_planned"], 0); sets != 5 {
+		t.Fatalf("expected sets_planned to sync to 5, got %d", sets)
+	}
+	if reps := asString(state.Metadata["reps_planned"]); reps != "3" {
+		t.Fatalf("expected reps_planned to sync to \"3\", got %q", reps)
+	}
+}
+
+func TestListProgressionStates_SynchronizesDirectSetsReps(t *testing.T) {
+	ctx := context.Background()
+
+	repo := &fakeRepo{
+		userOwnsWorkflowFunc: func(ctx context.Context, userID, workflowID int) (bool, error) {
+			return true, nil
+		},
+		listWorkflowBlocksFunc: func(ctx context.Context, workflowID int) ([]workflowBlockConfig, error) {
+			return []workflowBlockConfig{
+				{
+					ID:           11,
+					NodeTypeSlug: "linear_progression",
+					Position:     1,
+					Data: map[string]any{
+						"exercise_name":    "Squat",
+						"sets":             5,
+						"reps":             "3",
+						"fail_sequence":    "",
+						"start_load":       100.0,
+						"load_unit":        "kg",
+						"increment":        2.5,
+						"progression_rule": "add_each_session",
+					},
+				},
+			}, nil
+		},
+		listProgressionStatesFunc: func(ctx context.Context, userID, workflowID int) ([]ProgressionState, error) {
+			return []ProgressionState{
+				{
+					ID:              1,
+					UserID:          2,
+					WorkflowID:      9,
+					WorkflowBlockID: 11,
+					BlockKey:        "::linear_progression::squat::1",
+					NodeTypeSlug:    "linear_progression",
+					StateType:       StateTypeLinear,
+					Metadata: map[string]any{
+						"fail_sequence":     "",
+						"sets_planned":      3,
+						"reps_planned":      "5",
+						"target_reps_lower": 5.0,
+						"increment":         2.5,
+						"load_unit":         "kg",
+						"progression_rule":  "add_each_session",
+					},
+				},
+			}, nil
+		},
+	}
+
+	service := NewService(repo)
+
+	states, err := service.ListProgressionStates(ctx, ListProgressionStatesInput{
+		UserID:     2,
+		WorkflowID: 9,
+	})
+	if err != nil {
+		t.Fatalf("ListProgressionStates returned error: %v", err)
+	}
+
+	if len(states) != 1 {
+		t.Fatalf("expected 1 progression state, got %d", len(states))
+	}
+
+	state := states[0]
+	if sets := intOrDefault(state.Metadata["sets_planned"], 0); sets != 5 {
+		t.Fatalf("expected sets_planned to sync to 5, got %d", sets)
+	}
+	if reps := asString(state.Metadata["reps_planned"]); reps != "3" {
+		t.Fatalf("expected reps_planned to sync to \"3\", got %q", reps)
+	}
+}
+
+
