@@ -295,7 +295,18 @@
 	});
 	const currentBlock = $derived(routine?.blocks[currentBlockIndex] ?? null);
 	const currentBlockSets = $derived(currentBlock ? getResolvedPrescribedSets(currentBlock) : 1);
-	const currentBlockReps = $derived(currentBlock ? getResolvedPrescribedReps(currentBlock) : '5');
+	const currentBlockReps = $derived.by(() => {
+		if (!currentBlock) return '5';
+		const reps = getResolvedPrescribedReps(currentBlock);
+		if (
+			currentBlock.node_type_slug === 'linear_progression' &&
+			currentExerciseSet === currentBlockSets &&
+			!reps.endsWith('+')
+		) {
+			return reps + '+';
+		}
+		return reps;
+	});
 	const currentProgressionState = $derived(
 		currentBlock?.workflowBlockID ? progressionStateByBlockID[currentBlock.workflowBlockID] ?? null : null
 	);
@@ -887,6 +898,13 @@
 		}
 	): Record<string, unknown> {
 		let reps = getResolvedPrescribedReps(block);
+		if (
+			block.node_type_slug === 'linear_progression' &&
+			setIndex === getResolvedPrescribedSets(block) &&
+			!reps.endsWith('+')
+		) {
+			reps = reps + '+';
+		}
 		let load = getResolvedPrescribedLoad(block) || '';
 		if (block.node_type_slug === 'superset') {
 			reps = `${block.data?.reps_a || '0'}/${block.data?.reps_b || '0'}`;
