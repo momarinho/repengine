@@ -618,8 +618,25 @@
 		if (overrideLoads[block.id]) {
 			return overrideLoads[block.id];
 		}
+		const activeInput = actualLoadByBlock[block.id]?.trim();
+		if (activeInput && activeInput !== '0' && activeInput !== '0.0') {
+			const unit = block.loadUnit || 'kg';
+			return activeInput.toLowerCase().includes(unit.toLowerCase()) ? activeInput : `${activeInput} ${unit}`;
+		}
 		const progression = getBlockProgressionState(block);
-		if (progression?.state_type === 'linear' && progression.suggested_load) {
+		if (
+			progression?.state_type === 'linear' &&
+			progression.suggested_load &&
+			progression.suggested_load !== '0' &&
+			progression.suggested_load !== '0 kg' &&
+			progression.suggested_load !== '0.0 kg'
+		) {
+			return progression.suggested_load;
+		}
+		if (block.load !== undefined && block.load > 0) {
+			return `${block.load}${block.loadUnit ? ` ${block.loadUnit}` : ''}`;
+		}
+		if (progression?.suggested_load) {
 			return progression.suggested_load;
 		}
 		if (block.load !== undefined) {
@@ -1292,6 +1309,25 @@
 					return;
 				}
 				isSyncingSession = false;
+				if (block.node_type_slug === 'superset') {
+					const loadA = actualLoadAByBlock[block.id]?.trim();
+					const loadB = actualLoadBByBlock[block.id]?.trim();
+					if (loadA || loadB) {
+						overrideLoads = {
+							...overrideLoads,
+							[block.id]: `${loadA || '0'}/${loadB || '0'}`
+						};
+					}
+				} else if (actual.actualLoad && actual.actualLoad !== '0' && actual.actualLoad !== '0.0') {
+					const unit = block.loadUnit || 'kg';
+					const formattedLoad = actual.actualLoad.toLowerCase().includes(unit.toLowerCase())
+						? actual.actualLoad
+						: `${actual.actualLoad} ${unit}`;
+					overrideLoads = {
+						...overrideLoads,
+						[block.id]: formattedLoad
+					};
+				}
 				appendActivity(
 					block,
 					'set',

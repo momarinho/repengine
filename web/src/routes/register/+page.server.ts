@@ -1,26 +1,30 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
-
-const API_URL = process.env.API_URL || 'http://localhost:8080';
+import { apiFetch, safeJson } from '$lib/server/api';
 
 export const actions = {
-	register: async ({ request }) => {
+	register: async ({ request, fetch }) => {
 		const data = await request.formData();
 		const email = data.get('email') as string;
 		const password = data.get('password') as string;
 
-		const res = await fetch(`${API_URL}/auth/register`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ email, password })
-		});
+		let res: Response;
+		try {
+			res = await apiFetch(fetch, '/auth/register', undefined, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ email, password })
+			});
+		} catch (err) {
+			return fail(503, { message: 'Unable to connect to authentication server. Please try again.' });
+		}
 
 		if (!res.ok) {
 			let message = 'registration failed';
-			try {
-				const body = await res.json();
+			const body = await safeJson<{ message?: string; error?: string }>(res);
+			if (body) {
 				message = body.message || body.error || message;
-			} catch (_) {}
+			}
 			return fail(400, { message });
 		}
 

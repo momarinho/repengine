@@ -1,0 +1,18 @@
+{
+  "name": "RepEngine - Workout Player",
+  "short_name": "RepEngine",
+  "description": "High-performance workout routine builder and progression player.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

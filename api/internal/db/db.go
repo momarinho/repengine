@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
@@ -36,17 +37,33 @@ func Connect() error {
 	config.MaxConnLifetime = 1 * time.Hour
 	config.MaxConnIdleTime = 30 * time.Minute
 
-	pool, err := pgxpool.NewWithConfig(context.Background(), config)
-	if err != nil {
-		return fmt.Errorf("new pool %w", err)
+	var pool *pgxpool.Pool
+	var lastErr error
+	maxRetries := 10
+
+	for i := 1; i <= maxRetries; i++ {
+		pool, err = pgxpool.NewWithConfig(context.Background(), config)
+		if err == nil {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			lastErr = pool.Ping(pingCtx)
+			cancel()
+
+			if lastErr == nil {
+				Pool = pool
+				return nil
+			}
+			pool.Close()
+		} else {
+			lastErr = err
+		}
+
+		if i < maxRetries {
+			slog.Warn("database connection attempt failed, retrying...", "attempt", i, "max_retries", maxRetries, "err", lastErr)
+			time.Sleep(2 * time.Second)
+		}
 	}
 
-	if err := pool.Ping(context.Background()); err != nil {
-		return fmt.Errorf("ping: %w", err)
-	}
-
-	Pool = pool
-	return nil
+	return fmt.Errorf("ping after %d attempts: %w", maxRetries, lastErr)
 }
 
 func Close() {
@@ -314,6 +331,58 @@ func timedExerciseBlock(exercise string, duration int) templateBlockSeed {
 	}
 }
 
+func calisthenicsDoubleProgressionBlock(exercise, reps string, sets int, restSeconds int, notes string) templateBlockSeed {
+	return templateBlockSeed{
+		NodeTypeSlug: "linear_progression",
+		Data: map[string]any{
+			"exercise_name":    exercise,
+			"sets":             sets,
+			"reps":             reps,
+			"start_load":       0.0,
+			"load_unit":        "kg",
+			"increment":        0.0,
+			"progression_rule": "double_progression",
+			"rest_seconds":     restSeconds,
+			"notes":            notes,
+		},
+	}
+}
+
+func calisthenicsStepProgressionBlock(exercise, reps, sequence string, restSeconds int, notes string) templateBlockSeed {
+	return templateBlockSeed{
+		NodeTypeSlug: "linear_progression",
+		Data: map[string]any{
+			"exercise_name":    exercise,
+			"sets":             3,
+			"reps":             reps,
+			"start_load":       0.0,
+			"load_unit":        "kg",
+			"increment":        0.0,
+			"progression_rule": "double_progression",
+			"fail_sequence":    sequence,
+			"rest_seconds":     restSeconds,
+			"notes":            notes,
+		},
+	}
+}
+
+func calisthenicsSupersetBlock(exA, exB, repsA, repsB string, sets, restSeconds int, notes string) templateBlockSeed {
+	return templateBlockSeed{
+		NodeTypeSlug: "superset",
+		Data: map[string]any{
+			"exercise_a_name":    exA,
+			"exercise_b_name":    exB,
+			"sets":               sets,
+			"reps_a":             repsA,
+			"reps_b":             repsB,
+			"progression_type_a": "double_progression",
+			"progression_type_b": "double_progression",
+			"rest_seconds":       restSeconds,
+			"notes":              notes,
+		},
+	}
+}
+
 func linearProgressionBlock(exercise, reps, loadUnit string, sets int, startLoad, increment float64, restSeconds int) templateBlockSeed {
 	return templateBlockSeed{
 		NodeTypeSlug: "linear_progression",
@@ -473,6 +542,60 @@ func SeedTemplates(ctx context.Context) error {
 				restBlock(90),
 				exerciseBlock("Ring Bicep Curl", "15+", 3),
 				timedExerciseBlock("Pallof Press or RKC Plank Hold", 45),
+			},
+		},
+		{
+			Name:        "4-Day PHUL Calisthenics Split",
+			Description: "A 4-day Power Hypertrophy Upper Lower calisthenics split featuring heavy power days and volume hypertrophy days, modified to be completely dip-free for chest safety.",
+			Category:    "calisthenics",
+			IsOfficial:  true,
+			Metadata: map[string]any{
+				"duration":  "6 weeks",
+				"frequency": "4 days/week",
+				"level":     "intermediate",
+			},
+			Blocks: []templateBlockSeed{
+				// DAY 1: UPPER POWER
+				sectionBlock("Day 1 - Upper Power", "Heavy power focus with linear load progression (+2.5kg) on main presses and pulls, with safe controlled chest work.", "day"),
+				linearProgressionBlockWithNotes("Elevated Pike Push-Up / Overhead Press", "5", "kg", 3, 0.0, 2.5, 180, "T1 Overhead Power Press. Linear load progression: add +2.5kg load each successful session."),
+				restBlock(120),
+				linearProgressionBlockWithNotes("Heavy / Weighted Pull-Up (Pronated)", "5", "kg", 3, 0.0, 2.5, 180, "T1 Pull Power. Linear load progression: add +2.5kg load each successful session."),
+				restBlock(120),
+				linearProgressionBlockWithNotes("Inverted Row (Weighted/Elevated)", "6-8", "kg", 3, 0.0, 2.5, 120, "T2 Heavy Horizontal Pull. Linear load progression: add +2.5kg load each successful session."),
+				restBlock(90),
+				calisthenicsDoubleProgressionBlock("Standard Push-Up (Controlled Floor)", "8-10", 3, 90, "T2 Safe Chest Work. Reps progression without dips or extreme stretch to protect chest."),
+				restBlock(60),
+				exerciseBlock("Scapular Pull-Up + RKC Plank", "12-15", 3),
+
+				// DAY 2: LOWER POWER
+				sectionBlock("Day 2 - Lower Power", "Heavy power focus with linear load progression (+2.5kg) on leg compounds and hamstring eccentrics.", "day"),
+				linearProgressionBlockWithNotes("Single-Leg Pistol Squat / Weighted Squat", "5", "kg", 3, 0.0, 2.5, 150, "T1 Quad Power. Linear load progression: add +2.5kg load each successful session."),
+				restBlock(120),
+				linearProgressionBlockWithNotes("Nordic Hamstring Curl / Heavy Hinge", "5", "kg", 3, 0.0, 2.5, 120, "T1 Hamstring Power. Linear load progression: add +2.5kg load each successful session."),
+				restBlock(120),
+				linearProgressionBlockWithNotes("Bulgarian Split Squat (Weighted Power)", "6-8", "kg", 3, 0.0, 2.5, 90, "T2 Unilateral Lower Power. Linear load progression: add +2.5kg load each successful session."),
+				restBlock(90),
+				calisthenicsDoubleProgressionBlock("Single-Leg Calf Raise (2s Pause)", "8-10", 3, 60, "2-second peak contraction hold at top."),
+				restBlock(60),
+				calisthenicsDoubleProgressionBlock("Hanging Leg Raise (Strict)", "6-8", 3, 90, "Strict abdominal compression without body momentum."),
+
+				// DAY 3: UPPER HYPERTROPHY
+				sectionBlock("Day 3 - Upper Hypertrophy", "High volume reps+sets progression with paired supersets for pull/push and arms.", "day"),
+				calisthenicsSupersetBlock("Chin-Up / Neutral Grip Pull-Up", "Pike Push-Up (Floor/Low Box)", "8-12", "8-12", 3, 90, "Superset 1: Lats & biceps paired with shoulder/tricep push. 90s rest after pair."),
+				restBlock(90),
+				calisthenicsSupersetBlock("Wide Inverted Row", "Diamond / Incline Push-Up", "10-15", "10-12", 3, 90, "Superset 2: Upper back paired with safe chest/triceps push."),
+				restBlock(90),
+				calisthenicsSupersetBlock("Bodyweight Bicep Curl", "Bodyweight Tricep Extension", "12-15", "12-15", 3, 60, "Superset 3: Biceps & Triceps arm finisher."),
+
+				// DAY 4: LOWER HYPERTROPHY
+				sectionBlock("Day 4 - Lower Hypertrophy", "High volume reps+sets progression with paired supersets for quads/hamstrings, calves/tibialis, and core.", "day"),
+				calisthenicsSupersetBlock("Bulgarian Split Squat / Sissy Squat", "Single-Leg Romanian Deadlift", "8-12", "8-12", 3, 90, "Superset 1: Quad hypertrophy paired with single-leg hamstring hinge."),
+				restBlock(90),
+				calisthenicsStepProgressionBlock("Sliding Hamstring Curl", "10", "3x10 -> 4x10 -> 5x10", 90, "T3 Hamstring Isolation. Step loading reps+sets progression."),
+				restBlock(60),
+				calisthenicsSupersetBlock("Single-Leg Calf Raise (2s Pause)", "Tibialis Raise", "12-15", "15-20", 3, 60, "Superset 2: Calves paired with Tibialis raises."),
+				restBlock(60),
+				timedExerciseBlock("Hollow Body Hold", 45),
 			},
 		},
 	}

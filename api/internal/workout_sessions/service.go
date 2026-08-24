@@ -220,6 +220,37 @@ func (s *Service) UpdateSetLog(ctx context.Context, in UpdateSetLogInput) (Worko
 		return WorkoutSetLog{}, apperrors.ErrInternal()
 	}
 
+	if s.progression != nil {
+		session, err := s.repo.GetSession(ctx, in.SessionID, in.UserID)
+		if err == nil && session.Status == "completed" {
+			logs := make([]progressionstates.CompletedSetLog, 0, len(session.Logs))
+			for _, l := range session.Logs {
+				logs = append(logs, progressionstates.CompletedSetLog{
+					WorkflowBlockID:     l.WorkflowBlockID,
+					BlockClientID:       l.BlockClientID,
+					NodeTypeSlug:        l.NodeTypeSlug,
+					SetIndex:            l.SetIndex,
+					PrescribedReps:      l.PrescribedReps,
+					PrescribedLoad:      l.PrescribedLoad,
+					PrescribedIntensity: l.PrescribedIntensity,
+					PrescribedRPE:       l.PrescribedRPE,
+					ActualReps:          l.ActualReps,
+					ActualLoad:          l.ActualLoad,
+					ActualRPE:           l.ActualRPE,
+					ActualRIR:           l.ActualRIR,
+					Completed:           l.Completed,
+					Notes:               l.Notes,
+				})
+			}
+			_ = s.progression.ApplySessionProgression(ctx, progressionstates.ApplySessionProgressionInput{
+				UserID:     in.UserID,
+				WorkflowID: session.WorkflowID,
+				SessionID:  session.ID,
+				Logs:       logs,
+			})
+		}
+	}
+
 	return log, nil
 }
 

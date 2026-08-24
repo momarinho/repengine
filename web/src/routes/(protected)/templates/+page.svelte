@@ -7,7 +7,8 @@
 		{ key: '', label: 'All Templates' },
 		{ key: 'strength', label: 'Strength' },
 		{ key: 'hypertrophy', label: 'Hypertrophy' },
-		{ key: 'hybrid', label: 'Hybrid' }
+		{ key: 'hybrid', label: 'Hybrid' },
+		{ key: 'calisthenics', label: 'Calisthenics' }
 	];
 
 	function metadataValue(metadata: Record<string, unknown>, key: string): string | null {

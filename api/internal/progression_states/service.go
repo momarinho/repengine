@@ -856,21 +856,36 @@ func resolveLinearCurrentLoad(
 	hasExisting bool,
 	loadUnit string,
 ) string {
-	if hasExisting && strings.TrimSpace(existing.SuggestedLoad) != "" {
+	// 1. Check if the user logged an actual load for sets in the current session
+	for _, log := range logs {
+		if val := strings.TrimSpace(log.ActualLoad); val != "" && val != "0" && val != "0 kg" && val != "0.0" && val != "0.0 kg" {
+			if num, ok := parseNumberString(val); ok {
+				return formatLoad(num, loadUnit)
+			}
+			return val
+		}
+	}
+	// 2. Check existing progression state if it has a non-zero suggested load
+	if hasExisting && strings.TrimSpace(existing.SuggestedLoad) != "" && existing.SuggestedLoad != "0" && existing.SuggestedLoad != "0 kg" && existing.SuggestedLoad != "0.0" && existing.SuggestedLoad != "0.0 kg" {
 		return existing.SuggestedLoad
 	}
+	// 3. Check if block has a configured start_load > 0
 	if configured := parseNumberValue(block.Data["start_load"]); configured > 0 {
 		return formatLoad(configured, loadUnit)
 	}
+	// 4. Fallback to any non-empty log actual load
 	for _, log := range logs {
-		if strings.TrimSpace(log.ActualLoad) != "" {
-			return strings.TrimSpace(log.ActualLoad)
+		if val := strings.TrimSpace(log.ActualLoad); val != "" {
+			return val
 		}
 	}
 	for _, log := range logs {
-		if strings.TrimSpace(log.PrescribedLoad) != "" {
-			return strings.TrimSpace(log.PrescribedLoad)
+		if val := strings.TrimSpace(log.PrescribedLoad); val != "" {
+			return val
 		}
+	}
+	if hasExisting && strings.TrimSpace(existing.SuggestedLoad) != "" {
+		return existing.SuggestedLoad
 	}
 	return ""
 }

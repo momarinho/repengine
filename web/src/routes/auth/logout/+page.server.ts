@@ -1,18 +1,18 @@
 import { redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
-
-const API_URL = process.env.API_URL || 'http://localhost:8080';
+import { apiFetch } from '$lib/server/api';
 
 export const actions = {
-	logout: async ({ cookies }) => {
+	logout: async ({ cookies, fetch }) => {
 		const token = cookies.get('token');
-		const headers = new Headers();
 
 		if (token) {
-			headers.set('Authorization', `Bearer ${token}`);
+			try {
+				await apiFetch(fetch, '/auth/logout', token, { method: 'POST' });
+			} catch (_) {
+				// Ignore network failure during logout
+			}
 		}
-
-		await fetch(`${API_URL}/auth/logout`, { method: 'POST', headers });
 
 		cookies.delete('token', { path: '/' });
 
