@@ -106,8 +106,12 @@ func main() {
 	app.Use(fiberrecover.New(fiberrecover.Config{
 		EnableStackTrace: true,
 	}))
+	corsOrigins := cfg.CORSOrigins
+	if corsOrigins == "*" || corsOrigins == "" {
+		corsOrigins = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173"
+	}
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     cfg.CORSOrigins,
+		AllowOrigins:     corsOrigins,
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
 		AllowHeaders:     "Origin,Content-Type,Accept,Authorization",
 		AllowCredentials: true,

@@ -331,6 +331,32 @@ func timedExerciseBlock(exercise string, duration int) templateBlockSeed {
 	}
 }
 
+func repeatBlock(title string, rounds int, reps string) templateBlockSeed {
+	return templateBlockSeed{
+		NodeTypeSlug: "repeat",
+		Data: map[string]any{
+			"title":  title,
+			"times":  rounds,
+			"rounds": rounds,
+			"reps":   reps,
+		},
+	}
+}
+
+func intervalRepeatBlock(title string, rounds int, reps string, phases []map[string]any) templateBlockSeed {
+	return templateBlockSeed{
+		NodeTypeSlug: "repeat",
+		Data: map[string]any{
+			"title":           title,
+			"times":           rounds,
+			"rounds":          rounds,
+			"reps":            reps,
+			"interval_phases": phases,
+		},
+	}
+}
+
+
 func calisthenicsDoubleProgressionBlock(exercise, reps string, sets int, restSeconds int, notes string) templateBlockSeed {
 	return templateBlockSeed{
 		NodeTypeSlug: "linear_progression",
@@ -596,6 +622,86 @@ func SeedTemplates(ctx context.Context) error {
 				calisthenicsSupersetBlock("Single-Leg Calf Raise (2s Pause)", "Tibialis Raise", "12-15", "15-20", 3, 60, "Superset 2: Calves paired with Tibialis raises."),
 				restBlock(60),
 				timedExerciseBlock("Hollow Body Hold", 45),
+			},
+		},
+		{
+			Name:        "GZCLP Calisthenics & Barbell Hybrid",
+			Description: "A balanced 4-day GZCLP strength routine adapted for barbell floor press and strict pull-ups, with light RDLs and 2 dedicated jump rope & core conditioning days.",
+			Category:    "hybrid",
+			IsOfficial:  true,
+			Metadata: map[string]any{
+				"duration":  "8 weeks",
+				"frequency": "4-6 days/week",
+				"level":     "intermediate",
+			},
+			Blocks: []templateBlockSeed{
+				// DAY 1: SQUAT & FLOOR PRESS
+				sectionBlock("Day 1 - Squat & Floor Press", "T1 Heavy Squat progression paired with T2 Floor Press volume, RDL posterior focus, and calves.", "day"),
+				gzclpT1Block("Barbell Back Squat", 35.0, "kg", 2.5, 180, "T1 Main Compound. GZCLP progression: 3x5+ -> 5x3+ -> 6x2+. Add +2.5kg each successful session."),
+				restBlock(120),
+				linearProgressionBlockWithNotes("Barbell Floor Press", "10", "kg", 3, 30.0, 2.0, 120, "T2 Volume Press. Pause slightly on the floor each rep before driving up."),
+				restBlock(90),
+				exerciseBlockWithNotes("Barbell Romanian Deadlift (RDL)", "10-12", 3, "T3 Posterior Chain. Controlled 3-second eccentric stretch on hamstrings. Moderate load (30-40kg)."),
+				restBlock(60),
+				exerciseBlockWithNotes("Single-Leg Calf Raise", "15", 3, "T3 Calves. 2s peak contraction hold at the top of each rep."),
+
+				// JUMP ROPE & ABS A
+				sectionBlock("Jump Rope & Abs A", "High-intensity 30/15/15 intervals followed by vertical core compression and anti-extension holds.", "cardio"),
+				intervalRepeatBlock("Jump Rope 30/15/15 Intervals (8 Rounds)", 8, "30s @ 50% Pace -> 15s Sprint MAX -> 15s Complete Rest", []map[string]any{
+					{"name": "50% Moderate Pace", "duration_seconds": 30, "type": "work", "color": "emerald"},
+					{"name": "Sprint MAX", "duration_seconds": 15, "type": "sprint", "color": "rose"},
+					{"name": "Complete Rest", "duration_seconds": 15, "type": "rest", "color": "zinc"},
+				}),
+				restBlock(90),
+				exerciseBlockWithNotes("Hanging Knee / Leg Raise", "10-12", 3, "Strict abdominal compression from the pull-up bar without swinging."),
+				restBlock(60),
+				timedExerciseBlock("Hollow Body Hold", 45),
+				restBlock(60),
+				timedExerciseBlock("RKC Plank Hold", 45),
+
+				// DAY 2: OVERHEAD PRESS & PULL-UP
+				sectionBlock("Day 2 - Overhead Press & Pull-Up", "T1 Heavy OHP progression paired with T2 Pull-Up volume, barbell rows, and lateral delts.", "day"),
+				gzclpT1Block("Barbell Overhead Press", 20.0, "kg", 2.0, 180, "T1 Vertical Press. GZCLP progression: 3x5+ -> 5x3+ -> 6x2+. Add +2.0kg each successful session."),
+				restBlock(120),
+				calisthenicsDoubleProgressionBlock("Bodyweight Pull-Up", "6-8", 3, 120, "T2 Vertical Pull Volume. Full extension to chin over bar. Step progression across 3 sets."),
+				restBlock(90),
+				linearProgressionBlockWithNotes("Barbell Bent-Over Row", "10-12", "kg", 3, 30.0, 2.0, 90, "T3 Horizontal Pull. Strict torso angle, 1s pause against abdomen."),
+				restBlock(60),
+				exerciseBlockWithNotes("Plate / Barbell Lateral Raise", "12-15", 3, "T3 Lateral Delt Isolation. Controlled cadence."),
+
+				// JUMP ROPE & ABS B
+				sectionBlock("Jump Rope & Abs B", "High-intensity 30/15/15 intervals followed by dynamic flexion and rotational core stability.", "cardio"),
+				intervalRepeatBlock("Jump Rope 30/15/15 Intervals (8 Rounds)", 8, "30s @ 50% Pace -> 15s Sprint MAX -> 15s Complete Rest", []map[string]any{
+					{"name": "50% Moderate Pace", "duration_seconds": 30, "type": "work", "color": "emerald"},
+					{"name": "Sprint MAX", "duration_seconds": 15, "type": "sprint", "color": "rose"},
+					{"name": "Complete Rest", "duration_seconds": 15, "type": "rest", "color": "zinc"},
+				}),
+				restBlock(90),
+				exerciseBlockWithNotes("V-Ups / Abdominal Remador", "12-15", 3, "Dynamic abdominal flexion with controlled return to the floor."),
+				restBlock(60),
+				timedExerciseBlock("Side Plank Hold (Each Side)", 35),
+				restBlock(60),
+				timedExerciseBlock("Hollow Body Flutter Kicks", 40),
+
+				// DAY 3: FLOOR PRESS & SQUAT
+				sectionBlock("Day 3 - Floor Press & Squat", "T1 Heavy Floor Press progression paired with T2 Squat volume, inverted rows, and push-up accessories.", "day"),
+				gzclpT1Block("Barbell Floor Press", 35.0, "kg", 2.0, 180, "T1 Heavy Horizontal Press. GZCLP progression: 3x5+ -> 5x3+ -> 6x2+. Add +2.0kg each successful session."),
+				restBlock(120),
+				linearProgressionBlockWithNotes("Barbell Back Squat", "10", "kg", 3, 25.0, 2.5, 120, "T2 Volume Squat. Controlled cadence and consistent depth."),
+				restBlock(90),
+				exerciseBlockWithNotes("Inverted Row (Remada Australiana)", "10-12", 3, "T3 Upper Back. Body parallel to floor or feet elevated."),
+				restBlock(60),
+				exerciseBlockWithNotes("Deficit / Diamond Push-Up", "12-15", 3, "T3 Chest & Tricep Builder. Deep stretch at the bottom."),
+
+				// DAY 4: STRICT PULL-UP & OVERHEAD PRESS
+				sectionBlock("Day 4 - Strict Pull-Up & Overhead Press", "T1 Strict Pull-Up strength progression paired with T2 OHP volume, RDL posterior focus, and bicep curls.", "day"),
+				gzclpT1Block("Strict Pull-Up", 0.0, "kg", 1.5, 180, "T1 Vertical Pull Strength. GZCLP progression: 3x5+ -> 5x3+ -> 6x2+. Add small weight plate when bodyweight passes 3x5."),
+				restBlock(120),
+				linearProgressionBlockWithNotes("Barbell Overhead Press", "10", "kg", 3, 15.0, 1.5, 90, "T2 Volume Press. Strict lockout without leg drive."),
+				restBlock(90),
+				exerciseBlockWithNotes("Barbell Romanian Deadlift (RDL)", "10-12", 3, "T3 Posterior Chain. Moderate load (30-40kg), 3-second negative for hamstring stretch."),
+				restBlock(60),
+				exerciseBlockWithNotes("Barbell Bicep Curl", "10-12", 3, "T3 Arm Isolation. Strict form, elbows pinned at ribs."),
 			},
 		},
 	}

@@ -133,4 +133,84 @@ test.describe('RepEngine Workout Lifecycle E2E', () => {
 		await expect(page.locator('text=102.5').first()).toBeVisible();
 		await page.screenshot({ path: '../docs/screenshots/4-history-analytics.png' });
 	});
+
+	test('Explore official templates, clone GZCLP Hybrid, and run Jump Rope Interval Timer HUD', async ({ page }) => {
+		const uniqueSuffix = Date.now() + Math.floor(Math.random() * 1000);
+		const uniqueEmail = `hybrid_test_${uniqueSuffix}@example.com`;
+		const password = 'password123';
+
+		// 1. Register & log in
+		await page.goto('/register');
+		await page.fill('#email', uniqueEmail);
+		await page.fill('#password', password);
+		await page.click('button[type="submit"]');
+
+		await page.waitForURL('**/login');
+		await page.fill('#email', uniqueEmail);
+		await page.fill('#password', password);
+		await page.click('button[type="submit"]');
+		await page.waitForURL('**/dashboard');
+
+		// 2. Go to templates page
+		await page.goto('/templates');
+		const hybridCard = page.locator('article', { hasText: 'GZCLP Calisthenics & Barbell Hybrid' });
+		await expect(hybridCard).toBeVisible();
+
+		// 3. Click Preview link
+		await hybridCard.locator('a:has-text("Preview")').click();
+		await page.waitForURL(/\/templates\/\d+/);
+
+		// 4. Clone template
+		await page.click('button:has-text("Use Template")');
+		await page.waitForURL(/\/workflows\/\d+\/edit/, { timeout: 15000 });
+
+		// 5. Open player
+		const playLink = page.locator('a[href*="/play"]');
+		await playLink.click();
+		await page.waitForURL(/\/workflows\/\d+\/play/);
+
+		// 6. Section chooser: select "Jump Rope & Abs A"
+		const jumpRopeSectionBtn = page.locator('button:has-text("Jump Rope & Abs A")');
+		if (await jumpRopeSectionBtn.isVisible()) {
+			await jumpRopeSectionBtn.click();
+		}
+
+		// Click "Start Section" to advance into the jump rope block
+		const startSectionBtn = page.locator('button:has-text("Start Section")');
+		if (await startSectionBtn.isVisible()) {
+			await startSectionBtn.click();
+		}
+
+		// 7. Check Interval Timer HUD
+		await expect(page.locator('text=Interval Circuit')).toBeVisible();
+		await expect(page.locator('text=Round 1').first()).toBeVisible();
+		await expect(page.locator('text=50% Moderate Pace').first()).toBeVisible();
+
+		// 8. Capture screenshot of the Interval Timer HUD for documentation
+		await page.screenshot({ path: '../docs/screenshots/5-interval-timer.png' });
+
+		// 9. Start intervals
+		const startBtn = page.locator('button:has-text("Start Intervals")').first();
+		await startBtn.click();
+		await page.waitForTimeout(300);
+
+		// 10. Verify active running state
+		await expect(page.locator('button:has-text("Pause Timer"), button:has-text("Pause Intervals")').first()).toBeVisible();
+
+		// 11. Skip phase -> Sprint MAX
+		const skipPhaseBtn = page.locator('button:has-text("Skip Phase")').first();
+		await skipPhaseBtn.click();
+		await page.waitForTimeout(200);
+		await expect(page.locator('text=Sprint MAX').first()).toBeVisible();
+
+		// 12. Skip phase -> Complete Rest
+		await skipPhaseBtn.click();
+		await page.waitForTimeout(200);
+		await expect(page.locator('text=Complete Rest').first()).toBeVisible();
+
+		// 13. Skip phase -> Round 1 completes, advances to Round 2
+		await skipPhaseBtn.click();
+		await page.waitForTimeout(400);
+		await expect(page.locator('text=Round 2').first()).toBeVisible();
+	});
 });

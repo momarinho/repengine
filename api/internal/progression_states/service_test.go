@@ -630,7 +630,7 @@ func TestApplySessionProgression_LinearDeload(t *testing.T) {
 					Position:     1,
 					Data: map[string]any{
 						"exercise_name":    "Squat",
-						"deload_weeks":     4, // trigger deload every 4 sessions
+						"deload_weeks":     4,    // trigger deload every 4 sessions
 						"deload_percent":   0.90, // deload to 90%
 						"start_load":       100.0,
 						"load_unit":        "kg",
@@ -842,5 +842,3 @@ func TestListProgressionStates_SynchronizesDirectSetsReps(t *testing.T) {
 		t.Fatalf("expected reps_planned to sync to \"3\", got %q", reps)
 	}
 }
-
-

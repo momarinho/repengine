@@ -56,6 +56,10 @@
 		activityEntries: SessionActivity[];
 		timerRemainingSeconds: number;
 		isTimerRunning: boolean;
+		isIntervalTimerRunning?: boolean;
+		activeIntervalPhaseIdx?: number;
+		intervalPhaseSecondsLeft?: number;
+		intervalSoundEnabled?: boolean;
 		intraSetRest: {
 			blockID: string;
 			remainingSeconds: number;
@@ -65,6 +69,13 @@
 		} | null;
 		isIntraSetRestRunning: boolean;
 	};
+
+	export interface IntervalPhase {
+		name: string;
+		durationSeconds: number;
+		type: 'work' | 'sprint' | 'rest' | 'prep';
+		color?: string;
+	}
 
 	const { data }: { data: PageData } = $props();
 	const initialData = untrack(() => ({
@@ -101,6 +112,11 @@
 	let sessionElapsedSeconds = $state(routine?.elapsedSeconds ?? 0);
 	let isTimerRunning = $state(false);
 	let timerRemainingSeconds = $state(routine ? getInitialTimerSeconds(routine.blocks[initialBlockIndex]) : 0);
+	let isIntervalTimerRunning = $state(false);
+	let activeIntervalPhaseIdx = $state(0);
+	let intervalPhaseSecondsLeft = $state(0);
+	let intervalSoundEnabled = $state(true);
+	let showIntervalManualInputs = $state(false);
 	let intraSetRest = $state<{
 		blockID: string;
 		remainingSeconds: number;
@@ -193,6 +209,25 @@
 					return block.node_type_slug === 'exercise' || block.node_type_slug === 'linear_progression';
 				})
 			: [];
+
+		const hasConfigurableLoads = blocksToInitialize.some((block) => {
+			const progression = getBlockProgressionState(block);
+			const hasSuggested = Boolean(
+				progression?.state_type === 'linear' &&
+				progression.suggested_load &&
+				progression.suggested_load !== '0 kg' &&
+				progression.suggested_load !== '0' &&
+				progression.suggested_load !== '0.0 kg'
+			);
+			const hasBlockLoad = block.load !== undefined && block.load > 0;
+			const hasIncrement = block.increment !== undefined && block.increment > 0;
+			return hasSuggested || hasBlockLoad || hasIncrement;
+		});
+
+		if (blocksToInitialize.length === 0 || !hasConfigurableLoads) {
+			void startSection(section);
+			return;
+		}
 
 		for (const block of blocksToInitialize) {
 			const progression = getBlockProgressionState(block);
@@ -335,6 +370,19 @@
 	const isLastBlock = $derived(routine ? currentBlockIndex >= activeSectionEndIndex : true);
 	const currentExerciseSet = $derived(currentBlock ? getCurrentSet(currentBlock) : 1);
 	const currentRepeatRound = $derived(currentBlock ? getCurrentRound(currentBlock) : 1);
+	const currentIntervalPhases = $derived(
+		currentBlock?.node_type_slug === 'repeat' ? resolveIntervalPhases(currentBlock) : null
+	);
+	const activeIntervalPhase = $derived(
+		currentIntervalPhases && currentIntervalPhases[activeIntervalPhaseIdx]
+			? currentIntervalPhases[activeIntervalPhaseIdx]
+			: null
+	);
+	const nextIntervalPhase = $derived(
+		currentIntervalPhases && currentIntervalPhases.length > 0
+			? currentIntervalPhases[(activeIntervalPhaseIdx + 1) % currentIntervalPhases.length]
+			: null
+	);
 	const currentWaveSetIndex = $derived(currentBlock ? getCurrentWaveSetIndex(currentBlock) : 0);
 	const currentWaveWeek = $derived(currentBlock?.node_type_slug === 'wave' ? resolveWaveWeek(currentBlock) : null);
 	const currentWaveSet = $derived(currentWaveWeek ? currentWaveWeek.prescriptions[currentWaveSetIndex] : null);
@@ -366,6 +414,156 @@
 	function getCurrentRound(block: PlayerBlock): number {
 		return roundByBlock[block.id] ?? 1;
 	}
+
+	function resolveIntervalPhases(block: PlayerBlock | null): IntervalPhase[] | null {
+		if (!block || block.node_type_slug !== 'repeat') return null;
+
+		if (block.data && Array.isArray(block.data.interval_phases) && block.data.interval_phases.length > 0) {
+			return (block.data.interval_phases as Array<Record<string, unknown>>).map((raw) => {
+				const rawType = String(raw.type || 'work').toLowerCase();
+				const phaseType: IntervalPhase['type'] =
+					rawType === 'sprint' ? 'sprint' : rawType === 'rest' ? 'rest' : rawType === 'prep' ? 'prep' : 'work';
+				return {
+					name: String(raw.name || (phaseType === 'sprint' ? 'Sprint' : phaseType === 'rest' ? 'Rest' : 'Work')),
+					durationSeconds: Math.max(1, Number(raw.duration_seconds || raw.durationSeconds || raw.duration || 30)),
+					type: phaseType,
+					color: raw.color ? String(raw.color) : undefined
+				};
+			});
+		}
+
+		const text = `${block.title} ${block.reps ?? ''}`;
+		const threePart = text.match(
+			/(\d+)\s*(?:s|sec)?\s*(?:@\s*[^->/]+)?\s*(?:\/|->|-|,)\s*(\d+)\s*(?:s|sec)?\s*(?:[^->/]+)?\s*(?:\/|->|-|,)\s*(\d+)\s*(?:s|sec)?/i
+		);
+		if (threePart) {
+			const d1 = parseInt(threePart[1], 10);
+			const d2 = parseInt(threePart[2], 10);
+			const d3 = parseInt(threePart[3], 10);
+			if (d1 > 0 && d2 > 0 && d3 > 0) {
+				return [
+					{ name: '50% Moderate Pace', durationSeconds: d1, type: 'work', color: 'emerald' },
+					{ name: 'Sprint MAX', durationSeconds: d2, type: 'sprint', color: 'rose' },
+					{ name: 'Complete Rest', durationSeconds: d3, type: 'rest', color: 'zinc' }
+				];
+			}
+		}
+
+		const twoPart = text.match(/(\d+)\s*(?:s|sec)?\s*(?:\/|->|-)\s*(\d+)\s*(?:s|sec)?/i);
+		if (twoPart && /interval|tabata|sec|s\b|pace|work|sprint|rest|corda|jump/i.test(text)) {
+			const d1 = parseInt(twoPart[1], 10);
+			const d2 = parseInt(twoPart[2], 10);
+			if (d1 > 0 && d2 > 0) {
+				return [
+					{ name: 'Work Interval', durationSeconds: d1, type: 'work', color: 'emerald' },
+					{ name: 'Rest Interval', durationSeconds: d2, type: 'rest', color: 'zinc' }
+				];
+			}
+		}
+
+		return null;
+	}
+
+	let audioContext: AudioContext | null = null;
+
+	function getAudioContext(): AudioContext | null {
+		if (typeof window === 'undefined') return null;
+		const AudioCtx =
+			window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+		if (!AudioCtx) return null;
+		if (!audioContext || audioContext.state === 'closed') {
+			audioContext = new AudioCtx();
+		}
+		if (audioContext.state === 'suspended') {
+			audioContext.resume().catch(() => {});
+		}
+		return audioContext;
+	}
+
+	function playAudioTone(type: 'warning' | 'sprint' | 'work' | 'rest' | 'prep' | 'complete'): void {
+		if (!intervalSoundEnabled) return;
+		try {
+			const ctx = getAudioContext();
+			if (!ctx) return;
+			const now = ctx.currentTime;
+
+			if (type === 'warning') {
+				const osc = ctx.createOscillator();
+				const gain = ctx.createGain();
+				osc.type = 'sine';
+				osc.frequency.setValueAtTime(600, now);
+				gain.gain.setValueAtTime(0.2, now);
+				gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+				osc.connect(gain);
+				gain.connect(ctx.destination);
+				osc.start(now);
+				osc.stop(now + 0.12);
+			} else if (type === 'sprint') {
+				const osc1 = ctx.createOscillator();
+				const gain1 = ctx.createGain();
+				osc1.type = 'triangle';
+				osc1.frequency.setValueAtTime(750, now);
+				gain1.gain.setValueAtTime(0.3, now);
+				gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+				osc1.connect(gain1);
+				gain1.connect(ctx.destination);
+				osc1.start(now);
+				osc1.stop(now + 0.15);
+
+				const osc2 = ctx.createOscillator();
+				const gain2 = ctx.createGain();
+				osc2.type = 'triangle';
+				osc2.frequency.setValueAtTime(960, now + 0.16);
+				gain2.gain.setValueAtTime(0.35, now + 0.16);
+				gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+				osc2.connect(gain2);
+				gain2.connect(ctx.destination);
+				osc2.start(now + 0.16);
+				osc2.stop(now + 0.38);
+			} else if (type === 'rest') {
+				const osc = ctx.createOscillator();
+				const gain = ctx.createGain();
+				osc.type = 'sine';
+				osc.frequency.setValueAtTime(520, now);
+				osc.frequency.exponentialRampToValueAtTime(390, now + 0.28);
+				gain.gain.setValueAtTime(0.25, now);
+				gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+				osc.connect(gain);
+				gain.connect(ctx.destination);
+				osc.start(now);
+				osc.stop(now + 0.3);
+			} else if (type === 'work' || type === 'prep') {
+				const osc = ctx.createOscillator();
+				const gain = ctx.createGain();
+				osc.type = 'triangle';
+				osc.frequency.setValueAtTime(580, now);
+				osc.frequency.exponentialRampToValueAtTime(720, now + 0.2);
+				gain.gain.setValueAtTime(0.25, now);
+				gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+				osc.connect(gain);
+				gain.connect(ctx.destination);
+				osc.start(now);
+				osc.stop(now + 0.25);
+			} else if (type === 'complete') {
+				[523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+					const osc = ctx.createOscillator();
+					const gain = ctx.createGain();
+					const start = now + i * 0.12;
+					osc.type = 'sine';
+					osc.frequency.setValueAtTime(freq, start);
+					gain.gain.setValueAtTime(0.3, start);
+					gain.gain.exponentialRampToValueAtTime(0.001, start + 0.4);
+					osc.connect(gain);
+					gain.connect(ctx.destination);
+					osc.start(start);
+					osc.stop(start + 0.4);
+				});
+			}
+		} catch {
+			// AudioContext not allowed before user interaction
+		}
+	}
+
 
 	function getCurrentWaveSetIndex(block: PlayerBlock): number {
 		return waveSetByBlock[block.id] ?? 0;
@@ -806,8 +1004,20 @@
 				return currentWaveSetIndex + 1 >= (currentWaveWeek?.prescriptions.length ?? 1)
 					? 'Complete Wave'
 					: 'Log Set';
-			case 'repeat':
+			case 'repeat': {
+				const phases = resolveIntervalPhases(block);
+				if (phases && phases.length > 0) {
+					if (
+						getCurrentRound(block) >= (block.rounds ?? 1) &&
+						activeIntervalPhaseIdx >= phases.length - 1 &&
+						intervalPhaseSecondsLeft <= 0
+					) {
+						return 'Complete Block';
+					}
+					return isIntervalTimerRunning ? 'Pause Intervals' : 'Start Intervals';
+				}
 				return getCurrentRound(block) >= (block.rounds ?? 1) ? 'Complete Block' : 'Log Round';
+			}
 			case 'section':
 				return 'Start Section';
 			default:
@@ -829,8 +1039,13 @@
 				return 'Start Rest';
 			case 'exercise_timed':
 				return 'Reset Timer';
-			case 'repeat':
+			case 'repeat': {
+				const phases = resolveIntervalPhases(block);
+				if (phases && phases.length > 0) {
+					return isIntervalTimerRunning ? 'Skip Phase' : 'Reset Phase';
+				}
 				return 'Skip Round';
+			}
 			case 'wave':
 				return 'Reset Sets';
 			default:
@@ -1109,6 +1324,10 @@
 		sessionElapsedSeconds = 0;
 		isTimerRunning = false;
 		timerRemainingSeconds = routine ? getInitialTimerSeconds(routine.blocks[index]) : 0;
+		isIntervalTimerRunning = false;
+		activeIntervalPhaseIdx = 0;
+		const initialPhases = routine ? resolveIntervalPhases(routine.blocks[index]) : null;
+		intervalPhaseSecondsLeft = initialPhases && initialPhases.length > 0 ? initialPhases[0].durationSeconds : 0;
 		intraSetRest = null;
 		isIntraSetRestRunning = false;
 		mobileQueueOpen = false;
@@ -1181,11 +1400,17 @@
 		isTimerRunning = false;
 		clearIntraSetRest();
 		mobileQueueOpen = false;
+
+		isIntervalTimerRunning = false;
+		activeIntervalPhaseIdx = 0;
+		const nextPhases = resolveIntervalPhases(routine.blocks[index]);
+		intervalPhaseSecondsLeft = nextPhases && nextPhases.length > 0 ? nextPhases[0].durationSeconds : 0;
 	}
 
 	function goToNextBlock(): void {
 		if (!routine) return;
 		markBlockCompleted(currentBlockIndex);
+		isIntervalTimerRunning = false;
 
 		if (currentBlockIndex >= activeSectionEndIndex) {
 			isSessionComplete = true;
@@ -1281,6 +1506,83 @@
 		isIntraSetRestRunning = false;
 	}
 
+	function toggleIntervalTimer(): void {
+		if (!currentIntervalPhases || currentIntervalPhases.length === 0) return;
+		if (intervalPhaseSecondsLeft <= 0) {
+			intervalPhaseSecondsLeft =
+				currentIntervalPhases[activeIntervalPhaseIdx]?.durationSeconds ?? currentIntervalPhases[0].durationSeconds;
+		}
+		isIntervalTimerRunning = !isIntervalTimerRunning;
+		if (isIntervalTimerRunning) {
+			playAudioTone(currentIntervalPhases[activeIntervalPhaseIdx]?.type ?? 'work');
+		}
+	}
+
+	async function logIntervalRound(block: PlayerBlock, roundNum: number): Promise<void> {
+		const actual = readActualInputs(block.id);
+		const summary =
+			currentIntervalPhases?.map((p) => `${p.durationSeconds}s ${p.name}`).join(' -> ') ?? block.reps ?? '';
+		try {
+			await persistSetLog(block, {
+				workflow_block_id: block.workflowBlockID ?? null,
+				block_client_id: block.id,
+				node_type_slug: block.node_type_slug,
+				set_index: roundNum,
+				prescribed_reps: block.reps ?? '',
+				prescribed_load: '',
+				prescribed_intensity: '',
+				prescribed_rpe: '',
+				actual_reps: actual.actualReps || summary,
+				actual_load: actual.actualLoad,
+				actual_rpe: actual.actualRPE,
+				actual_rir: actual.actualRIR,
+				completed: true,
+				notes: notesByBlock[block.id] ?? ''
+			});
+		} catch (error: unknown) {
+			console.error('Unable to save interval round log:', error);
+		}
+		appendActivity(block, 'round', `Round ${roundNum}`, actual.actualReps || summary);
+	}
+
+	function skipIntervalPhase(): void {
+		if (!currentBlock || !currentIntervalPhases || currentIntervalPhases.length === 0) return;
+		const block = currentBlock;
+		const currentRound = getCurrentRound(block);
+
+		if (activeIntervalPhaseIdx < currentIntervalPhases.length - 1) {
+			activeIntervalPhaseIdx += 1;
+			intervalPhaseSecondsLeft = currentIntervalPhases[activeIntervalPhaseIdx].durationSeconds;
+			playAudioTone(currentIntervalPhases[activeIntervalPhaseIdx].type);
+		} else {
+			void logIntervalRound(block, currentRound);
+			if (currentRound >= (block.rounds ?? 1)) {
+				playAudioTone('complete');
+				isIntervalTimerRunning = false;
+				completeCurrentBlock(block, `${block.rounds ?? 1} rounds completed`);
+			} else {
+				roundByBlock = { ...roundByBlock, [block.id]: currentRound + 1 };
+				activeIntervalPhaseIdx = 0;
+				intervalPhaseSecondsLeft = currentIntervalPhases[0].durationSeconds;
+				playAudioTone(currentIntervalPhases[0].type);
+			}
+		}
+	}
+
+	function restartIntervalPhase(): void {
+		if (!currentIntervalPhases || currentIntervalPhases.length === 0) return;
+		const phase = currentIntervalPhases[activeIntervalPhaseIdx];
+		if (!phase) return;
+
+		if (intervalPhaseSecondsLeft < phase.durationSeconds - 2) {
+			intervalPhaseSecondsLeft = phase.durationSeconds;
+		} else if (activeIntervalPhaseIdx > 0) {
+			activeIntervalPhaseIdx -= 1;
+			intervalPhaseSecondsLeft = currentIntervalPhases[activeIntervalPhaseIdx].durationSeconds;
+			playAudioTone(currentIntervalPhases[activeIntervalPhaseIdx].type);
+		}
+	}
+
 	async function runPrimaryAction(): Promise<void> {
 		if (!currentBlock || isSyncingSession) return;
 		const block = currentBlock;
@@ -1333,10 +1635,13 @@
 					'set',
 					`Set ${currentSet}`,
 					actual.actualReps || actual.actualLoad || actual.actualRPE || actual.actualRIR
-						? `${actual.actualReps || getResolvedPrescribedReps(block) || '-'} reps${actual.actualLoad ? ` @ ${actual.actualLoad}` : ''}${actual.actualRPE ? ` • RPE ${actual.actualRPE}` : ''}${actual.actualRIR ? ` • RIR ${actual.actualRIR}` : ''}`.trim()
-						: `${getResolvedPrescribedReps(block) ?? '-'} reps${getResolvedPrescribedLoad(block) ? ` @ ${getResolvedPrescribedLoad(block)}` : ''}`.trim()
+						? `${actual.actualReps || block.reps || 'Prescribed reps'}${actual.actualLoad ? ` @ ${actual.actualLoad}${block.loadUnit ? ` ${block.loadUnit}` : ''}` : ''}${actual.actualRPE ? ` • RPE ${actual.actualRPE}` : ''}${actual.actualRIR ? ` • RIR ${actual.actualRIR}` : ''}`
+						: `${block.reps ?? 'Completed set'}`
 				);
-				const targetSets = getResolvedPrescribedSets(block);
+				const targetSets =
+					block.node_type_slug === 'linear_progression'
+						? getResolvedPrescribedSets(block)
+						: (block.sets ?? 1);
 				if (currentSet >= targetSets) {
 					completeCurrentBlock(block, `${targetSets} sets logged`);
 					return;
@@ -1349,19 +1654,18 @@
 				});
 				return;
 			}
-			case 'rest':
+			case 'rest': {
+				if (timerRemainingSeconds <= 0) {
+					completeCurrentBlock(block, 'Rest finished');
+					return;
+				}
+
+				isTimerRunning = !isTimerRunning;
+				return;
+			}
 			case 'exercise_timed': {
 				if (timerRemainingSeconds <= 0) {
-					appendActivity(
-						block,
-						'timer',
-						block.node_type_slug === 'rest' ? 'Rest complete' : 'Interval complete',
-						`${formatClock(getInitialTimerSeconds(block))} elapsed`
-					);
-					completeCurrentBlock(
-						block,
-						block.node_type_slug === 'rest' ? 'Recovery finished' : 'Interval finished'
-					);
+					completeCurrentBlock(block, 'Timed effort complete');
 					return;
 				}
 
@@ -1370,9 +1674,8 @@
 			}
 			case 'wave': {
 				const currentSet = getCurrentWaveSetIndex(block);
-				const resolvedWeek = resolveWaveWeek(block);
-				const totalSets = resolvedWeek?.prescriptions.length ?? 1;
-				const prescription = resolvedWeek?.prescriptions[currentSet];
+				const currentWeek = resolveWaveWeek(block);
+				const currentPrescription = currentWeek?.prescriptions[currentSet];
 				const actual = readActualInputs(block.id);
 				isSyncingSession = true;
 				sessionError = null;
@@ -1382,10 +1685,10 @@
 						block_client_id: block.id,
 						node_type_slug: block.node_type_slug,
 						set_index: currentSet + 1,
-						prescribed_reps: prescription?.reps ?? '',
+						prescribed_reps: currentPrescription?.reps ?? '',
 						prescribed_load: '',
-						prescribed_intensity: prescription?.intensity ?? '',
-						prescribed_rpe: prescription?.rpe ?? '',
+						prescribed_intensity: currentPrescription?.intensity ? `${currentPrescription.intensity}%` : '',
+						prescribed_rpe: currentPrescription?.rpe ? String(currentPrescription.rpe) : '',
 						actual_reps: actual.actualReps,
 						actual_load: actual.actualLoad,
 						actual_rpe: actual.actualRPE,
@@ -1404,11 +1707,12 @@
 					'set',
 					`Set ${currentSet + 1}`,
 					actual.actualReps || actual.actualLoad || actual.actualRPE || actual.actualRIR
-						? `${actual.actualReps || prescription?.reps || '-'} reps${actual.actualLoad ? ` @ ${actual.actualLoad}` : ''}${actual.actualRPE ? ` • RPE ${actual.actualRPE}` : ''}${actual.actualRIR ? ` • RIR ${actual.actualRIR}` : ''}`
-						: `${prescription?.reps ?? '-'} reps • ${prescription?.intensity ?? '-'}% • RPE ${prescription?.rpe ?? '-'}`
+						? `${actual.actualReps || currentPrescription?.reps || 'Set'}${actual.actualLoad ? ` @ ${actual.actualLoad}` : ''}${actual.actualRPE ? ` • RPE ${actual.actualRPE}` : ''}${actual.actualRIR ? ` • RIR ${actual.actualRIR}` : ''}`
+						: `${currentPrescription?.reps ?? 'Set'} @ ${currentPrescription?.intensity ?? 0}%`
 				);
+				const totalSets = currentWeek?.prescriptions.length ?? 1;
 				if (currentSet + 1 >= totalSets) {
-					completeCurrentBlock(block, `${totalSets} wave sets logged`);
+					completeCurrentBlock(block, `${totalSets} sets logged`);
 					return;
 				}
 
@@ -1420,6 +1724,20 @@
 				return;
 			}
 			case 'repeat': {
+				const phases = resolveIntervalPhases(block);
+				if (phases && phases.length > 0) {
+					const currentRound = getCurrentRound(block);
+					if (
+						currentRound >= (block.rounds ?? 1) &&
+						activeIntervalPhaseIdx >= phases.length - 1 &&
+						intervalPhaseSecondsLeft <= 0
+					) {
+						completeCurrentBlock(block, `${block.rounds ?? 1} rounds completed`);
+						return;
+					}
+					toggleIntervalTimer();
+					return;
+				}
 				const currentRound = getCurrentRound(block);
 				const actual = readActualInputs(block.id);
 				isSyncingSession = true;
@@ -1493,6 +1811,15 @@
 				isTimerRunning = false;
 				return;
 			case 'repeat': {
+				const phases = resolveIntervalPhases(block);
+				if (phases && phases.length > 0) {
+					if (isIntervalTimerRunning) {
+						skipIntervalPhase();
+					} else {
+						restartIntervalPhase();
+					}
+					return;
+				}
 				const nextRound = Math.min((block.rounds ?? 1), getCurrentRound(block) + 1);
 				roundByBlock = { ...roundByBlock, [block.id]: nextRound };
 				return;
@@ -1571,6 +1898,19 @@
 			isTimerRunning = Boolean(savedState.isTimerRunning) && timerRemainingSeconds > 0;
 			intraSetRest = sanitizeSavedRestState(savedState.intraSetRest, blockIDs);
 			isIntraSetRestRunning = Boolean(savedState.isIntraSetRestRunning) && Boolean(intraSetRest);
+			const block = routine.blocks[normalizedIndex];
+			const phases = resolveIntervalPhases(block);
+			if (typeof savedState.activeIntervalPhaseIdx === 'number') {
+				activeIntervalPhaseIdx = savedState.activeIntervalPhaseIdx;
+			}
+			if (typeof savedState.intervalPhaseSecondsLeft === 'number') {
+				intervalPhaseSecondsLeft = savedState.intervalPhaseSecondsLeft;
+			} else if (phases && phases.length > 0) {
+				intervalPhaseSecondsLeft = phases[0].durationSeconds;
+			}
+			if (typeof savedState.intervalSoundEnabled === 'boolean') {
+				intervalSoundEnabled = savedState.intervalSoundEnabled;
+			}
 			if (savedBackendSessionID) {
 				void restorePersistedSession(savedBackendSessionID).catch(() => {
 					sessionError = 'Unable to restore workout session.';
@@ -1660,6 +2000,48 @@
 	});
 
 	$effect(() => {
+		if (!routine || !currentBlock) return;
+		if (!isIntervalTimerRunning) return;
+		if (currentBlock.node_type_slug !== 'repeat') return;
+		if (!currentIntervalPhases || currentIntervalPhases.length === 0) return;
+
+		const intervalTimer = setInterval(() => {
+			if (intervalPhaseSecondsLeft <= 1) {
+				const block = currentBlock;
+				if (!block) return;
+				const currentRound = getCurrentRound(block);
+
+				if (activeIntervalPhaseIdx < currentIntervalPhases.length - 1) {
+					activeIntervalPhaseIdx += 1;
+					intervalPhaseSecondsLeft = currentIntervalPhases[activeIntervalPhaseIdx].durationSeconds;
+					playAudioTone(currentIntervalPhases[activeIntervalPhaseIdx].type);
+				} else {
+					void logIntervalRound(block, currentRound);
+					if (currentRound >= (block.rounds ?? 1)) {
+						playAudioTone('complete');
+						isIntervalTimerRunning = false;
+						completeCurrentBlock(block, `${block.rounds ?? 1} rounds completed`);
+					} else {
+						roundByBlock = { ...roundByBlock, [block.id]: currentRound + 1 };
+						activeIntervalPhaseIdx = 0;
+						intervalPhaseSecondsLeft = currentIntervalPhases[0].durationSeconds;
+						playAudioTone(currentIntervalPhases[0].type);
+					}
+				}
+				return;
+			}
+
+			if (intervalPhaseSecondsLeft <= 4 && intervalPhaseSecondsLeft >= 2) {
+				playAudioTone('warning');
+			}
+
+			intervalPhaseSecondsLeft -= 1;
+		}, 1000);
+
+		return () => clearInterval(intervalTimer);
+	});
+
+	$effect(() => {
 		if (!browser || !routine || !localSessionKey || !hasRestoredSession) return;
 
 		const state: PersistedPlayerState = {
@@ -1682,6 +2064,10 @@
 			activityEntries,
 			timerRemainingSeconds,
 			isTimerRunning,
+			isIntervalTimerRunning: false,
+			activeIntervalPhaseIdx,
+			intervalPhaseSecondsLeft,
+			intervalSoundEnabled,
 			intraSetRest,
 			isIntraSetRestRunning
 		};
@@ -1772,8 +2158,17 @@
 					>
 						← Back to sections
 					</button>
-					<h1 class="mt-3 text-3xl font-bold tracking-tight text-on-background">Adjust Load Overrides</h1>
-					<p class="mt-2 text-sm text-on-surface-variant">Review and customize your target loads for this session before starting.</p>
+					<div class="mt-3 flex items-center gap-2">
+						{#if previewSection}
+							<span class="rounded bg-surface-container-high px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-tertiary">
+								{previewSection.kind} · {previewSection.title}
+							</span>
+						{/if}
+					</div>
+					<h1 class="mt-2 text-3xl font-bold tracking-tight text-on-background">Adjust Load Overrides</h1>
+					<p class="mt-2 text-sm text-on-surface-variant">
+						Customize starting loads for weighted progression exercises. Remaining exercises (supersets, bodyweight, timed intervals) will execute as scheduled.
+					</p>
 				</div>
 
 				<div class="space-y-6">
@@ -2724,123 +3119,477 @@
 							</div>
 						</div>
 					{:else if currentBlock.node_type_slug === 'repeat'}
-						<div class="space-y-6">
-							<div class="grid gap-4 md:grid-cols-3">
-								<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
-									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Current round</p>
-									<p class="mt-2 text-5xl font-bold text-primary">{currentRepeatRound}<span class="ml-1 text-xl font-light text-on-surface-variant">/ {currentBlock.rounds}</span></p>
-								</div>
-								<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
-									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Prescription</p>
-									<p class="mt-2 text-2xl font-bold text-on-surface">{currentBlock.reps}</p>
-								</div>
-								<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
-									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Flow</p>
-									<p class="mt-2 text-lg font-semibold text-on-surface">Stay moving, short transitions</p>
-								</div>
-							</div>
-
-							<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
-								<p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Round completion</p>
-								<div class="mt-4 flex gap-2">
-									{#each Array(currentBlock.rounds ?? 0) as _, index}
-										<div class={`h-2 flex-1 rounded-full ${index < currentRepeatRound - 1 ? 'bg-primary' : 'bg-surface-variant'}`}></div>
-									{/each}
-								</div>
-							</div>
-
-							<div class="grid gap-4 rounded-xl border border-white/5 bg-surface-container-low p-5 md:grid-cols-4">
-								<div>
-									<label for="repeat-actual-reps" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
-									<input
-										id="repeat-actual-reps"
-										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-										placeholder={currentBlock.reps ?? 'e.g. 12/12/10'}
-										value={actualRepsByBlock[currentBlock.id] ?? ''}
-										oninput={(event) => {
-											actualRepsByBlock = {
-												...actualRepsByBlock,
-												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-											};
-										}}
-									/>
-								</div>
-								<div>
-									<label for="repeat-actual-load" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual load</label>
-									<input
-										id="repeat-actual-load"
-										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-										placeholder="Optional"
-										value={actualLoadByBlock[currentBlock.id] ?? ''}
-										oninput={(event) => {
-											actualLoadByBlock = {
-												...actualLoadByBlock,
-												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-											};
-										}}
-									/>
-								</div>
-								<div>
-									<label for="repeat-actual-rpe" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RPE</label>
-									<input
-										id="repeat-actual-rpe"
-										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-										placeholder="Optional"
-										value={actualRPEByBlock[currentBlock.id] ?? ''}
-										oninput={(event) => {
-											actualRPEByBlock = {
-												...actualRPEByBlock,
-												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-											};
-									}}
-								/>
-							</div>
-								<div>
-									<label for="repeat-actual-rir" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RIR</label>
-									<input
-										id="repeat-actual-rir"
-										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-										placeholder="Optional"
-										value={actualRIRByBlock[currentBlock.id] ?? ''}
-										oninput={(event) => {
-											actualRIRByBlock = {
-												...actualRIRByBlock,
-												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-											};
-										}}
-									/>
-								</div>
-							</div>
-
-							{#if getLastSessionLogs(currentBlock).length > 0}
-								<div class="rounded-xl border border-primary/20 bg-primary/5 p-5">
-									<div class="mb-3 flex items-center justify-between">
-										<span class="text-[10px] font-bold uppercase tracking-[0.18em] text-primary font-headline">Previous performance</span>
-										<span class="text-[10px] font-medium text-on-surface-variant">Last session</span>
+						{#if currentIntervalPhases && currentIntervalPhases.length > 0}
+							<!-- INTERACTIVE INTERVAL TIMER (JUMP ROPE / HIIT) -->
+							<div class="space-y-6">
+								<!-- ROUND HEADER & SOUND TOGGLE -->
+								<div class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/5 bg-surface-container-low p-5">
+									<div class="flex items-center gap-3">
+										<div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
+											<span class="material-symbols-outlined">timer</span>
+										</div>
+										<div>
+											<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant">Interval Circuit</p>
+											<h3 class="text-xl font-black text-on-surface">
+												Round {currentRepeatRound} <span class="text-sm font-normal text-on-surface-variant">/ {currentBlock.rounds ?? 1}</span>
+											</h3>
+										</div>
 									</div>
-									<div class="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
-										{#each getLastSessionLogs(currentBlock) as log}
-											<div class="rounded-lg border border-white/5 bg-surface-container-lowest p-3 text-center">
-												<p class="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">Round {log.set_index}</p>
-												<p class="mt-1 text-base font-bold text-on-surface">
-													{log.actual_reps || '-'} <span class="text-xs font-normal text-on-surface-variant">reps</span>
-												</p>
-												{#if log.actual_load}
-													<p class="mt-0.5 text-xs font-semibold text-secondary">{log.actual_load}</p>
-												{/if}
-												{#if log.actual_rpe || log.actual_rir}
-													<p class="mt-0.5 text-[10px] text-on-surface-variant/70">
-														{log.actual_rpe ? `RPE ${log.actual_rpe}` : ''}
-														{log.actual_rpe && log.actual_rir ? ' • ' : ''}
-														{log.actual_rir ? `RIR ${log.actual_rir}` : ''}
-													</p>
-												{/if}
-											</div>
+
+									<div class="flex items-center gap-2">
+										<button
+											type="button"
+											class={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors border ${
+												intervalSoundEnabled
+													? 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/20'
+													: 'border-white/10 bg-surface-container text-on-surface-variant hover:text-on-surface'
+											}`}
+											onclick={() => {
+												intervalSoundEnabled = !intervalSoundEnabled;
+												if (intervalSoundEnabled) {
+													playAudioTone('work');
+												}
+											}}
+											title={intervalSoundEnabled ? 'Sound cues ON' : 'Sound cues MUTED'}
+										>
+											<span class="material-symbols-outlined text-base">
+												{intervalSoundEnabled ? 'volume_up' : 'volume_off'}
+											</span>
+											<span>{intervalSoundEnabled ? 'Sound ON' : 'Muted'}</span>
+										</button>
+									</div>
+								</div>
+
+								<!-- ROUND PROGRESSION BAR -->
+								<div class="space-y-2 rounded-xl border border-white/5 bg-surface-container-low p-4">
+									<div class="flex items-center justify-between text-xs">
+										<span class="font-bold uppercase tracking-wider text-on-surface-variant">Round Progression</span>
+										<span class="font-semibold text-primary">
+											{Math.round(((currentRepeatRound - 1) / (currentBlock.rounds || 1)) * 100)}% Complete
+										</span>
+									</div>
+									<div class="flex gap-1.5">
+										{#each Array(currentBlock.rounds ?? 0) as _, index}
+											<div
+												class={`h-2 flex-1 rounded-full transition-all duration-300 ${
+													index < currentRepeatRound - 1
+														? 'bg-primary'
+														: index === currentRepeatRound - 1
+															? isIntervalTimerRunning
+																? 'bg-primary animate-pulse'
+																: 'bg-primary/50'
+															: 'bg-surface-variant'
+												}`}
+											></div>
 										{/each}
 									</div>
 								</div>
-							{/if}
-						</div>
+
+								<!-- MAIN INTERVAL HUD CARD -->
+								{#if activeIntervalPhase}
+									<div
+										class={`relative overflow-hidden rounded-3xl border p-8 text-center transition-all duration-500 shadow-2xl ${
+											activeIntervalPhase.type === 'sprint'
+												? 'border-rose-500/40 bg-gradient-to-b from-rose-950/40 via-surface-container-low to-surface-container-low shadow-rose-950/30'
+												: activeIntervalPhase.type === 'rest'
+													? 'border-zinc-500/30 bg-gradient-to-b from-zinc-900/40 via-surface-container-low to-surface-container-low'
+													: 'border-emerald-500/40 bg-gradient-to-b from-emerald-950/40 via-surface-container-low to-surface-container-low shadow-emerald-950/30'
+										}`}
+									>
+										<!-- Background glow -->
+										<div
+											class={`pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-48 w-80 rounded-full blur-3xl opacity-20 ${
+												activeIntervalPhase.type === 'sprint'
+													? 'bg-rose-500'
+													: activeIntervalPhase.type === 'rest'
+														? 'bg-zinc-400'
+														: 'bg-emerald-500'
+											}`}
+										></div>
+
+										<!-- Phase Type Badge -->
+										<div
+											class={`relative mb-4 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-black uppercase tracking-[0.22em] border shadow-lg ${
+												activeIntervalPhase.type === 'sprint'
+													? 'border-rose-500/60 bg-rose-500/20 text-rose-300 animate-pulse'
+													: activeIntervalPhase.type === 'rest'
+														? 'border-zinc-500/40 bg-zinc-800 text-zinc-300'
+														: 'border-emerald-500/60 bg-emerald-500/20 text-emerald-300'
+											}`}
+										>
+											<span class="material-symbols-outlined text-sm">
+												{activeIntervalPhase.type === 'sprint'
+													? 'bolt'
+													: activeIntervalPhase.type === 'rest'
+														? 'self_improvement'
+														: 'directions_run'}
+											</span>
+											<span>{activeIntervalPhase.name}</span>
+										</div>
+
+										<!-- GIANT DIGITAL COUNTDOWN DIGITS -->
+										<div class="relative my-4">
+											<div
+												class={`font-mono text-7xl sm:text-8xl md:text-9xl font-black tracking-tighter tabular-nums ${
+													activeIntervalPhase.type === 'sprint'
+														? 'text-rose-400 drop-shadow-[0_0_24px_rgba(244,63,94,0.35)]'
+														: activeIntervalPhase.type === 'rest'
+															? 'text-zinc-300'
+															: 'text-emerald-400 drop-shadow-[0_0_24px_rgba(52,211,153,0.35)]'
+												}`}
+											>
+												{String(intervalPhaseSecondsLeft).padStart(2, '0')}
+												<span class="text-2xl sm:text-3xl font-normal text-on-surface-variant/70">s</span>
+											</div>
+										</div>
+
+										<!-- PHASE PROGRESS BAR -->
+										<div class="relative mx-auto mt-6 max-w-md">
+											<div class="h-2.5 w-full overflow-hidden rounded-full bg-surface-container-highest">
+												<div
+													class={`h-full transition-all duration-300 rounded-full ${
+														activeIntervalPhase.type === 'sprint'
+															? 'bg-rose-500'
+															: activeIntervalPhase.type === 'rest'
+																? 'bg-zinc-400'
+																: 'bg-emerald-500'
+													}`}
+													style={`width: ${Math.min(100, Math.max(0, (intervalPhaseSecondsLeft / activeIntervalPhase.durationSeconds) * 100))}%`}
+												></div>
+											</div>
+										</div>
+
+										<!-- UP NEXT PREVIEW -->
+										{#if nextIntervalPhase}
+											<div class="mt-6 inline-flex items-center gap-2 rounded-full border border-white/5 bg-surface-container-lowest/80 px-4 py-1.5 text-xs text-on-surface-variant">
+												<span class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/70">Up next:</span>
+												<span class="font-bold text-on-surface">{nextIntervalPhase.name}</span>
+												<span class="text-[11px] opacity-60">({nextIntervalPhase.durationSeconds}s)</span>
+											</div>
+										{/if}
+
+										<!-- HUD INTERACTIVE CONTROLS -->
+										<div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+											<!-- Restart Phase -->
+											<button
+												type="button"
+												class="flex items-center gap-1.5 rounded-xl border border-white/10 bg-surface-container px-4 py-3 text-xs font-bold text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface active:scale-95"
+												onclick={restartIntervalPhase}
+												title="Restart phase or return to previous"
+											>
+												<span class="material-symbols-outlined text-base">replay</span>
+												<span>Restart</span>
+											</button>
+
+											<!-- BIG PLAY / PAUSE BUTTON -->
+											<button
+												type="button"
+												class={`flex items-center gap-2.5 rounded-2xl px-8 py-3.5 text-sm font-black uppercase tracking-wider shadow-lg transition-all active:scale-95 ${
+													isIntervalTimerRunning
+														? 'border border-amber-500/40 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30'
+														: 'border border-primary bg-primary text-on-primary hover:brightness-110 shadow-primary/25'
+												}`}
+												onclick={toggleIntervalTimer}
+											>
+												<span class="material-symbols-outlined text-xl">
+													{isIntervalTimerRunning ? 'pause' : 'play_arrow'}
+												</span>
+												<span>
+													{isIntervalTimerRunning
+														? 'Pause Timer'
+														: intervalPhaseSecondsLeft < activeIntervalPhase.durationSeconds
+															? 'Resume'
+															: 'Start Intervals'}
+												</span>
+											</button>
+
+											<!-- Skip Phase -->
+											<button
+												type="button"
+												class="flex items-center gap-1.5 rounded-xl border border-white/10 bg-surface-container px-4 py-3 text-xs font-bold text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface active:scale-95"
+												onclick={skipIntervalPhase}
+												title="Skip to next phase or round"
+											>
+												<span>Skip Phase</span>
+												<span class="material-symbols-outlined text-base">skip_next</span>
+											</button>
+										</div>
+									</div>
+								{/if}
+
+								<!-- PHASE TIMELINE CHIPS -->
+								<div class="grid gap-3 sm:grid-cols-3">
+									{#each currentIntervalPhases as phase, pIndex}
+										<div
+											class={`flex items-center justify-between rounded-xl border p-3.5 transition-all ${
+												pIndex === activeIntervalPhaseIdx
+													? phase.type === 'sprint'
+														? 'border-rose-500/60 bg-rose-950/30 shadow-md'
+														: phase.type === 'rest'
+															? 'border-zinc-400 bg-zinc-800/40 shadow-md'
+															: 'border-emerald-500/60 bg-emerald-950/30 shadow-md'
+													: pIndex < activeIntervalPhaseIdx
+														? 'border-white/5 bg-surface-container-lowest opacity-50'
+														: 'border-white/5 bg-surface-container-low opacity-75'
+											}`}
+										>
+											<div class="flex items-center gap-2.5">
+												<div
+													class={`h-2.5 w-2.5 rounded-full ${
+														phase.type === 'sprint'
+															? 'bg-rose-500'
+															: phase.type === 'rest'
+																? 'bg-zinc-400'
+																: 'bg-emerald-500'
+													}`}
+												></div>
+												<div>
+													<p class="text-xs font-bold text-on-surface">{phase.name}</p>
+													<p class="text-[10px] text-on-surface-variant">{phase.durationSeconds} seconds</p>
+												</div>
+											</div>
+											{#if pIndex === activeIntervalPhaseIdx}
+												<span class="rounded-md bg-white/10 px-1.5 py-0.5 text-[10px] font-black uppercase text-on-surface">Active</span>
+											{:else if pIndex < activeIntervalPhaseIdx}
+												<span class="material-symbols-outlined text-sm text-primary">check</span>
+											{/if}
+										</div>
+									{/each}
+								</div>
+
+								<!-- MANUAL LOGGING TOGGLE & DRAWER -->
+								<div class="rounded-xl border border-white/5 bg-surface-container-low p-4">
+									<button
+										type="button"
+										class="flex w-full items-center justify-between text-left text-xs font-bold text-on-surface-variant hover:text-on-surface"
+										onclick={() => {
+											showIntervalManualInputs = !showIntervalManualInputs;
+										}}
+									>
+										<span class="flex items-center gap-2">
+											<span class="material-symbols-outlined text-base">tune</span>
+											<span>Manual metrics & notes (Optional)</span>
+										</span>
+										<span class="material-symbols-outlined text-base">
+											{showIntervalManualInputs ? 'expand_less' : 'expand_more'}
+										</span>
+									</button>
+
+									{#if showIntervalManualInputs}
+										<div class="mt-4 grid gap-4 border-t border-white/5 pt-4 md:grid-cols-4">
+											<div>
+												<label for="repeat-actual-reps" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps/jumps</label>
+												<input
+													id="repeat-actual-reps"
+													class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+													placeholder={currentBlock.reps ?? 'e.g. 120 jumps'}
+													value={actualRepsByBlock[currentBlock.id] ?? ''}
+													oninput={(event) => {
+														actualRepsByBlock = {
+															...actualRepsByBlock,
+															[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+														};
+													}}
+												/>
+											</div>
+											<div>
+												<label for="repeat-actual-load" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual load / weight</label>
+												<input
+													id="repeat-actual-load"
+													class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+													placeholder="e.g. weighted rope / vest"
+													value={actualLoadByBlock[currentBlock.id] ?? ''}
+													oninput={(event) => {
+														actualLoadByBlock = {
+															...actualLoadByBlock,
+															[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+														};
+													}}
+												/>
+											</div>
+											<div>
+												<label for="repeat-actual-rpe" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RPE</label>
+												<input
+													id="repeat-actual-rpe"
+													class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+													placeholder="1-10"
+													value={actualRPEByBlock[currentBlock.id] ?? ''}
+													oninput={(event) => {
+														actualRPEByBlock = {
+															...actualRPEByBlock,
+															[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+														};
+													}}
+												/>
+											</div>
+											<div>
+												<label for="repeat-actual-rir" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RIR</label>
+												<input
+													id="repeat-actual-rir"
+													class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+													placeholder="0-4"
+													value={actualRIRByBlock[currentBlock.id] ?? ''}
+													oninput={(event) => {
+														actualRIRByBlock = {
+															...actualRIRByBlock,
+															[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+														};
+													}}
+												/>
+											</div>
+										</div>
+									{/if}
+								</div>
+
+								{#if getLastSessionLogs(currentBlock).length > 0}
+									<div class="rounded-xl border border-primary/20 bg-primary/5 p-5">
+										<div class="mb-3 flex items-center justify-between">
+											<span class="text-[10px] font-bold uppercase tracking-[0.18em] text-primary font-headline">Previous performance</span>
+											<span class="text-[10px] font-medium text-on-surface-variant">Last session</span>
+										</div>
+										<div class="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
+											{#each getLastSessionLogs(currentBlock) as log}
+												<div class="rounded-lg border border-white/5 bg-surface-container-lowest p-3 text-center">
+													<p class="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">Round {log.set_index}</p>
+													<p class="mt-1 text-base font-bold text-on-surface">
+														{log.actual_reps || '-'} <span class="text-xs font-normal text-on-surface-variant">reps</span>
+													</p>
+													{#if log.actual_load}
+														<p class="mt-0.5 text-xs font-semibold text-secondary">{log.actual_load}</p>
+													{/if}
+													{#if log.actual_rpe || log.actual_rir}
+														<p class="mt-0.5 text-[10px] text-on-surface-variant/70">
+															{log.actual_rpe ? `RPE ${log.actual_rpe}` : ''}
+															{log.actual_rpe && log.actual_rir ? ' • ' : ''}
+															{log.actual_rir ? `RIR ${log.actual_rir}` : ''}
+														</p>
+													{/if}
+												</div>
+											{/each}
+										</div>
+									</div>
+								{/if}
+							</div>
+						{:else}
+							<!-- STANDARD REPEAT BLOCK (NON-INTERVAL) -->
+							<div class="space-y-6">
+								<div class="grid gap-4 md:grid-cols-3">
+									<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
+										<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Current round</p>
+										<p class="mt-2 text-5xl font-bold text-primary">{currentRepeatRound}<span class="ml-1 text-xl font-light text-on-surface-variant">/ {currentBlock.rounds}</span></p>
+									</div>
+									<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
+										<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Prescription</p>
+										<p class="mt-2 text-2xl font-bold text-on-surface">{currentBlock.reps}</p>
+									</div>
+									<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
+										<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Flow</p>
+										<p class="mt-2 text-lg font-semibold text-on-surface">Stay moving, short transitions</p>
+									</div>
+								</div>
+
+								<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
+									<p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Round completion</p>
+									<div class="mt-4 flex gap-2">
+										{#each Array(currentBlock.rounds ?? 0) as _, index}
+											<div class={`h-2 flex-1 rounded-full ${index < currentRepeatRound - 1 ? 'bg-primary' : 'bg-surface-variant'}`}></div>
+										{/each}
+									</div>
+								</div>
+
+								<div class="grid gap-4 rounded-xl border border-white/5 bg-surface-container-low p-5 md:grid-cols-4">
+									<div>
+										<label for="repeat-actual-reps" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
+										<input
+											id="repeat-actual-reps"
+											class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+											placeholder={currentBlock.reps ?? 'e.g. 12/12/10'}
+											value={actualRepsByBlock[currentBlock.id] ?? ''}
+											oninput={(event) => {
+												actualRepsByBlock = {
+													...actualRepsByBlock,
+													[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+												};
+											}}
+										/>
+									</div>
+									<div>
+										<label for="repeat-actual-load" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual load</label>
+										<input
+											id="repeat-actual-load"
+											class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+											placeholder="Optional"
+											value={actualLoadByBlock[currentBlock.id] ?? ''}
+											oninput={(event) => {
+												actualLoadByBlock = {
+													...actualLoadByBlock,
+													[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+												};
+											}}
+										/>
+									</div>
+									<div>
+										<label for="repeat-actual-rpe" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RPE</label>
+										<input
+											id="repeat-actual-rpe"
+											class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+											placeholder="Optional"
+											value={actualRPEByBlock[currentBlock.id] ?? ''}
+											oninput={(event) => {
+												actualRPEByBlock = {
+													...actualRPEByBlock,
+													[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+												};
+										}}
+									/>
+								</div>
+									<div>
+										<label for="repeat-actual-rir" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RIR</label>
+										<input
+											id="repeat-actual-rir"
+											class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+											placeholder="Optional"
+											value={actualRIRByBlock[currentBlock.id] ?? ''}
+											oninput={(event) => {
+												actualRIRByBlock = {
+													...actualRIRByBlock,
+													[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+												};
+											}}
+										/>
+									</div>
+								</div>
+
+								{#if getLastSessionLogs(currentBlock).length > 0}
+									<div class="rounded-xl border border-primary/20 bg-primary/5 p-5">
+										<div class="mb-3 flex items-center justify-between">
+											<span class="text-[10px] font-bold uppercase tracking-[0.18em] text-primary font-headline">Previous performance</span>
+											<span class="text-[10px] font-medium text-on-surface-variant">Last session</span>
+										</div>
+										<div class="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
+											{#each getLastSessionLogs(currentBlock) as log}
+												<div class="rounded-lg border border-white/5 bg-surface-container-lowest p-3 text-center">
+													<p class="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">Round {log.set_index}</p>
+													<p class="mt-1 text-base font-bold text-on-surface">
+														{log.actual_reps || '-'} <span class="text-xs font-normal text-on-surface-variant">reps</span>
+													</p>
+													{#if log.actual_load}
+														<p class="mt-0.5 text-xs font-semibold text-secondary">{log.actual_load}</p>
+													{/if}
+													{#if log.actual_rpe || log.actual_rir}
+														<p class="mt-0.5 text-[10px] text-on-surface-variant/70">
+															{log.actual_rpe ? `RPE ${log.actual_rpe}` : ''}
+															{log.actual_rpe && log.actual_rir ? ' • ' : ''}
+															{log.actual_rir ? `RIR ${log.actual_rir}` : ''}
+														</p>
+													{/if}
+												</div>
+											{/each}
+										</div>
+									</div>
+								{/if}
+							</div>
+						{/if}
 					{:else}
 						<div class="rounded-xl border border-white/5 bg-surface-container-low p-6">
 							<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Section objective</p>

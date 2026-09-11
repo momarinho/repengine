@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { browser } from '$app/environment';
 	import { enhance } from '$app/forms';
 	import type { PageData } from './$types';
@@ -23,7 +24,8 @@
 		}
 	}
 
-	let trainingMaxes = $state<TrainingMax[]>((data.trainingMaxes as TrainingMax[]) ?? []);
+	const initialTMs = untrack(() => (data.trainingMaxes as TrainingMax[]) ?? []);
+	let trainingMaxes = $state<TrainingMax[]>(initialTMs);
 	let isSaving = $state(false);
 	let saveError = $state<string | null>(null);
 
