@@ -19,6 +19,9 @@ Here is a quick look at the RepEngine interface in action:
 | ![Dashboard](docs/screenshots/1-dashboard.png) | ![Block-Based Editor](docs/screenshots/2-editor.png) |
 | ⚡ **Active Workout Player** | 📊 **Progression Analytics** |
 | ![Active Workout Player](docs/screenshots/3-player.png) | ![Progression Analytics](docs/screenshots/4-history-analytics.png) |
+| ⏱️ **Hands-Free Interval Timer (Web Audio)** | |
+| ![Hands-Free Interval Timer](docs/screenshots/5-interval-timer.png) | |
+
 
 ---
 
@@ -65,12 +68,17 @@ This project is built using production-grade patterns, focusing on security, con
 *   **Secure Authentication**: Custom stateless JWT authentication with issuer/audience claims validation, secure-only cookies, token-revocation storage upon logout, and brute-force protection through rate limiters on registration/login endpoints.
 *   **Least Privilege Execution**: Final production Docker containers drop root privileges and run under a minimal, dedicated `appuser` (using Alpine Linux), minimizing attack surfaces in host environments.
 
+### ⏱️ 7. Real-Time Web Audio Interval Engine
+*   **Zero-Dependency Synthesizer**: Built a native Web Audio API sound generator that dynamically creates audio cues (3-2-1 countdown beeps at 600Hz, sprint chimes, rest alerts, and victory chords) without external audio asset downloads or playback latency.
+*   **Hands-Free Multi-Phase Execution**: Automatically parses structured interval protocols (such as 30s base pace / 15s all-out sprint / 15s rest) or dynamic regex intervals (`30/15/15`, Tabata `20/10`), cycling through phases, announcing phase switches, auto-logging completed rounds, and progressing seamlessly hands-free.
+*   **High-Visibility HUD**: Features an interactive interval dashboard with animated glowing phase badges, giant tabular countdown typography, round progress pills, audio toggle controls, and quick-skip/pause capabilities.
+
 ---
 
 ## 🛠️ Tech Stack
 
 *   **Backend**: Go (v1.25), Fiber framework, `pgx/pgxpool` (native PostgreSQL driver), JWT, `slog` (structured logging), Prometheus metrics.
-*   **Frontend**: SvelteKit (Svelte 5 runes), TypeScript, TailwindCSS, `localStorage` local runtime state.
+*   **Frontend**: SvelteKit (Svelte 5 runes), TypeScript, TailwindCSS, Web Audio API, `localStorage` local runtime state.
 *   **Database**: PostgreSQL 16.
 *   **CI/CD & DevOps**: GitHub Actions (Linting, Tests, Docker Build & Push), Docker Compose, Nginx (TLS Termination).
 
@@ -81,6 +89,8 @@ This project is built using production-grade patterns, focusing on security, con
 ### Implemented
 *   **Block-Based Editor**: Contextual block insertion supporting linear progression, wave loading, repeats, rest intervals, and timed exercises.
 *   **Active Workout Player**: Real-time section execution, interactive timer/rest tracker, and set-by-set input logging (Load, Reps, RPE, RIR).
+*   **Hands-Free Interval Engine**: Automated multi-phase interval player with native Web Audio sound cues (3-2-1 warnings, sprint chimes, rest cues) and hands-free round progression for conditioning workouts (Jump Rope, HIIT, Tabata).
+*   **Pre-Built Hybrid Templates**: Seeded official templates including GZCLP adapted for Calisthenics & Barbell Hybrid with dedicated jump rope conditioning and linear progression.
 *   **Smart Progression Suggestions**: Real-time suggestion engine adjusting target loads/reps for linear and wave progression nodes based on completed set difficulty.
 *   **Version History & Restore**: Automatic serialization of workflow snapshots with restore capabilities and rollback mechanisms.
 *   **Account Settings**: Password resets, email/profile updates, and complete session invalidation on credential updates.

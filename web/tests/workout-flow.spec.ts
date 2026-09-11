@@ -177,14 +177,17 @@ test.describe('RepEngine Workout Lifecycle E2E', () => {
 
 		// Click "Start Section" to advance into the jump rope block
 		const startSectionBtn = page.locator('button:has-text("Start Section")');
-		if (await startSectionBtn.isVisible()) {
-			await startSectionBtn.click();
-		}
+		await expect(startSectionBtn).toBeVisible({ timeout: 5000 });
+		await startSectionBtn.click();
 
 		// 7. Check Interval Timer HUD
 		await expect(page.locator('text=Interval Circuit')).toBeVisible();
 		await expect(page.locator('text=Round 1').first()).toBeVisible();
 		await expect(page.locator('text=50% Moderate Pace').first()).toBeVisible();
+
+		// Scroll the timer into view for a beautiful screenshot
+		const timerCard = page.locator('text=50% Moderate Pace').first();
+		await timerCard.scrollIntoViewIfNeeded();
 
 		// 8. Capture screenshot of the Interval Timer HUD for documentation
 		await page.screenshot({ path: '../docs/screenshots/5-interval-timer.png' });
