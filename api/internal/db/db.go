@@ -80,7 +80,7 @@ func SeedNodeTypes(ctx context.Context) error {
 		schema                        string
 	}{
 		{"exercise", "Exercise", "A single exercise node", "dumbbell",
-			`{"exercise_name": "", "sets": 3, "reps": "", "rest_seconds": 90, "notes": ""}`},
+			`{"exercise_name": "", "sets": 3, "reps": "", "rest_seconds": 90, "notes": "", "load_value": null, "load_unit": "kg"}`},
 		{"exercise_timed", "Timed Exercise", "Exercise with duration", "timer",
 			`{"exercise_name": "", "duration": 30}`},
 		{
@@ -109,7 +109,11 @@ func SeedNodeTypes(ctx context.Context) error {
 				"week_5_rpe": "",
 				"week_6_reps": "",
 				"week_6_intensity": "",
-				"week_6_rpe": ""
+				"week_6_rpe": "",
+				"week": "",
+				"intensity_percent": "",
+				"rpe": "",
+				"reps": ""
 			}`,
 		},
 		{
@@ -129,7 +133,9 @@ func SeedNodeTypes(ctx context.Context) error {
 				"fail_sequence": "",
 				"reset_percent": 0.85,
 				"rounding_precision": 2.5,
-				"notes": ""
+				"notes": "",
+				"deload_weeks": null,
+				"deload_percent": null
 			}`,
 		},
 		{
@@ -157,14 +163,27 @@ func SeedNodeTypes(ctx context.Context) error {
 				"notes": ""
 			}`,
 		},
-		{"repeat", "Repeat", "Repeat block", "repeat", `{"times": 3}`},
+		{
+			"repeat",
+			"Repeat",
+			"Repeat block",
+			"repeat",
+			`{
+				"title": "",
+				"times": 3,
+				"rounds": 3,
+				"reps": "",
+				"interval_phases": []
+			}`,
+		},
 		{"rest", "Rest", "Rest period between sets", "pause", `{"duration": 30}`},
 		{"section", "Section", "Logical section or training day divider", "folder",
 			`{
 				"title": "Day 1",
 				"subtitle": "",
 				"kind": "day",
-				"collapsed": false
+				"collapsed": false,
+				"label": ""
 			}`},
 	}
 

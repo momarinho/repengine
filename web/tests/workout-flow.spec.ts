@@ -80,9 +80,10 @@ test.describe('RepEngine Workout Lifecycle E2E', () => {
 		// 14. Should be on the play page
 		await page.waitForURL(/\/workflows\/\d+\/play/);
 
-		// Fill actual load to 102.5 and actual RPE to 8
-		await page.fill('#actual-load', '102.5');
-		await page.fill('#actual-rpe', '8');
+		// Fill actual reps, load and RPE
+		await page.fill('#actual-reps', '5');
+		await page.fill('#actual-load', '100');
+		await page.fill('#actual-rpe', '7.5');
 		await page.screenshot({ path: '../docs/screenshots/3-player.png' });
 
 		// 15. The player should auto-start or show sections.
@@ -93,15 +94,16 @@ test.describe('RepEngine Workout Lifecycle E2E', () => {
 			if (await skipRestBtn.isVisible()) {
 				await skipRestBtn.click();
 				await page.waitForTimeout(200);
-				// Refill load and RPE after skipping rest to ensure it persists
-				await page.fill('#actual-load', '102.5');
-				await page.fill('#actual-rpe', '8');
+				// Refill reps, load and RPE after skipping rest to ensure it persists
+				await page.fill('#actual-reps', '5');
+				await page.fill('#actual-load', '100');
+				await page.fill('#actual-rpe', '7.5');
 			}
 
 			const primaryBtn = page.locator('button:has-text("Log Set")');
 			await expect(primaryBtn).toBeVisible();
 			await primaryBtn.click();
-			await page.waitForTimeout(500); // wait for set log animation/transition
+			await page.waitForTimeout(400); // wait for set log animation/transition
 		}
 
 		// 16. For the 3rd set, we skip the rest timer again and click "Complete Exercise".
@@ -109,8 +111,9 @@ test.describe('RepEngine Workout Lifecycle E2E', () => {
 		if (await skipRestBtn.isVisible()) {
 			await skipRestBtn.click();
 			await page.waitForTimeout(200);
-			await page.fill('#actual-load', '102.5');
-			await page.fill('#actual-rpe', '8');
+			await page.fill('#actual-reps', '5');
+			await page.fill('#actual-load', '100');
+			await page.fill('#actual-rpe', '7.5');
 		}
 
 		const completeExerciseBtn = page.locator('button:has-text("Complete Exercise")');
@@ -124,14 +127,68 @@ test.describe('RepEngine Workout Lifecycle E2E', () => {
 		// 18. Click "View history" link
 		await page.click('a:has-text("View history")');
 
-		// 19. Should be on the history page and see the analytics chart
+		// 19. Should be on the history page
 		await page.waitForURL(/\/workflows\/\d+\/history/);
 		await expect(page.locator('h1')).toContainText('E2E Test Routine history');
 
 		// Assert that the load and routine name are present in the history details
 		await expect(page.locator('text=E2E Test Routine').first()).toBeVisible();
-		await expect(page.locator('text=102.5').first()).toBeVisible();
+		await expect(page.locator('text=100').first()).toBeVisible();
+
+		// 20. Run a 2nd session so Progression Analytics SVG chart has >= 2 data points
+		await page.click('a:has-text("Open player")');
+		await page.waitForURL(/\/workflows\/\d+\/play/);
+
+		const restartBtn = page.locator('button:has-text("Restart section")');
+		if (await restartBtn.isVisible()) {
+			await restartBtn.click();
+			await page.waitForTimeout(300);
+		}
+
+		await page.fill('#actual-reps', '5');
+		await page.fill('#actual-load', '105');
+		await page.fill('#actual-rpe', '8.5');
+
+		for (let i = 0; i < 2; i++) {
+			const skipBtn = page.locator('button:has-text("Skip Rest")');
+			if (await skipBtn.isVisible()) {
+				await skipBtn.click();
+				await page.waitForTimeout(200);
+				await page.fill('#actual-reps', '5');
+				await page.fill('#actual-load', '105');
+				await page.fill('#actual-rpe', '8.5');
+			}
+			const primaryBtn = page.locator('button:has-text("Log Set")');
+			await expect(primaryBtn).toBeVisible();
+			await primaryBtn.click();
+			await page.waitForTimeout(400);
+		}
+
+		const skipBtnFinal = page.locator('button:has-text("Skip Rest")');
+		if (await skipBtnFinal.isVisible()) {
+			await skipBtnFinal.click();
+			await page.waitForTimeout(200);
+			await page.fill('#actual-reps', '5');
+			await page.fill('#actual-load', '105');
+			await page.fill('#actual-rpe', '8.5');
+		}
+
+		const finishBtn = page.locator('button:has-text("Complete Exercise")');
+		await expect(finishBtn).toBeVisible();
+		await finishBtn.click();
+		await expect(page.locator('text=Session complete')).toBeVisible();
+
+		// 21. Back to history with full SVG chart rendered
+		await page.click('a:has-text("View history")');
+		await page.waitForURL(/\/workflows\/\d+\/history/);
+		await page.waitForSelector('svg path', { state: 'attached' });
+		await page.waitForTimeout(500);
 		await page.screenshot({ path: '../docs/screenshots/4-history-analytics.png' });
+
+		// 22. Capture populated dashboard
+		await page.goto('/dashboard');
+		await expect(page.locator('text=E2E Test Routine').first()).toBeVisible();
+		await page.screenshot({ path: '../docs/screenshots/1-dashboard.png' });
 	});
 
 	test('Explore official templates, clone GZCLP Hybrid, and run Jump Rope Interval Timer HUD', async ({ page }) => {

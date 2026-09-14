@@ -293,12 +293,8 @@ func (s *Service) validateBlock(ctx context.Context, block WorkflowBlock) error 
 		return apperrors.ErrInternal()
 	}
 
-	if len(schema) == 0 {
+	if len(schema) == 0 || block.Data == nil {
 		return nil
-	}
-
-	if block.Data == nil {
-		return apperrors.ErrBlockInvalid("data is required for this node_type_slug")
 	}
 
 	for key := range block.Data {
@@ -325,11 +321,15 @@ func isSameJSONType(expected, actual any) bool {
 	expectedType := jsonTypeName(expected)
 	actualType := jsonTypeName(actual)
 
+	if expectedType == "null" || actualType == "null" {
+		return true
+	}
+
 	if expectedType == "number" && actualType == "number" {
 		return true
 	}
-	if (expectedType == "number" && actualType == "null") ||
-		(expectedType == "null" && actualType == "number") {
+	if (expectedType == "string" && actualType == "number") ||
+		(expectedType == "number" && actualType == "string") {
 		return true
 	}
 

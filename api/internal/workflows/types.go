@@ -10,6 +10,7 @@ type Workflow struct {
 	IsPublic    bool            `json:"is_public"`
 	CreatedAt   time.Time       `json:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at"`
+	BlockCount  int             `json:"block_count"`
 	Blocks      []WorkflowBlock `json:"blocks,omitempty"`
 }
 

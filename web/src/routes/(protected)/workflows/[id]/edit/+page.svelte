@@ -1147,11 +1147,11 @@
 											<label for="exercise-reps" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Reps</label>
 											<input
 												id="exercise-reps"
-												type="number"
-												min="1"
+												type="text"
 												class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
-												value={typeof selectedBlock.data.reps === 'number' ? selectedBlock.data.reps : ''}
-												oninput={(event) => updateBlockField(selectedBlock.client_id, 'reps', Number((event.currentTarget as HTMLInputElement).value))}
+												value={typeof selectedBlock.data.reps === 'string' ? selectedBlock.data.reps : typeof selectedBlock.data.reps === 'number' ? String(selectedBlock.data.reps) : ''}
+												oninput={(event) => updateBlockField(selectedBlock.client_id, 'reps', (event.currentTarget as HTMLInputElement).value)}
+												placeholder="10 or 8-12"
 											/>
 										</div>
 									</div>
@@ -1509,16 +1509,44 @@
 									</div>
 								</div>
 							{:else if selectedBlock.node_type_slug === 'repeat'}
-								<div class="space-y-2">
-									<label for="repeat-times" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Repeat count</label>
-									<input
-										id="repeat-times"
-										type="number"
-										min="1"
-										class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
-										value={typeof selectedBlock.data.times === 'number' ? selectedBlock.data.times : 3}
-										oninput={(event) => updateBlockField(selectedBlock.client_id, 'times', Number((event.currentTarget as HTMLInputElement).value))}
-									/>
+								<div class="space-y-4">
+									<div class="space-y-2">
+										<label for="repeat-title" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Title</label>
+										<input
+											id="repeat-title"
+											type="text"
+											class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+											value={typeof selectedBlock.data.title === 'string' ? selectedBlock.data.title : ''}
+											oninput={(event) => updateBlockField(selectedBlock.client_id, 'title', (event.currentTarget as HTMLInputElement).value)}
+											placeholder="Intervals or circuit title"
+										/>
+									</div>
+									<div class="space-y-2">
+										<label for="repeat-times" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Repeat count</label>
+										<input
+											id="repeat-times"
+											type="number"
+											min="1"
+											class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+											value={typeof selectedBlock.data.times === 'number' ? selectedBlock.data.times : typeof selectedBlock.data.rounds === 'number' ? selectedBlock.data.rounds : 3}
+											oninput={(event) => {
+												const val = Number((event.currentTarget as HTMLInputElement).value);
+												updateBlockField(selectedBlock.client_id, 'times', val);
+												updateBlockField(selectedBlock.client_id, 'rounds', val);
+											}}
+										/>
+									</div>
+									<div class="space-y-2">
+										<label for="repeat-reps" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Protocol / Description</label>
+										<input
+											id="repeat-reps"
+											type="text"
+											class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+											value={typeof selectedBlock.data.reps === 'string' ? selectedBlock.data.reps : ''}
+											oninput={(event) => updateBlockField(selectedBlock.client_id, 'reps', (event.currentTarget as HTMLInputElement).value)}
+											placeholder="e.g. 30s @ 50% Pace -> 15s Sprint MAX"
+										/>
+									</div>
 								</div>
 							{:else if selectedBlock.node_type_slug === 'rest'}
 								<div class="space-y-2">

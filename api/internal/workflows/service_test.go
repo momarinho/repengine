@@ -480,3 +480,89 @@ func TestServiceDeleteWorkflow_NotFound(t *testing.T) {
 		t.Fatalf("expected status 404, got %d", appErr.Status)
 	}
 }
+
+func TestServiceUpdateWorkflow_AcceptsRepeatIntervalBlockAndNulls(t *testing.T) {
+	ctx := context.Background()
+	tx := &fakeTx{}
+	now := time.Date(2026, 9, 12, 12, 0, 0, 0, time.UTC)
+
+	repo := &fakeRepo{
+		getOwnerAndUpdatedAtFunc: func(ctx context.Context, workflowID int) (int, time.Time, error) {
+			return 1, now, nil
+		},
+		getNodeTypeSchemaFunc: func(ctx context.Context, slug string) (map[string]any, error) {
+			if slug == "repeat" {
+				return map[string]any{
+					"times":           3,
+					"rounds":          3,
+					"title":           "",
+					"reps":            "",
+					"interval_phases": []any{},
+				}, nil
+			}
+			if slug == "exercise" {
+				return map[string]any{
+					"exercise_name": "",
+					"sets":          3,
+					"reps":          "",
+					"rest_seconds":  90,
+					"notes":         "",
+					"load_value":    nil,
+					"load_unit":     "kg",
+				}, nil
+			}
+			return map[string]any{}, nil
+		},
+		beginTxFunc: func(ctx context.Context) (dbtx, error) {
+			return tx, nil
+		},
+		updateWorkflowIfVersionMatchesFunc: func(ctx context.Context, tx dbtx, in UpdateWorkflowInput) (time.Time, error) {
+			return now.Add(time.Second), nil
+		},
+		replaceBlocksTxFunc: func(ctx context.Context, tx dbtx, workflowID int, blocks []WorkflowBlock) error {
+			return nil
+		},
+		getWorkflowWithBlocksTxFunc: func(ctx context.Context, tx dbtx, workflowID, userID int) (Workflow, error) {
+			return Workflow{ID: workflowID, UserID: userID, Name: "Updated"}, nil
+		},
+	}
+
+	service := NewService(repo)
+	_, err := service.UpdateWorkflow(ctx, UpdateWorkflowInput{
+		WorkflowID: 2,
+		UserID:     1,
+		Name:       "GZCLP Hybrid",
+		UpdatedAt:  now,
+		Blocks: []WorkflowBlock{
+			{
+				NodeTypeSlug: "repeat",
+				Position:     0,
+				Data: map[string]any{
+					"title":  "Jump Rope 30/15/15 Intervals (8 Rounds)",
+					"times":  8,
+					"rounds": 8,
+					"reps":   "30s @ 50% Pace -> 15s Sprint MAX -> 15s Complete Rest",
+					"interval_phases": []any{
+						map[string]any{"name": "50% Moderate Pace", "duration_seconds": 30, "type": "work"},
+						map[string]any{"name": "Sprint MAX", "duration_seconds": 15, "type": "sprint"},
+					},
+				},
+			},
+			{
+				NodeTypeSlug: "exercise",
+				Position:     1,
+				Data: map[string]any{
+					"exercise_name": "Bench Press",
+					"sets":          3,
+					"reps":          10, // number instead of string
+					"notes":         nil, // null
+					"load_value":    80.0,
+					"load_unit":     "kg",
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("UpdateWorkflow returned error: %v", err)
+	}
+}

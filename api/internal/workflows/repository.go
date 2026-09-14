@@ -25,10 +25,20 @@ func (r *Repository) BeginTx(ctx context.Context) (dbtx, error) {
 
 func (r *Repository) ListWorkflows(ctx context.Context, userID int, cursor int64, limit int) (PaginatedWorkflows, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, user_id, name, description, is_public, created_at, updated_at
-		FROM workflows
-		WHERE user_id = $1 AND ($2 = 0 OR id < $2)
-		ORDER BY id DESC
+		SELECT
+			w.id,
+			w.user_id,
+			w.name,
+			w.description,
+			w.is_public,
+			w.created_at,
+			w.updated_at,
+			COUNT(b.id)::INTEGER AS block_count
+		FROM workflows w
+		LEFT JOIN workflow_blocks b ON b.workflow_id = w.id
+		WHERE w.user_id = $1 AND ($2 = 0 OR w.id < $2)
+		GROUP BY w.id
+		ORDER BY w.id DESC
 		LIMIT $3
 	`, userID, cursor, limit+1)
 	if err != nil {
@@ -39,7 +49,7 @@ func (r *Repository) ListWorkflows(ctx context.Context, userID int, cursor int64
 	workflows := make([]Workflow, 0, limit+1)
 	for rows.Next() {
 		var w Workflow
-		if err := rows.Scan(&w.ID, &w.UserID, &w.Name, &w.Description, &w.IsPublic, &w.CreatedAt, &w.UpdatedAt); err != nil {
+		if err := rows.Scan(&w.ID, &w.UserID, &w.Name, &w.Description, &w.IsPublic, &w.CreatedAt, &w.UpdatedAt, &w.BlockCount); err != nil {
 			return PaginatedWorkflows{}, err
 		}
 		workflows = append(workflows, w)
@@ -88,7 +98,11 @@ func (r *Repository) CreateWorkflowTx(ctx context.Context, tx dbtx, in CreateWor
 func (r *Repository) InsertBlocksTx(ctx context.Context, tx dbtx, workflowID int, blocks []WorkflowBlock) ([]WorkflowBlock, error) {
 	inserted := make([]WorkflowBlock, 0, len(blocks))
 	for i, block := range blocks {
-		dataJSON, err := json.Marshal(block.Data)
+		data := block.Data
+		if data == nil {
+			data = map[string]any{}
+		}
+		dataJSON, err := json.Marshal(data)
 		if err != nil {
 			return nil, fmt.Errorf("marshal block data: %w", err)
 		}
@@ -157,7 +171,11 @@ func (r *Repository) ReplaceBlocksTx(ctx context.Context, tx dbtx, workflowID in
 	}
 
 	for i, block := range blocks {
-		dataJSON, err := json.Marshal(block.Data)
+		data := block.Data
+		if data == nil {
+			data = map[string]any{}
+		}
+		dataJSON, err := json.Marshal(data)
 		if err != nil {
 			return fmt.Errorf("marshal block data: %w", err)
 		}
@@ -191,6 +209,7 @@ func (r *Repository) GetWorkflowWithBlocksTx(ctx context.Context, tx dbtx, workf
 		return Workflow{}, err
 	}
 	w.Blocks = blocks
+	w.BlockCount = len(blocks)
 
 	return w, nil
 }
@@ -213,6 +232,7 @@ func (r *Repository) GetWorkflowVisibleToUser(ctx context.Context, workflowID, u
 		return Workflow{}, err
 	}
 	w.Blocks = blocks
+	w.BlockCount = len(blocks)
 
 	return w, nil
 }

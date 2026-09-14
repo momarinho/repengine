@@ -177,7 +177,12 @@ func deleteWorkflow(client *http.Client, apiURL, token string, workflowID int) e
 
 func buildBlocks(iteration int) []workflowBlock {
 	blocks := []workflowBlock{
-		{NodeTypeSlug: "section"},
+		{
+			NodeTypeSlug: "section",
+			Data: map[string]any{
+				"title": fmt.Sprintf("Workout Section %d", iteration),
+			},
+		},
 	}
 
 	for i := range 10 {
@@ -189,7 +194,12 @@ func buildBlocks(iteration int) []workflowBlock {
 		})
 	}
 
-	blocks = append(blocks, workflowBlock{NodeTypeSlug: "section"})
+	blocks = append(blocks, workflowBlock{
+		NodeTypeSlug: "section",
+		Data: map[string]any{
+			"title": "Cooldown",
+		},
+	})
 
 	return blocks
 }
