@@ -218,9 +218,11 @@ test.describe('RepEngine Workout Lifecycle E2E', () => {
 		await page.waitForTimeout(500);
 		await page.screenshot({ path: '../docs/screenshots/4-history-analytics.png' });
 
-		// 22. Capture populated dashboard
+		// 22. Capture populated dashboard & verify Hero Workout Launcher
 		await page.goto('/dashboard');
 		await expect(page.locator('text=E2E Test Routine').first()).toBeVisible();
+		await expect(page.locator('text=Up Next · Quick Launch')).toBeVisible();
+		await expect(page.getByRole('link', { name: /Start Workout/i }).first()).toBeVisible();
 		await page.screenshot({ path: '../docs/screenshots/1-dashboard.png' });
 	});
 

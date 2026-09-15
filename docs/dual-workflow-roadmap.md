@@ -49,9 +49,9 @@ flowchart TD
   - Add padding to fixed bottom action bar to respect iOS/Android gesture navigation bars.
 
 ### Phase 2: Action-Oriented Mobile Dashboard
-* [ ] **Hero Workout Launcher**:
+* [x] **Hero Workout Launcher**:
   - Highlight the most recent routine at the top of the mobile dashboard with a prominent "Start Workout" button for instant 1-tap entry.
-* [ ] **Action Hierarchy Polish**:
+* [x] **Action Hierarchy Polish**:
   - Elevate "Start Workout" as the primary filled button on routine cards.
   - Keep "Edit" and "History" as secondary actions.
 

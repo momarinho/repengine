@@ -24,6 +24,14 @@
 				)
 	);
 
+	const mostRecentWorkflow = $derived(
+		workflows.length > 0
+			? [...workflows].sort(
+					(a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+				)[0]
+			: null
+	);
+
 	async function deleteWorkflow(id: number, name: string): Promise<void> {
 		if (deletingWorkflowID !== null) return;
 		if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
@@ -67,22 +75,22 @@
 
 <div class="min-h-screen bg-background">
 	<!-- Top Bar -->
-	<header class="sticky top-0 z-30 bg-background/80 backdrop-blur-md border-b border-surface-container-low px-8 py-6 flex justify-between items-center">
-		<h2 class="font-headline text-3xl font-bold text-on-surface tracking-tight">My Routines</h2>
-		<div class="flex items-center gap-4">
+	<header class="sticky top-0 z-30 bg-background/80 backdrop-blur-md border-b border-surface-container-low px-4 py-4 sm:px-8 sm:py-6 flex flex-wrap justify-between items-center gap-4">
+		<h2 class="font-headline text-2xl sm:text-3xl font-bold text-on-surface tracking-tight">My Routines</h2>
+		<div class="flex flex-wrap items-center gap-2 sm:gap-4">
 			<a
 				href="/settings"
-				class="rounded-md border border-outline-variant/20 px-4 py-2.5 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+				class="rounded-md border border-outline-variant/20 px-3 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
 			>
 				Account
 			</a>
 			<a
 				href="/templates"
-				class="rounded-md border border-outline-variant/20 px-4 py-2.5 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+				class="rounded-md border border-outline-variant/20 px-3 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
 			>
 				Browse Templates
 			</a>
-			<a href="/dashboard/new" data-sveltekit-reload class="btn-primary-gradient text-on-primary-fixed font-body font-semibold px-6 py-2.5 rounded-md flex items-center gap-2 hover:opacity-90 transition-opacity">
+			<a href="/dashboard/new" data-sveltekit-reload class="btn-primary-gradient text-on-primary-fixed font-body font-semibold px-4 py-2 sm:px-6 sm:py-2.5 rounded-md flex items-center gap-1.5 sm:gap-2 hover:opacity-90 transition-opacity text-xs sm:text-sm">
 				<span class="material-symbols-outlined text-sm">add</span>
 				New Routine
 			</a>
@@ -90,7 +98,7 @@
 	</header>
 
 	<!-- Dashboard Content -->
-	<div class="p-8 max-w-7xl mx-auto">
+	<div class="p-4 sm:p-8 max-w-7xl mx-auto">
 		{#if data.newRoutineFailed}
 			<div class="mb-6 rounded-md border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
 				Unable to create a new routine right now. Try again.
@@ -100,6 +108,67 @@
 			<div class="mb-6 rounded-md border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
 				{deleteError}
 			</div>
+		{/if}
+
+		{#if mostRecentWorkflow}
+			<!-- Hero Workout Launcher (Mobile & Quick-Start) -->
+			<section class="mb-8 overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-surface-container via-surface-container-high to-surface-container p-5 sm:p-6 shadow-xl relative group">
+				<div class="absolute -top-12 -right-12 h-44 w-44 rounded-full bg-primary/10 blur-3xl pointer-events-none group-hover:bg-primary/15 transition-all"></div>
+				
+				<div class="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+					<div class="space-y-2">
+						<div class="flex flex-wrap items-center gap-2">
+							<span class="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-primary">
+								<span class="h-2 w-2 rounded-full bg-primary animate-pulse"></span>
+								Up Next · Quick Launch
+							</span>
+							<span class="text-xs text-on-surface-variant font-medium">
+								Edited {formatDate(mostRecentWorkflow.updated_at)}
+							</span>
+						</div>
+						<h3 class="font-headline text-2xl sm:text-3xl font-bold text-on-surface">
+							{mostRecentWorkflow.name}
+						</h3>
+						{#if mostRecentWorkflow.description}
+							<p class="text-sm text-on-surface-variant max-w-xl line-clamp-2">
+								{mostRecentWorkflow.description}
+							</p>
+						{/if}
+						<div class="flex items-center gap-3 pt-1">
+							<span class="px-2.5 py-1 rounded-md bg-[#26233a] text-[#c4a7e7] font-label text-xs tracking-wider uppercase font-semibold">
+								{(mostRecentWorkflow.block_count ?? mostRecentWorkflow.blocks?.length) || 0} Blocks
+							</span>
+							<span class="text-xs text-on-surface-variant">
+								{mostRecentWorkflow.is_public ? 'Public template' : 'Private routine'}
+							</span>
+						</div>
+					</div>
+
+					<div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+						<a
+							href={`/workflows/${mostRecentWorkflow.id}/play`}
+							class="btn-primary-gradient text-on-primary-fixed font-headline font-bold text-base px-6 py-3.5 rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center gap-2 hover:brightness-110 active:scale-[0.98] transition-all"
+						>
+							<span class="material-symbols-outlined text-2xl">play_arrow</span>
+							Start Workout
+						</a>
+						<div class="flex gap-2">
+							<a
+								href={`/workflows/${mostRecentWorkflow.id}/edit`}
+								class="flex-1 sm:flex-none rounded-xl border border-outline-variant/20 bg-surface-container-high px-4 py-3 text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-colors text-center"
+							>
+								Edit
+							</a>
+							<a
+								href={`/workflows/${mostRecentWorkflow.id}/history`}
+								class="flex-1 sm:flex-none rounded-xl border border-outline-variant/20 bg-surface-container-high px-4 py-3 text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-colors text-center"
+							>
+								History
+							</a>
+						</div>
+					</div>
+				</div>
+			</section>
 		{/if}
 
 		<!-- Filters -->
@@ -141,33 +210,38 @@
 						<div class="flex flex-wrap gap-2 mb-6">
 							<span class="px-2 py-1 rounded-md bg-[#26233a] text-[#c4a7e7] font-label text-xs tracking-wider uppercase">{(workflow.block_count ?? workflow.blocks?.length) || 0} Blocks</span>
 						</div>
-						<div class="mb-5 flex gap-2">
-							<a
-								href={`/workflows/${workflow.id}/edit`}
-								class="rounded-md bg-surface-container-high px-3 py-2 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container-highest"
-							>
-								Edit
-							</a>
+						<div class="mb-5 flex flex-col gap-2.5">
 							<a
 								href={`/workflows/${workflow.id}/play`}
-								class="rounded-md border border-primary/20 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+								class="btn-primary-gradient text-on-primary-fixed font-headline font-bold text-xs sm:text-sm px-4 py-2.5 rounded-lg shadow-md flex items-center justify-center gap-1.5 hover:brightness-110 active:scale-[0.98] transition-all"
 							>
+								<span class="material-symbols-outlined text-lg">play_arrow</span>
 								Start Workout
 							</a>
-							<a
-								href={`/workflows/${workflow.id}/history`}
-								class="rounded-md border border-outline-variant/20 px-3 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
-							>
-								History
-							</a>
-							<button
-								type="button"
-								class="rounded-md border border-error/25 bg-error/10 px-3 py-2 text-xs font-semibold text-error transition-colors hover:bg-error/20 disabled:cursor-not-allowed disabled:opacity-60"
-								disabled={deletingWorkflowID === workflow.id}
-								onclick={() => deleteWorkflow(workflow.id, workflow.name)}
-							>
-								{deletingWorkflowID === workflow.id ? 'Deleting...' : 'Delete'}
-							</button>
+							<div class="flex items-center gap-2">
+								<a
+									href={`/workflows/${workflow.id}/edit`}
+									class="flex-1 rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-center text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container-highest"
+								>
+									Edit
+								</a>
+								<a
+									href={`/workflows/${workflow.id}/history`}
+									class="flex-1 rounded-md border border-outline-variant/20 px-3 py-2 text-center text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+								>
+									History
+								</a>
+								<button
+									type="button"
+									class="rounded-md border border-error/25 bg-error/10 px-2.5 py-2 text-xs font-semibold text-error transition-colors hover:bg-error/20 disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center"
+									disabled={deletingWorkflowID === workflow.id}
+									onclick={() => deleteWorkflow(workflow.id, workflow.name)}
+									title="Delete routine"
+									aria-label={`Delete ${workflow.name}`}
+								>
+									<span class="material-symbols-outlined text-base">delete</span>
+								</button>
+							</div>
 						</div>
 						<div class="flex justify-between items-end mt-auto pt-4 border-t border-outline-variant/10">
 							<span class="font-body text-xs text-outline">{workflow.is_public ? 'Public' : 'Private'}</span>
