@@ -36,16 +36,16 @@ flowchart TD
 ## 📋 Implementation Phases
 
 ### Phase 1: Mobile Player "Gym-Ready" Polish
-* [ ] **Screen Wake Lock API (`navigator.wakeLock`)**:
+* [x] **Screen Wake Lock API (`navigator.wakeLock`)**:
   - Request screen wake lock upon entering active workout sessions.
   - Automatically release on workout completion, abandonment, or visibility loss to preserve battery.
-* [ ] **Native Numeric Keypads (`inputmode="decimal"` & `inputmode="numeric"`)**:
+* [x] **Native Numeric Keypads (`inputmode="decimal"` & `inputmode="numeric"`)**:
   - Add `inputmode` hints to actual load, reps, RPE, and RIR inputs across all block types (single exercise, waves, linear progression, supersets).
   - Ensures mobile OS immediately renders the large number dialpad instead of full alphanumeric QWERTY.
-* [ ] **Haptic Feedback (Vibration API)**:
+* [x] **Haptic Feedback (Vibration API)**:
   - Integrate `navigator.vibrate([100, 50, 100])` synchronized with Web Audio countdown beeps (3-2-1) and interval round transitions.
   - Keeps athletes aware of rest/work phase switches even when phone is in pocket or earphones are loud.
-* [ ] **Safe Area Insets (`env(safe-area-inset-bottom)`)**:
+* [x] **Safe Area Insets (`env(safe-area-inset-bottom)`)**:
   - Add padding to fixed bottom action bar to respect iOS/Android gesture navigation bars.
 
 ### Phase 2: Action-Oriented Mobile Dashboard

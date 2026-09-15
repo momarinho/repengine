@@ -1,6 +1,31 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('RepEngine Workout Lifecycle E2E', () => {
+	test.beforeEach(async ({ page }) => {
+		await page.addInitScript(() => {
+			(window as any).__vibrateCalls = [];
+			(window as any).__wakeLockRequested = false;
+
+			(navigator as any).vibrate = (pattern: any) => {
+				(window as any).__vibrateCalls.push(pattern);
+				return true;
+			};
+
+			if (!('wakeLock' in navigator)) {
+				(navigator as any).wakeLock = {
+					request: async (type: string) => {
+						(window as any).__wakeLockRequested = true;
+						return {
+							type,
+							released: false,
+							release: async () => {}
+						};
+					}
+				};
+			}
+		});
+	});
+
 	test('Register, log in, create a routine, add a block, save, play, log, and view history', async ({ page }) => {
 		page.on('console', msg => {
 			console.log(`[BROWSER CONSOLE] [${msg.type()}] ${msg.text()}`);
@@ -79,6 +104,14 @@ test.describe('RepEngine Workout Lifecycle E2E', () => {
 
 		// 14. Should be on the play page
 		await page.waitForURL(/\/workflows\/\d+\/play/);
+
+		// Phase 1 gym-ready mobile assertions
+		await expect(page.locator('meta[name="viewport"]')).toHaveAttribute('content', /viewport-fit=cover/);
+		await expect(page.locator('#actual-reps')).toHaveAttribute('inputmode', 'numeric');
+		await expect(page.locator('#actual-load')).toHaveAttribute('inputmode', 'decimal');
+		await expect(page.locator('#actual-rpe')).toHaveAttribute('inputmode', 'decimal');
+		await expect(page.locator('#actual-rir')).toHaveAttribute('inputmode', 'decimal');
+		await expect(page.locator('footer')).toHaveClass(/pb-\[env\(safe-area-inset-bottom\)\]/);
 
 		// Fill actual reps, load and RPE
 		await page.fill('#actual-reps', '5');
@@ -272,5 +305,9 @@ test.describe('RepEngine Workout Lifecycle E2E', () => {
 		await skipPhaseBtn.click();
 		await page.waitForTimeout(400);
 		await expect(page.locator('text=Round 2').first()).toBeVisible();
+
+		// 14. Verify haptic feedback was triggered during interval phase transitions
+		const vibrateCount = await page.evaluate(() => ((window as any).__vibrateCalls || []).length);
+		expect(vibrateCount).toBeGreaterThan(0);
 	});
 });

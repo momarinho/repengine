@@ -480,7 +480,55 @@
 		return audioContext;
 	}
 
+	let wakeLockSentinel: { release: () => Promise<void>; released?: boolean } | null = null;
+
+	async function requestWakeLock(): Promise<void> {
+		if (!browser || typeof navigator === 'undefined' || !('wakeLock' in navigator)) return;
+		try {
+			if (!wakeLockSentinel || wakeLockSentinel.released) {
+				const lock = await (navigator as unknown as { wakeLock: { request: (type: string) => Promise<{ release: () => Promise<void>; released?: boolean }> } }).wakeLock.request('screen');
+				wakeLockSentinel = lock;
+			}
+		} catch {
+			// Ignore wake lock rejection (unsupported, low battery, etc.)
+		}
+	}
+
+	function releaseWakeLock(): void {
+		if (wakeLockSentinel) {
+			wakeLockSentinel.release().catch(() => {});
+			wakeLockSentinel = null;
+		}
+	}
+
+	function triggerHaptic(type: 'warning' | 'sprint' | 'work' | 'rest' | 'prep' | 'complete'): void {
+		if (!browser || typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return;
+		try {
+			switch (type) {
+				case 'warning':
+					navigator.vibrate(60);
+					break;
+				case 'sprint':
+				case 'work':
+					navigator.vibrate([100, 50, 100]);
+					break;
+				case 'rest':
+					navigator.vibrate(150);
+					break;
+				case 'complete':
+					navigator.vibrate([100, 50, 100, 50, 250]);
+					break;
+				case 'prep':
+					navigator.vibrate(80);
+					break;
+			}
+		} catch {
+			// Silently ignore if device doesn't support or disallows vibration
+		}
+	}
+
 	function playAudioTone(type: 'warning' | 'sprint' | 'work' | 'rest' | 'prep' | 'complete'): void {
+		triggerHaptic(type);
 		if (!intervalSoundEnabled) return;
 		try {
 			const ctx = getAudioContext();
@@ -1374,6 +1422,7 @@
 				throw new Error('Unable to abandon workout session.');
 			}
 
+			releaseWakeLock();
 			syncSessionHistory(session);
 			clearLocalSession({ autoStart: false, chooserOpen: true });
 		} catch (error: unknown) {
@@ -1416,6 +1465,8 @@
 			isSessionComplete = true;
 			isTimerRunning = false;
 			clearIntraSetRest();
+			releaseWakeLock();
+			playAudioTone('complete');
 			if (activePersistedSession) {
 				isSyncingSession = true;
 				void completePersistedSession()
@@ -1960,6 +2011,7 @@
 			if (timerRemainingSeconds <= 1) {
 				timerRemainingSeconds = 0;
 				isTimerRunning = false;
+				playAudioTone('complete');
 				if (currentBlock.node_type_slug === 'rest') {
 					appendActivity(
 						currentBlock,
@@ -1970,6 +2022,10 @@
 					completeCurrentBlock(currentBlock, 'Recovery finished');
 				}
 				return;
+			}
+
+			if (timerRemainingSeconds <= 4 && timerRemainingSeconds >= 2) {
+				playAudioTone('warning');
 			}
 
 			timerRemainingSeconds -= 1;
@@ -1986,8 +2042,13 @@
 		const restInterval = setInterval(() => {
 			if (!intraSetRest) return;
 			if (intraSetRest.remainingSeconds <= 1) {
+				playAudioTone('complete');
 				clearIntraSetRest(true);
 				return;
+			}
+
+			if (intraSetRest.remainingSeconds <= 4 && intraSetRest.remainingSeconds >= 2) {
+				playAudioTone('warning');
 			}
 
 			intraSetRest = {
@@ -1997,6 +2058,28 @@
 		}, 1000);
 
 		return () => clearInterval(restInterval);
+	});
+
+	$effect(() => {
+		if (!browser) return;
+
+		if (!isChoosingSection && !isSessionComplete) {
+			void requestWakeLock();
+		} else {
+			releaseWakeLock();
+		}
+
+		const handleVisibilityChange = () => {
+			if (document.visibilityState === 'visible' && !isChoosingSection && !isSessionComplete) {
+				void requestWakeLock();
+			}
+		};
+
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+		return () => {
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
+			releaseWakeLock();
+		};
 	});
 
 	$effect(() => {
@@ -2214,6 +2297,9 @@
 
 										<input
 											type="text"
+											inputmode="decimal"
+											autocomplete="off"
+											enterkeyhint="done"
 											class="h-10 w-28 rounded-lg border border-white/10 bg-surface-container-lowest text-center text-sm font-bold text-on-surface focus:ring-1 focus:ring-primary/50 outline-none"
 											value={overrideLoads[block.id] ?? ''}
 											oninput={(event) => {
@@ -2456,7 +2542,7 @@
 		{/if}
 	</header>
 
-	<main class="flex h-screen overflow-hidden pt-[3.75rem] pb-24">
+	<main class="flex h-screen overflow-hidden pt-[3.75rem] pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
 		<section class="custom-scrollbar flex-1 overflow-y-auto px-4 md:px-8">
 			<div class="mx-auto max-w-3xl py-6">
 				<div class="mb-6">
@@ -2628,6 +2714,10 @@
 								<label for="actual-reps" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
 								<input
 									id="actual-reps"
+									type="text"
+									inputmode="numeric"
+									autocomplete="off"
+									enterkeyhint="next"
 									class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 									placeholder={currentBlockReps ?? 'e.g. 8'}
 									value={actualRepsByBlock[currentBlock.id] ?? ''}
@@ -2643,6 +2733,10 @@
 								<label for="actual-load" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual load</label>
 								<input
 									id="actual-load"
+									type="text"
+									inputmode="decimal"
+									autocomplete="off"
+									enterkeyhint="next"
 									class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 									placeholder={getResolvedPrescribedLoad(currentBlock) || 'e.g. 80 kg'}
 									value={actualLoadByBlock[currentBlock.id] ?? ''}
@@ -2658,6 +2752,10 @@
 								<label for="actual-rpe" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RPE</label>
 								<input
 									id="actual-rpe"
+									type="text"
+									inputmode="decimal"
+									autocomplete="off"
+									enterkeyhint="next"
 									class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 									placeholder="e.g. 8.5"
 									value={actualRPEByBlock[currentBlock.id] ?? ''}
@@ -2673,6 +2771,10 @@
 								<label for="actual-rir" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RIR</label>
 								<input
 									id="actual-rir"
+									type="text"
+									inputmode="decimal"
+									autocomplete="off"
+									enterkeyhint="done"
 									class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 									placeholder="e.g. 2"
 									value={actualRIRByBlock[currentBlock.id] ?? ''}
@@ -2785,6 +2887,10 @@
 											<label for="superset-actual-reps-a" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
 											<input
 												id="superset-actual-reps-a"
+												type="text"
+												inputmode="numeric"
+												autocomplete="off"
+												enterkeyhint="next"
 												class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
 												placeholder={`${currentBlock.data?.reps_a ?? '5'}`}
 												value={actualRepsAByBlock[currentBlock.id] ?? ''}
@@ -2800,6 +2906,10 @@
 											<label for="superset-actual-load-a" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual load</label>
 											<input
 												id="superset-actual-load-a"
+												type="text"
+												inputmode="decimal"
+												autocomplete="off"
+												enterkeyhint="next"
 												class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
 												placeholder={currentBlock.data?.start_load_a !== null && currentBlock.data?.start_load_a !== undefined ? `${currentBlock.data.start_load_a}` : 'kg'}
 												value={actualLoadAByBlock[currentBlock.id] ?? ''}
@@ -2822,6 +2932,10 @@
 											<label for="superset-actual-reps-b" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
 											<input
 												id="superset-actual-reps-b"
+												type="text"
+												inputmode="numeric"
+												autocomplete="off"
+												enterkeyhint="next"
 												class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
 												placeholder={`${currentBlock.data?.reps_b ?? '10'}`}
 												value={actualRepsBByBlock[currentBlock.id] ?? ''}
@@ -2837,6 +2951,10 @@
 											<label for="superset-actual-load-b" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual load</label>
 											<input
 												id="superset-actual-load-b"
+												type="text"
+												inputmode="decimal"
+												autocomplete="off"
+												enterkeyhint="next"
 												class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
 												placeholder={currentBlock.data?.start_load_b !== null && currentBlock.data?.start_load_b !== undefined ? `${currentBlock.data.start_load_b}` : 'kg'}
 												value={actualLoadBByBlock[currentBlock.id] ?? ''}
@@ -2858,6 +2976,10 @@
 									<label for="superset-actual-rpe" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RPE</label>
 									<input
 										id="superset-actual-rpe"
+										type="text"
+										inputmode="decimal"
+										autocomplete="off"
+										enterkeyhint="next"
 										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
 										placeholder="e.g. 8"
 										value={actualRPEByBlock[currentBlock.id] ?? ''}
@@ -2873,6 +2995,10 @@
 									<label for="superset-actual-rir" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RIR</label>
 									<input
 										id="superset-actual-rir"
+										type="text"
+										inputmode="decimal"
+										autocomplete="off"
+										enterkeyhint="done"
 										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
 										placeholder="e.g. 2"
 										value={actualRIRByBlock[currentBlock.id] ?? ''}
@@ -3031,6 +3157,10 @@
 									<label for="wave-actual-reps" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
 									<input
 										id="wave-actual-reps"
+										type="text"
+										inputmode="numeric"
+										autocomplete="off"
+										enterkeyhint="next"
 										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 										placeholder={currentWaveSet?.reps ?? 'e.g. 5'}
 										value={actualRepsByBlock[currentBlock.id] ?? ''}
@@ -3046,6 +3176,10 @@
 									<label for="wave-actual-load" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual load</label>
 									<input
 										id="wave-actual-load"
+										type="text"
+										inputmode="decimal"
+										autocomplete="off"
+										enterkeyhint="next"
 										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 										placeholder={calculateCalculatedLoad(currentBlock?.data?.exercise_name as string, currentWaveSet?.intensity) || 'e.g. 140 kg'}
 										value={actualLoadByBlock[currentBlock.id] ?? ''}
@@ -3061,6 +3195,10 @@
 									<label for="wave-actual-rpe" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RPE</label>
 									<input
 										id="wave-actual-rpe"
+										type="text"
+										inputmode="decimal"
+										autocomplete="off"
+										enterkeyhint="next"
 										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 										placeholder={currentWaveSet?.rpe ?? 'e.g. 9'}
 										value={actualRPEByBlock[currentBlock.id] ?? ''}
@@ -3076,6 +3214,10 @@
 									<label for="wave-actual-rir" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RIR</label>
 									<input
 										id="wave-actual-rir"
+										type="text"
+										inputmode="decimal"
+										autocomplete="off"
+										enterkeyhint="done"
 										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 										placeholder="e.g. 1"
 										value={actualRIRByBlock[currentBlock.id] ?? ''}
@@ -3381,6 +3523,10 @@
 												<label for="repeat-actual-reps" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps/jumps</label>
 												<input
 													id="repeat-actual-reps"
+													type="text"
+													inputmode="numeric"
+													autocomplete="off"
+													enterkeyhint="next"
 													class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 													placeholder={currentBlock.reps ?? 'e.g. 120 jumps'}
 													value={actualRepsByBlock[currentBlock.id] ?? ''}
@@ -3396,6 +3542,10 @@
 												<label for="repeat-actual-load" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual load / weight</label>
 												<input
 													id="repeat-actual-load"
+													type="text"
+													inputmode="decimal"
+													autocomplete="off"
+													enterkeyhint="next"
 													class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 													placeholder="e.g. weighted rope / vest"
 													value={actualLoadByBlock[currentBlock.id] ?? ''}
@@ -3411,6 +3561,10 @@
 												<label for="repeat-actual-rpe" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RPE</label>
 												<input
 													id="repeat-actual-rpe"
+													type="text"
+													inputmode="decimal"
+													autocomplete="off"
+													enterkeyhint="next"
 													class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 													placeholder="1-10"
 													value={actualRPEByBlock[currentBlock.id] ?? ''}
@@ -3426,6 +3580,10 @@
 												<label for="repeat-actual-rir" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RIR</label>
 												<input
 													id="repeat-actual-rir"
+													type="text"
+													inputmode="decimal"
+													autocomplete="off"
+													enterkeyhint="done"
 													class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 													placeholder="0-4"
 													value={actualRIRByBlock[currentBlock.id] ?? ''}
@@ -3502,6 +3660,10 @@
 										<label for="repeat-actual-reps" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
 										<input
 											id="repeat-actual-reps"
+											type="text"
+											inputmode="numeric"
+											autocomplete="off"
+											enterkeyhint="next"
 											class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 											placeholder={currentBlock.reps ?? 'e.g. 12/12/10'}
 											value={actualRepsByBlock[currentBlock.id] ?? ''}
@@ -3517,6 +3679,10 @@
 										<label for="repeat-actual-load" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual load</label>
 										<input
 											id="repeat-actual-load"
+											type="text"
+											inputmode="decimal"
+											autocomplete="off"
+											enterkeyhint="next"
 											class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 											placeholder="Optional"
 											value={actualLoadByBlock[currentBlock.id] ?? ''}
@@ -3532,6 +3698,10 @@
 										<label for="repeat-actual-rpe" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RPE</label>
 										<input
 											id="repeat-actual-rpe"
+											type="text"
+											inputmode="decimal"
+											autocomplete="off"
+											enterkeyhint="next"
 											class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 											placeholder="Optional"
 											value={actualRPEByBlock[currentBlock.id] ?? ''}
@@ -3547,6 +3717,10 @@
 										<label for="repeat-actual-rir" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RIR</label>
 										<input
 											id="repeat-actual-rir"
+											type="text"
+											inputmode="decimal"
+											autocomplete="off"
+											enterkeyhint="done"
 											class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 											placeholder="Optional"
 											value={actualRIRByBlock[currentBlock.id] ?? ''}
@@ -3775,7 +3949,7 @@
 		</aside>
 	</main>
 
-	<footer class="fixed bottom-0 left-0 z-50 flex h-20 w-full items-center justify-between border-t border-white/5 bg-background/95 px-6 shadow-[0_-10px_30px_rgba(0,0,0,0.3)] backdrop-blur-2xl">
+	<footer class="fixed bottom-0 left-0 z-50 flex h-[calc(5rem+env(safe-area-inset-bottom))] w-full items-center justify-between border-t border-white/5 bg-background/95 px-6 pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_30px_rgba(0,0,0,0.3)] backdrop-blur-2xl">
 		<div class="flex gap-2">
 			<button
 				type="button"
@@ -3829,7 +4003,7 @@
 
 	{#if mobileQueueOpen}
 		<div class="fixed inset-0 z-30 bg-black/45 lg:hidden" role="presentation" onclick={() => (mobileQueueOpen = false)}></div>
-		<section class="custom-scrollbar fixed inset-x-0 bottom-20 z-40 max-h-[62vh] overflow-y-auto rounded-t-[1.75rem] border-t border-white/10 bg-surface-container px-6 py-6 shadow-2xl lg:hidden">
+		<section class="custom-scrollbar fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 max-h-[62vh] overflow-y-auto rounded-t-[1.75rem] border-t border-white/10 bg-surface-container px-6 py-6 shadow-2xl lg:hidden">
 			<div class="mb-6 flex items-center justify-between">
 				<h3 class="text-sm font-bold text-on-surface">Queue</h3>
 				<button
