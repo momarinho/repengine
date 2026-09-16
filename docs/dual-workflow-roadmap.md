@@ -56,14 +56,14 @@ flowchart TD
   - Keep "Edit" and "History" as secondary actions.
 
 ### Phase 3: Desktop "Routine Architect" & Mobile Bridge
-* [ ] **Preserve Desktop Power**:
+* [x] **Preserve Desktop Power**:
   - Keep the full multi-column canvas, inspector sidebar, hotkeys (`Ctrl+Z`, `Ctrl+Y`), and version rollback intact for desktop viewports.
-* [ ] **Local QR Code Bridge**:
+* [x] **Local QR Code Bridge**:
   - Add an "Open on Mobile" modal in the desktop editor/dashboard that renders a dynamic QR code pointing directly to the routine player on the local network IP.
-* [ ] **Mobile Editor Awareness**:
+* [x] **Mobile Editor Awareness**:
   - Display an unobtrusive advisory banner on mobile screens when accessing the editor:
     *"💡 The block canvas is optimized for larger screens. You can edit here, or jump straight to the Workout Player."*
 
 ### Phase 4: Verification & Performance
-* [ ] Maintain 100% test coverage across Go unit tests, SvelteKit checks, and Playwright E2E lifecycle tests.
-* [ ] Verify seamless offline sync queue resilience under simulated network drops.
+* [x] Maintain 100% test coverage across Go unit tests, SvelteKit checks, and Playwright E2E lifecycle tests.
+* [x] Verify seamless offline sync queue resilience under simulated network drops.

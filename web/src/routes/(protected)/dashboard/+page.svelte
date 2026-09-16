@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import type { PageData } from './$types';
+	import QrCodeModal from '$lib/components/QrCodeModal.svelte';
 
 	let { data }: { data: PageData } = $props();
 	const initialWorkflows = untrack(() => [...data.workflows]);
@@ -9,6 +10,7 @@
 	let workflows = $state(initialWorkflows);
 	let deletingWorkflowID = $state<number | null>(null);
 	let deleteError = $state('');
+	let qrWorkflow = $state<typeof workflows[0] | null>(null);
 
 	const filters = [
 		{ key: 'all', label: 'All Routines' },
@@ -153,6 +155,15 @@
 							Start Workout
 						</a>
 						<div class="flex gap-2">
+							<button
+								type="button"
+								class="flex-1 sm:flex-none rounded-xl border border-outline-variant/20 bg-surface-container-high px-3.5 py-3 text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-colors flex items-center justify-center gap-1.5"
+								onclick={() => (qrWorkflow = mostRecentWorkflow)}
+								title="Open on Mobile via QR"
+							>
+								<span class="material-symbols-outlined text-base">qr_code_2</span>
+								<span class="hidden sm:inline">Phone QR</span>
+							</button>
 							<a
 								href={`/workflows/${mostRecentWorkflow.id}/edit`}
 								class="flex-1 sm:flex-none rounded-xl border border-outline-variant/20 bg-surface-container-high px-4 py-3 text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-colors text-center"
@@ -233,6 +244,15 @@
 								</a>
 								<button
 									type="button"
+									class="rounded-md border border-outline-variant/20 bg-surface-container-high px-2.5 py-2 text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-colors flex items-center justify-center"
+									onclick={() => (qrWorkflow = workflow)}
+									title="Open on Mobile via QR"
+									aria-label={`Open ${workflow.name} on mobile`}
+								>
+									<span class="material-symbols-outlined text-base">qr_code_2</span>
+								</button>
+								<button
+									type="button"
 									class="rounded-md border border-error/25 bg-error/10 px-2.5 py-2 text-xs font-semibold text-error transition-colors hover:bg-error/20 disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center"
 									disabled={deletingWorkflowID === workflow.id}
 									onclick={() => deleteWorkflow(workflow.id, workflow.name)}
@@ -252,6 +272,15 @@
 			</div>
 		{/if}
 	</div>
+
+	{#if qrWorkflow}
+		<QrCodeModal
+			open={Boolean(qrWorkflow)}
+			routineId={qrWorkflow.id}
+			routineName={qrWorkflow.name}
+			onclose={() => (qrWorkflow = null)}
+		/>
+	{/if}
 </div>
 
 <style>

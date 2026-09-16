@@ -4,6 +4,7 @@
 	import type { PageData } from './$types';
 	import AddBlockModal from '$lib/editor/AddBlockModal.svelte';
 	import BlockRenderer from '$lib/blocks/BlockRenderer.svelte';
+	import QrCodeModal from '$lib/components/QrCodeModal.svelte';
 	import { groupBlocksBySection, type SectionBlockGroup } from '$lib/sections/group';
 	import type {
 		DraftBlock,
@@ -38,6 +39,7 @@
 
 	let activeTab = $state<'editor' | 'preview' | 'history'>('editor');
 	let showAddBlock = $state(false);
+	let showQrModal = $state(false);
 	let addBlockInsertIndex = $state(0);
 	let addBlockPlacementLabel = $state('');
 	let title = $state('');
@@ -605,6 +607,15 @@
 						<span class="material-symbols-outlined text-base">play_circle</span>
 						Play
 					</a>
+					<button
+						type="button"
+						onclick={() => (showQrModal = true)}
+						class="inline-flex h-11 items-center gap-2 rounded-md border border-outline-variant/20 bg-surface-container-low px-3.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
+						title="Open on Mobile via QR code"
+					>
+						<span class="material-symbols-outlined text-base">qr_code_2</span>
+						<span class="hidden xl:inline">Mobile QR</span>
+					</button>
 					<div class="inline-flex h-11 items-center rounded-md border border-outline-variant/20 bg-surface-container-low p-1">
 						<button
 							type="button"
@@ -663,6 +674,24 @@
 				</label>
 			</div>
 		</header>
+
+		<!-- Mobile Editor Awareness Advisory Banner -->
+		<div class="block md:hidden border-b border-primary/20 bg-primary/10 px-4 py-3 text-xs text-on-surface">
+			<div class="flex items-center justify-between gap-3">
+				<div class="flex items-center gap-2 min-w-0">
+					<span class="material-symbols-outlined text-base text-primary shrink-0">info</span>
+					<p class="text-xs text-on-surface-variant leading-snug">
+						The block canvas is optimized for larger screens. You can edit here, or jump straight to the Workout Player.
+					</p>
+				</div>
+				<a
+					href={`/workflows/${workflow!.id}/play`}
+					class="shrink-0 rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-on-primary-fixed shadow-sm hover:brightness-110"
+				>
+					Play
+				</a>
+			</div>
+		</div>
 
 		<div class="mx-auto grid max-w-[1600px] gap-6 px-6 py-6 xl:grid-cols-[minmax(0,1fr)_380px]">
 			<section class="space-y-4">
@@ -1818,5 +1847,14 @@
 			onclose={closeAddBlockModal}
 			onselect={addBlock}
 		/>
+
+		{#if workflow}
+			<QrCodeModal
+				open={showQrModal}
+				routineId={workflow.id}
+				routineName={title || workflow.name}
+				onclose={() => (showQrModal = false)}
+			/>
+		{/if}
 	</div>
 {/if}

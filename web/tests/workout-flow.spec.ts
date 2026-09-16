@@ -99,6 +99,14 @@ test.describe('RepEngine Workout Lifecycle E2E', () => {
 		await page.waitForTimeout(2000);
 		await page.screenshot({ path: '../docs/screenshots/2-editor.png' });
 
+		// Phase 3: Verify Mobile QR Code Bridge modal opens and closes in Editor
+		await page.click('button[title="Open on Mobile via QR code"]');
+		await expect(page.locator('#qr-modal-title')).toBeVisible();
+		await expect(page.locator('#qr-modal-title')).toHaveText('Open on Mobile');
+		await expect(page.locator('div[role="dialog"] svg')).toBeVisible();
+		await page.keyboard.press('Escape');
+		await expect(page.locator('#qr-modal-title')).not.toBeVisible();
+
 		// 13. Open the player
 		await page.click('a:has-text("Play")');
 
@@ -223,6 +231,15 @@ test.describe('RepEngine Workout Lifecycle E2E', () => {
 		await expect(page.locator('text=E2E Test Routine').first()).toBeVisible();
 		await expect(page.locator('text=Up Next · Quick Launch')).toBeVisible();
 		await expect(page.getByRole('link', { name: /Start Workout/i }).first()).toBeVisible();
+
+		// Phase 3: Verify Mobile QR modal launches from dashboard hero button
+		const heroQrBtn = page.locator('button[title="Open on Mobile via QR"]').first();
+		await heroQrBtn.click();
+		await expect(page.locator('#qr-modal-title')).toBeVisible();
+		await expect(page.locator('#qr-modal-title')).toHaveText('Open on Mobile');
+		await page.keyboard.press('Escape');
+		await expect(page.locator('#qr-modal-title')).not.toBeVisible();
+
 		await page.screenshot({ path: '../docs/screenshots/1-dashboard.png' });
 	});
 
@@ -257,7 +274,7 @@ test.describe('RepEngine Workout Lifecycle E2E', () => {
 		await page.waitForURL(/\/workflows\/\d+\/edit/, { timeout: 15000 });
 
 		// 5. Open player
-		const playLink = page.locator('a[href*="/play"]');
+		const playLink = page.locator('header a[href*="/play"]');
 		await playLink.click();
 		await page.waitForURL(/\/workflows\/\d+\/play/);
 

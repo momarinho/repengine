@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -17,6 +18,7 @@ type Config struct {
 	AppEnv      string // default "development"
 	LogLevel    string // default "info"
 	CORSOrigins string // default development localhost origins
+	RateLimitMax int   // default 600 (dev) or 300 (prod)
 	Version     string // injected at build time via ldflags
 	BuildTime   string // injected at build time via ldflags
 }
@@ -71,14 +73,25 @@ func Load(version, buildTime string) (*Config, error) {
 		corsOrigins = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173"
 	}
 
+	rateLimitMax := 300
+	if appEnv == "development" {
+		rateLimitMax = 600
+	}
+	if v := os.Getenv("RATE_LIMIT_MAX"); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 {
+			rateLimitMax = parsed
+		}
+	}
+
 	return &Config{
-		DatabaseURL: databaseURL,
-		JWTSecret:   jwtSecret,
-		Port:        port,
-		AppEnv:      appEnv,
-		LogLevel:    logLevel,
-		CORSOrigins: corsOrigins,
-		Version:     version,
-		BuildTime:   buildTime,
+		DatabaseURL:  databaseURL,
+		JWTSecret:    jwtSecret,
+		Port:         port,
+		AppEnv:       appEnv,
+		LogLevel:     logLevel,
+		CORSOrigins:  corsOrigins,
+		RateLimitMax: rateLimitMax,
+		Version:      version,
+		BuildTime:    buildTime,
 	}, nil
 }

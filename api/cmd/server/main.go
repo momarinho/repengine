@@ -119,7 +119,7 @@ func main() {
 	app.Use(middleware.RequestID())
 	app.Use(middleware.TimeoutMiddleware(10 * time.Second))
 	app.Use(limiter.New(limiter.Config{
-		Max:        100,
+		Max:        cfg.RateLimitMax,
 		Expiration: 1 * time.Minute,
 		KeyGenerator: func(c *fiber.Ctx) string {
 			return c.IP()
