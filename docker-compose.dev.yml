@@ -27,14 +27,26 @@ services:
         condition: service_healthy
     restart: on-failure
 
+  analytics:
+    build: ./analytics
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: development
+      PORT: 8000
+      CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000,http://localhost:8080"
+    restart: on-failure
+
   web:
     build: ./web
     ports:
       - "3000:3000"
     environment:
       API_URL: http://api:8080
+      ANALYTICS_URL: http://analytics:8000
     depends_on:
       - api
+      - analytics
 
 volumes:
   pgdata:

@@ -29,7 +29,8 @@ Here is a quick look at the RepEngine interface in action:
 
 ```mermaid
 graph TD
-    Client[SvelteKit Client] -- REST / Auth Cookie --> API[Go Fiber API]
+    Client[SvelteKit Client] -- REST / Auth Cookie --> API[Go Fiber Core API]
+    Client -- REST / Insights --> Analytics[Python FastAPI Analytics Service]
     API -- pgxpool --> DB[(PostgreSQL 16)]
     API -- Background Worker --> Queue[Clone Jobs Engine]
     Queue -- Async Clone --> DB
@@ -81,11 +82,18 @@ This project is built using production-grade patterns, focusing on security, con
 *   **Send-to-Phone QR Bridge**: Desktop editor and dashboard generate dynamic standalone SVG QR codes to transition an active session from desktop to a smartphone camera in seconds.
 *   **Resilient Local-First Offline Queue**: Set logs persist to `localStorage` when network connectivity drops in underground gyms and automatically flush upon reconnecting via `window.addEventListener('online')`.
 
+### 🐍 9. Python / FastAPI Athletic Intelligence & Autoregulation Microservice
+*   **Polyglot Microservices Architecture**: Decouples the low-latency Go core API (handling session persistence, locks, and concurrency) from an advanced Python 3.12 / FastAPI analytics engine designed for scientific data modeling.
+*   **Statistical 1RM Consensus**: Aggregates 5 canonical formulas (Brzycki, Epley, Mayhew, Wathen, Lombardi) adjusted for athlete RPE / Reps in Reserve, yielding consensus estimates, standard deviations, 95% confidence intervals, and projected 1-12 rep load targets.
+*   **ACWR Fatigue & Injury Prevention**: Calculates Acute:Chronic Workload Ratios via coupled rolling windows and EWMA (Exponentially Weighted Moving Average) models to detect non-functional overreaching, safe progression sweet-spots (0.8–1.3), and injury-prone spikes (>1.5).
+*   **Intelligent Autoregulation Recommender**: Evaluates chronological workout session histories, analyzing RPE drift and consecutive stall patterns to output progressive overload recommendations (+increment), load maintenance, or periodization cycle resets (-15%).
+
 ---
 
 ## 🛠️ Tech Stack
 
-*   **Backend**: Go (v1.25), Fiber framework, `pgx/pgxpool` (native PostgreSQL driver), JWT, `slog` (structured logging), Prometheus metrics.
+*   **Core Backend**: Go (v1.25), Fiber framework, `pgx/pgxpool` (native PostgreSQL driver), JWT, `slog` (structured logging), Prometheus metrics.
+*   **Analytics & AI Microservice**: Python (v3.12), FastAPI, Pydantic v2, NumPy, Uvicorn, Pytest.
 *   **Frontend**: SvelteKit (Svelte 5 runes), TypeScript, TailwindCSS, Web Audio API, Screen Wake Lock API, Vibration API, `localStorage` local-first runtime state.
 *   **Database**: PostgreSQL 16.
 *   **CI/CD & DevOps**: GitHub Actions (Linting, Tests, Docker Build & Push), Docker Compose, Nginx (TLS Termination).

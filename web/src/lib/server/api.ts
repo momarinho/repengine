@@ -1,7 +1,20 @@
 const API_URL = process.env.API_URL || 'http://localhost:8080';
+const ANALYTICS_URL = process.env.ANALYTICS_URL || 'http://localhost:8000';
 
 export function apiUrl(path: string): string {
 	return `${API_URL}${path}`;
+}
+
+export function analyticsUrl(path: string): string {
+	return `${ANALYTICS_URL}${path}`;
+}
+
+export async function analyticsFetch(
+	fetchFn: typeof fetch,
+	path: string,
+	init: RequestInit = {}
+): Promise<Response> {
+	return fetchFn(analyticsUrl(path), init);
 }
 
 export async function apiFetch(

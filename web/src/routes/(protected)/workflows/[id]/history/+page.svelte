@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import AnalyticsChart from '$lib/components/AnalyticsChart.svelte';
+	import ScientificInsights from '$lib/components/ScientificInsights.svelte';
 	import type { PageData } from './$types';
 	import type { WorkoutSession, WorkoutSetLog } from '$lib/workout-sessions/types';
 
@@ -210,6 +211,10 @@
 						{/if}
 					</div>
 				</div>
+			{/if}
+
+			{#if data.insights}
+				<ScientificInsights insights={data.insights} />
 			{/if}
 
 			{#if sessions.length > 0}

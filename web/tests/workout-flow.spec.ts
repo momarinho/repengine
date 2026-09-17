@@ -223,6 +223,12 @@ test.describe('RepEngine Workout Lifecycle E2E', () => {
 		await page.click('a:has-text("View history")');
 		await page.waitForURL(/\/workflows\/\d+\/history/);
 		await page.waitForSelector('svg path', { state: 'attached' });
+
+		// Assert Python FastAPI Athletic Intelligence & Autoregulation insights
+		await expect(page.locator('text=Athletic Intelligence & Autoregulation')).toBeVisible();
+		await expect(page.locator('text=Estimated 1RM Consensus')).toBeVisible();
+		await expect(page.locator('text=Autoregulation Next Step')).toBeVisible();
+
 		await page.waitForTimeout(500);
 		await page.screenshot({ path: '../docs/screenshots/4-history-analytics.png' });
 
