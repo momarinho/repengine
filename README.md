@@ -73,12 +73,20 @@ This project is built using production-grade patterns, focusing on security, con
 *   **Hands-Free Multi-Phase Execution**: Automatically parses structured interval protocols (such as 30s base pace / 15s all-out sprint / 15s rest) or dynamic regex intervals (`30/15/15`, Tabata `20/10`), cycling through phases, announcing phase switches, auto-logging completed rounds, and progressing seamlessly hands-free.
 *   **High-Visibility HUD**: Features an interactive interval dashboard with animated glowing phase badges, giant tabular countdown typography, round progress pills, audio toggle controls, and quick-skip/pause capabilities.
 
+### 📱 8. Dual-Workflow Model & Mobile Gym HUD
+*   **Physical Friction Elimination**: Solves the split between desktop routine programming ("Routine Architect") and in-gym workout execution ("Gym Execution HUD").
+*   **Screen Wake Lock API**: Leverages `navigator.wakeLock` to prevent mobile screens from sleeping during rests between sets, auto-reacquiring on tab visibility changes and releasing on workout completion.
+*   **Native Dialpad Inputs (`inputmode`)**: Explicitly triggers `inputmode="decimal"` and `inputmode="numeric"` so mobile OS renders large numeric dialpads directly, avoiding cumbersome QWERTY switching with sweaty hands.
+*   **Hardware Haptic Feedback**: Integrates `navigator.vibrate` synchronized with rest-interval countdowns (3-2-1 beeps) and phase transitions.
+*   **Send-to-Phone QR Bridge**: Desktop editor and dashboard generate dynamic standalone SVG QR codes to transition an active session from desktop to a smartphone camera in seconds.
+*   **Resilient Local-First Offline Queue**: Set logs persist to `localStorage` when network connectivity drops in underground gyms and automatically flush upon reconnecting via `window.addEventListener('online')`.
+
 ---
 
 ## 🛠️ Tech Stack
 
 *   **Backend**: Go (v1.25), Fiber framework, `pgx/pgxpool` (native PostgreSQL driver), JWT, `slog` (structured logging), Prometheus metrics.
-*   **Frontend**: SvelteKit (Svelte 5 runes), TypeScript, TailwindCSS, Web Audio API, `localStorage` local runtime state.
+*   **Frontend**: SvelteKit (Svelte 5 runes), TypeScript, TailwindCSS, Web Audio API, Screen Wake Lock API, Vibration API, `localStorage` local-first runtime state.
 *   **Database**: PostgreSQL 16.
 *   **CI/CD & DevOps**: GitHub Actions (Linting, Tests, Docker Build & Push), Docker Compose, Nginx (TLS Termination).
 
@@ -88,8 +96,10 @@ This project is built using production-grade patterns, focusing on security, con
 
 ### Implemented
 *   **Block-Based Editor**: Contextual block insertion supporting linear progression, wave loading, repeats, rest intervals, and timed exercises.
-*   **Active Workout Player**: Real-time section execution, interactive timer/rest tracker, and set-by-set input logging (Load, Reps, RPE, RIR).
-*   **Hands-Free Interval Engine**: Automated multi-phase interval player with native Web Audio sound cues (3-2-1 warnings, sprint chimes, rest cues) and hands-free round progression for conditioning workouts (Jump Rope, HIIT, Tabata).
+*   **Active Workout Player (Gym HUD)**: Real-time section execution, interactive timer/rest tracker, native numeric dialpads, Screen Wake Lock, and set-by-set input logging (Load, Reps, RPE, RIR).
+*   **Hands-Free Interval Engine**: Automated multi-phase interval player with native Web Audio sound cues (3-2-1 warnings, sprint chimes, rest cues), haptic vibrations, and hands-free round progression for conditioning workouts (Jump Rope, HIIT, Tabata).
+*   **Local Send-to-Phone QR Bridge**: Dynamic in-app SVG QR code generator to transition training sessions from desktop to phone instantly.
+*   **Action-Oriented Mobile Dashboard**: Quick-launch hero workout card for 1-tap training starts and elevated primary action hierarchy.
 *   **Pre-Built Hybrid Templates**: Seeded official templates including GZCLP adapted for Calisthenics & Barbell Hybrid with dedicated jump rope conditioning and linear progression.
 *   **Smart Progression Suggestions**: Real-time suggestion engine adjusting target loads/reps for linear and wave progression nodes based on completed set difficulty.
 *   **Version History & Restore**: Automatic serialization of workflow snapshots with restore capabilities and rollback mechanisms.
