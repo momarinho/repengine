@@ -2,6 +2,7 @@
 	import { untrack } from 'svelte';
 	import type { PageData } from './$types';
 	import QrCodeModal from '$lib/components/QrCodeModal.svelte';
+	import PlayRoutineModal from '$lib/components/PlayRoutineModal.svelte';
 
 	let { data }: { data: PageData } = $props();
 	const initialWorkflows = untrack(() => [...data.workflows]);
@@ -11,6 +12,7 @@
 	let deletingWorkflowID = $state<number | null>(null);
 	let deleteError = $state('');
 	let qrWorkflow = $state<typeof workflows[0] | null>(null);
+	let playWorkflow = $state<typeof workflows[0] | null>(null);
 
 	const filters = [
 		{ key: 'all', label: 'All Routines' },
@@ -150,6 +152,10 @@
 						<a
 							href={`/workflows/${mostRecentWorkflow.id}/play`}
 							class="btn-primary-gradient text-on-primary-fixed font-headline font-bold text-base px-6 py-3.5 rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center gap-2 hover:brightness-110 active:scale-[0.98] transition-all"
+							onclick={(e) => {
+								e.preventDefault();
+								playWorkflow = mostRecentWorkflow;
+							}}
 						>
 							<span class="material-symbols-outlined text-2xl">play_arrow</span>
 							Start Workout
@@ -225,6 +231,10 @@
 							<a
 								href={`/workflows/${workflow.id}/play`}
 								class="btn-primary-gradient text-on-primary-fixed font-headline font-bold text-xs sm:text-sm px-4 py-2.5 rounded-lg shadow-md flex items-center justify-center gap-1.5 hover:brightness-110 active:scale-[0.98] transition-all"
+								onclick={(e) => {
+									e.preventDefault();
+									playWorkflow = workflow;
+								}}
 							>
 								<span class="material-symbols-outlined text-lg">play_arrow</span>
 								Start Workout
@@ -279,6 +289,15 @@
 			routineId={qrWorkflow.id}
 			routineName={qrWorkflow.name}
 			onclose={() => (qrWorkflow = null)}
+		/>
+	{/if}
+
+	{#if playWorkflow}
+		<PlayRoutineModal
+			open={Boolean(playWorkflow)}
+			routineId={playWorkflow.id}
+			routineName={playWorkflow.name}
+			onclose={() => (playWorkflow = null)}
 		/>
 	{/if}
 </div>

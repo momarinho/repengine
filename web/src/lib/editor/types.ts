@@ -52,14 +52,25 @@ export type DraftBlock = {
 
 export type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'conflict' | 'error';
 
+export function defaultRestSecondsForNodeType(slug: string): number | undefined {
+	if (slug === 'exercise') return 90;
+	if (['linear_progression', 'wave', 'superset'].includes(slug)) return 120;
+	return undefined;
+}
+
 export function toDraftBlock(block: WorkflowBlockApi, index: number): DraftBlock {
+	const data = deepClone(block.data ?? {});
+	const defaultRest = defaultRestSecondsForNodeType(block.node_type_slug);
+	if (defaultRest !== undefined && data.rest_seconds === undefined) {
+		data.rest_seconds = defaultRest;
+	}
 	return {
 		client_id: `${block.id ?? 'new'}-${index}-${cryptoLikeRandom()}`,
 		id: block.id,
 		workflow_id: block.workflow_id,
 		node_type_slug: block.node_type_slug,
 		position: block.position ?? index,
-		data: deepClone(block.data ?? {})
+		data
 	};
 }
 
@@ -72,11 +83,16 @@ export function toWorkflowPayload(blocks: DraftBlock[]): WorkflowBlockApi[] {
 }
 
 export function defaultBlockForNodeType(nodeType: NodeType, position: number): DraftBlock {
+	const data = deepClone(nodeType.schema ?? {});
+	const defaultRest = defaultRestSecondsForNodeType(nodeType.slug);
+	if (defaultRest !== undefined && data.rest_seconds === undefined) {
+		data.rest_seconds = defaultRest;
+	}
 	return {
 		client_id: `new-${nodeType.slug}-${position}-${cryptoLikeRandom()}`,
 		node_type_slug: nodeType.slug,
 		position,
-		data: deepClone(nodeType.schema ?? {})
+		data
 	};
 }
 

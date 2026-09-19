@@ -7,6 +7,7 @@
 	import type { PlayerBlock, PlayerRoutine, PlayerSection, WaveWeek } from '$lib/player/types';
 	import type { WorkoutSession, WorkoutSetLog } from '$lib/workout-sessions/types';
 	import type { TrainingMax } from '$lib/training-maxes/types';
+	import { getNextAndLastCompletedSection, getSectionExercisePreview, formatRelativeDate } from '$lib/player/cycle';
 
 	type SessionActivityKind = 'set' | 'round' | 'block' | 'timer';
 
@@ -131,6 +132,7 @@
 	let isSessionComplete = $state(false);
 	let activityEntries = $state<SessionActivity[]>([]);
 	let hasRestoredSession = $state(false);
+	let hasActiveSavedRun = $state(false);
 	let sessionHistory = $state<WorkoutSession[]>(initialData.sessionHistory ?? []);
 	let progressionStates = $state<ProgressionState[]>(initialData.progressionStates ?? []);
 	let activePersistedSession = $state<WorkoutSession | null>(null);
@@ -140,6 +142,24 @@
 	let isPreviewingLoads = $state(false);
 	let previewSection = $state<PlayerSection | null>(null);
 	let overrideLoads = $state<Record<string, string>>({});
+
+	const nextCycleInfo = $derived.by(() => {
+		return getNextAndLastCompletedSection(routine?.sections, sessionHistory);
+	});
+
+	function resumeSavedSession(): void {
+		isChoosingSection = false;
+		isSessionComplete = false;
+	}
+
+	async function discardSavedSession(): Promise<void> {
+		if (activePersistedSession) {
+			await abandonPersistedSession();
+		} else {
+			clearLocalSession({ autoStart: false, chooserOpen: true });
+		}
+		hasActiveSavedRun = false;
+	}
 
 	let syncQueue = $state<Array<{
 		sessionID: number;
@@ -404,7 +424,9 @@
 			return block.durationSeconds ?? block.restSeconds ?? 0;
 		}
 
-		return block.restSeconds ?? 0;
+		return typeof block.restSeconds === 'number'
+			? block.restSeconds
+			: (block.node_type_slug === 'exercise' ? 90 : 120);
 	}
 
 	function getCurrentSet(block: PlayerBlock): number {
@@ -1522,7 +1544,11 @@
 			value: number;
 		}
 	): void {
-		const duration = block.restSeconds ?? 0;
+		const fallbackRest = block.node_type_slug === 'exercise' ? 90 : 120;
+		const duration =
+			typeof block.restSeconds === 'number' && block.restSeconds >= 0
+				? block.restSeconds
+				: fallbackRest;
 		if (duration <= 0) {
 			if (advance?.type === 'set') {
 				currentSetByBlock = { ...currentSetByBlock, [block.id]: advance.value };
@@ -1903,6 +1929,10 @@
 				void restorePersistedSession(recentActiveSession.id).catch(() => {
 					sessionError = 'Unable to restore workout session.';
 				});
+				if (routine.sections.length > 0 && !hasSectionQuery) {
+					isChoosingSection = true;
+					hasActiveSavedRun = true;
+				}
 			} else if (!isChoosingSection) {
 				void startSection(initialSection);
 			}
@@ -1939,8 +1969,25 @@
 			actualRIRByBlock = savedState.actualRIRByBlock ?? {};
 			sessionElapsedSeconds = Math.max(savedState.sessionElapsedSeconds ?? 0, 0);
 			activeSection = savedSection;
-			isChoosingSection = Boolean(savedState.isChoosingSection);
-			isSessionComplete = Boolean(savedState.isSessionComplete);
+
+			if (savedState.isSessionComplete) {
+				localStorage.removeItem(localSessionKey);
+				isSessionComplete = false;
+				if (routine.sections.length > 0 && !hasSectionQuery) {
+					isChoosingSection = true;
+				} else {
+					resetRuntimeState(initialBlockIndex, initialSection, false);
+				}
+			} else {
+				if (routine.sections.length > 0 && !hasSectionQuery) {
+					isChoosingSection = true;
+					hasActiveSavedRun = true;
+					isSessionComplete = false;
+				} else {
+					isChoosingSection = Boolean(savedState.isChoosingSection);
+					isSessionComplete = false;
+				}
+			}
 			activityEntries = (savedState.activityEntries ?? []).filter((entry) => blockIDs.has(entry.blockID));
 			timerRemainingSeconds =
 				typeof savedState.timerRemainingSeconds === 'number'
@@ -2183,47 +2230,195 @@
 			<div class="mx-auto max-w-5xl">
 				<div class="mb-8 flex flex-wrap items-center justify-between gap-4">
 					<div>
-						<a href={`/workflows/${routine.id}/edit`} class="text-xs font-bold uppercase tracking-[0.2em] text-tertiary">Back to editor</a>
-						<h1 class="mt-3 text-3xl font-bold tracking-tight text-on-background">{routine.name}</h1>
-						<p class="mt-2 text-sm text-on-surface-variant">{routine.description || 'Choose the section you want to execute now.'}</p>
+						<div class="flex items-center gap-2 mb-1 text-xs font-bold uppercase tracking-[0.2em]">
+							<a href="/dashboard" class="text-on-surface-variant hover:text-on-surface transition-colors">← Dashboard</a>
+							<span class="text-outline-variant/40">·</span>
+							<a href={`/workflows/${routine.id}/edit`} class="text-tertiary hover:underline">Edit routine</a>
+						</div>
+						<h1 class="mt-2 text-3xl font-bold tracking-tight text-on-background">{routine.name}</h1>
+						<p class="mt-2 text-sm text-on-surface-variant">{routine.description || 'Choose a day to train today or continue to the next scheduled day in your cycle.'}</p>
 					</div>
-					<button
-						type="button"
-						class="rounded-md border border-outline-variant/20 bg-surface-container px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
-						onclick={() => openLoadPreview(null)}
-						disabled={isSyncingSession}
-					>
-						Start Workout
-					</button>
+
+					<div class="flex flex-wrap items-center gap-2">
+						{#if hasActiveSavedRun}
+							<button
+								type="button"
+								class="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-xs sm:text-sm font-bold text-amber-400 transition-colors hover:bg-amber-500/20 cursor-pointer"
+								onclick={resumeSavedSession}
+							>
+								Resume in-progress workout
+							</button>
+						{/if}
+						<button
+							type="button"
+							class="rounded-xl border border-outline-variant/20 bg-surface-container px-4 py-2 text-xs sm:text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high cursor-pointer"
+							onclick={() => openLoadPreview(null)}
+							disabled={isSyncingSession}
+						>
+							Start whole workout
+						</button>
+					</div>
 				</div>
+
 				{#if sessionError}
 					<div class="mb-6 rounded-xl border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
 						{sessionError}
 					</div>
 				{/if}
 
-				<div class="grid gap-4 md:grid-cols-2">
-					{#each routine.sections as section}
-						<button
-							type="button"
-							class="rounded-xl border border-outline-variant/20 bg-surface-container p-5 text-left transition-colors hover:border-primary/40 hover:bg-surface-container-high"
-							onclick={() => openLoadPreview(section)}
-							disabled={isSyncingSession}
-						>
-							<div class="mb-5 flex items-start justify-between gap-4">
-								<div>
-									<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-tertiary">{section.kind}</p>
-									<h2 class="mt-2 text-xl font-bold text-on-surface">{section.title}</h2>
-									<p class="mt-1 text-sm text-on-surface-variant">{section.subtitle || `${section.blockCount} blocks`}</p>
+				<!-- Active In-Progress Banner -->
+				{#if hasActiveSavedRun && activeSection}
+					<div class="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 shadow-lg">
+						<div class="flex flex-wrap items-center justify-between gap-4">
+							<div>
+								<div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+									<span class="material-symbols-outlined text-base">pause_circle</span>
+									Active session in progress
 								</div>
-								<span class="material-symbols-outlined text-primary">play_circle</span>
+								<h3 class="mt-1 text-lg font-bold text-on-surface">
+									{activeSection.title}
+								</h3>
+								<p class="text-xs text-on-surface-variant">
+									You have an unfinished workout session with recorded logs.
+								</p>
 							</div>
-							<div class="flex items-center justify-between border-t border-outline-variant/20 pt-4 text-xs text-on-surface-variant">
-								<span>{section.blockCount} blocks</span>
-								<span>Starts at #{section.startBlockIndex + 1}</span>
+							<div class="flex items-center gap-3">
+								<button
+									type="button"
+									class="rounded-xl bg-amber-500 px-4 py-2.5 text-xs sm:text-sm font-bold text-slate-950 shadow hover:brightness-110 active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer"
+									onclick={resumeSavedSession}
+								>
+									<span class="material-symbols-outlined text-base">play_arrow</span>
+									Resume workout
+								</button>
+								<button
+									type="button"
+									class="rounded-xl border border-outline-variant/30 bg-surface-container px-3.5 py-2.5 text-xs font-semibold text-on-surface-variant hover:text-error hover:border-error/40 transition-colors cursor-pointer"
+									onclick={() => void discardSavedSession()}
+								>
+									Discard
+								</button>
 							</div>
-						</button>
-					{/each}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Featured Next Day Card -->
+				{#if nextCycleInfo.nextSection}
+					{@const next = nextCycleInfo.nextSection}
+					{@const previews = getSectionExercisePreview(routine.blocks, next, 4)}
+					<div class="mb-8 rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-surface-container-high/90 to-surface-container p-6 shadow-xl shadow-primary/5">
+						<div class="flex flex-wrap items-center justify-between gap-2">
+							<span class="inline-flex items-center gap-1.5 rounded-md bg-primary/20 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-primary">
+								<span class="material-symbols-outlined text-sm">auto_awesome</span>
+								Suggested Next in Cycle
+							</span>
+							{#if nextCycleInfo.lastCompletedSection && nextCycleInfo.lastCompletedSession}
+								<span class="text-xs text-on-surface-variant">
+									Last completed: <strong class="text-on-surface">{nextCycleInfo.lastCompletedSection.title}</strong> ({formatRelativeDate(nextCycleInfo.lastCompletedSession.completed_at || nextCycleInfo.lastCompletedSession.started_at)})
+								</span>
+							{/if}
+						</div>
+
+						<div class="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+							<div>
+								<h2 class="font-headline text-2xl md:text-3xl font-bold text-on-surface">{next.title}</h2>
+								<p class="mt-1 text-sm text-on-surface-variant">
+									{next.subtitle || `${next.blockCount} exercises & blocks`} · Starts at #{next.startBlockIndex + 1}
+								</p>
+
+								{#if previews.length > 0}
+									<div class="mt-3 flex flex-wrap gap-1.5">
+										{#each previews as exercise}
+											<span class="rounded-lg border border-white/10 bg-surface-container-lowest/60 px-2.5 py-1 text-xs text-on-surface">
+												{exercise}
+											</span>
+										{/each}
+										{#if next.blockCount > previews.length}
+											<span class="text-xs text-on-surface-variant self-center">
+												+{next.blockCount - previews.length} more
+											</span>
+										{/if}
+									</div>
+								{/if}
+							</div>
+
+							<div class="flex-shrink-0">
+								<button
+									type="button"
+									class="btn-primary-gradient w-full md:w-auto text-on-primary-fixed font-headline font-bold text-base py-3.5 px-7 rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center gap-2 hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
+									onclick={() => openLoadPreview(next)}
+									disabled={isSyncingSession}
+								>
+									<span class="material-symbols-outlined text-2xl">play_arrow</span>
+									Continue to Next: {next.title}
+								</button>
+							</div>
+						</div>
+					</div>
+				{/if}
+
+				<!-- Choose another day -->
+				<div>
+					<div class="mb-4 flex items-center justify-between">
+						<h3 class="font-headline text-lg font-bold text-on-surface">
+							Or Choose Another Day
+						</h3>
+						<span class="text-xs text-on-surface-variant">
+							{routine.sections.length} total days in routine
+						</span>
+					</div>
+
+					<div class="grid gap-4 md:grid-cols-2">
+						{#each routine.sections as section}
+							{@const isNext = section.id === nextCycleInfo.nextSection?.id}
+							{@const isLast = section.id === nextCycleInfo.lastCompletedSection?.id}
+							{@const exercises = getSectionExercisePreview(routine.blocks, section, 3)}
+							<button
+								type="button"
+								class="group rounded-xl border border-outline-variant/20 bg-surface-container p-5 text-left transition-all hover:border-primary/40 hover:bg-surface-container-high active:scale-[0.99] cursor-pointer"
+								onclick={() => openLoadPreview(section)}
+								disabled={isSyncingSession}
+							>
+								<div class="mb-4 flex items-start justify-between gap-4">
+									<div>
+										<div class="flex items-center gap-2 mb-1">
+											<span class="text-[10px] font-bold uppercase tracking-[0.2em] text-tertiary">{section.kind || 'Day'}</span>
+											{#if isNext}
+												<span class="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+													Next up
+												</span>
+											{:else if isLast}
+												<span class="rounded bg-surface-container-highest px-1.5 py-0.5 text-[10px] font-medium text-on-surface-variant">
+													Last done
+												</span>
+											{/if}
+										</div>
+										<h4 class="text-xl font-bold text-on-surface group-hover:text-primary transition-colors">{section.title}</h4>
+										<p class="mt-1 text-sm text-on-surface-variant">{section.subtitle || `${section.blockCount} blocks`}</p>
+									</div>
+									<span class="material-symbols-outlined text-primary group-hover:scale-110 transition-transform">play_circle</span>
+								</div>
+
+								{#if exercises.length > 0}
+									<div class="mb-4 flex flex-wrap gap-1.5">
+										{#each exercises as exercise}
+											<span class="rounded border border-white/5 bg-surface-container-low px-2 py-0.5 text-[11px] text-on-surface-variant">
+												{exercise}
+											</span>
+										{/each}
+									</div>
+								{/if}
+
+								<div class="flex items-center justify-between border-t border-outline-variant/20 pt-4 text-xs text-on-surface-variant">
+									<span>{section.blockCount} blocks</span>
+									<span class="text-primary font-semibold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+										Start day <span class="material-symbols-outlined text-xs">arrow_forward</span>
+									</span>
+								</div>
+							</button>
+						{/each}
+					</div>
 				</div>
 			</div>
 		</div>
@@ -2455,21 +2650,38 @@
 					</div>
 				{/if}
 				<div class="mt-8 flex flex-wrap justify-center gap-3">
+					{#if nextCycleInfo.nextSection && nextCycleInfo.nextSection.id !== activeSection?.id}
+						<button
+							type="button"
+							class="btn-primary-gradient rounded-xl px-5 py-2.5 text-sm font-bold text-on-primary-fixed shadow-md hover:brightness-110 active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer"
+							onclick={() => {
+								clearLocalSession({ autoStart: false, chooserOpen: false });
+								openLoadPreview(nextCycleInfo.nextSection);
+							}}
+							disabled={isSyncingSession}
+						>
+							<span class="material-symbols-outlined text-lg">play_arrow</span>
+							Continue to Next Day: {nextCycleInfo.nextSection.title}
+						</button>
+					{/if}
 					<button
 						type="button"
-						class="rounded-md border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/15"
-						onclick={() => void startSection(activeSection)}
+						class="rounded-xl border border-outline-variant/20 bg-surface-container-high px-4 py-2.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-highest cursor-pointer"
+						onclick={() => {
+							clearLocalSession({ autoStart: false, chooserOpen: true });
+							isChoosingSection = true;
+						}}
 						disabled={isSyncingSession}
 					>
-						Restart section
+						Choose another day
 					</button>
 					<button
 						type="button"
-						class="rounded-md border border-outline-variant/20 bg-surface-container-high px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-highest"
-						onclick={() => (isChoosingSection = true)}
+						class="rounded-xl border border-primary/20 bg-primary/10 px-4 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/15 cursor-pointer"
+						onclick={() => void startSection(activeSection)}
 						disabled={isSyncingSession}
 					>
-						Choose another section
+						Restart this day
 					</button>
 					{#if activePersistedSession && sessionError}
 						<button
@@ -2512,8 +2724,20 @@
 	{:else if currentBlock}
 	<header class="fixed top-0 z-40 flex w-full flex-col items-center border-b border-white/5 bg-background/80 backdrop-blur-xl">
 		<div class="flex h-14 w-full items-center justify-between px-6">
-			<div class="min-w-0">
+			<div class="flex items-center gap-3 min-w-0">
 				<p class="truncate text-sm font-bold tracking-tight text-on-background">{routine.name}</p>
+				{#if routine.sections.length > 1}
+					<button
+						type="button"
+						class="flex items-center gap-1 rounded-lg border border-outline-variant/20 bg-surface-container px-2 py-1 text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors flex-shrink-0 cursor-pointer"
+						onclick={() => (isChoosingSection = true)}
+						title="Switch Day or Section"
+					>
+						<span class="material-symbols-outlined text-xs text-tertiary">calendar_today</span>
+						<span class="hidden sm:inline">{activeSection?.title || 'Change Day'}</span>
+						<span class="material-symbols-outlined text-xs">arrow_drop_down</span>
+					</button>
+				{/if}
 			</div>
 
 			<div class="flex items-center gap-4">
@@ -2656,7 +2880,7 @@
 						<div class="grid gap-4 rounded-xl border border-white/5 bg-surface-container-low p-5 md:grid-cols-2">
 							<div>
 								<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Suggested rest</p>
-								<p class="mt-2 text-2xl font-bold text-on-surface">{formatClock(currentBlock.restSeconds ?? 0)}</p>
+								<p class="mt-2 text-2xl font-bold text-on-surface">{formatClock(currentBlock.restSeconds ?? (currentBlock.node_type_slug === 'exercise' ? 90 : 120))}</p>
 							</div>
 							<div>
 								<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Set completion</p>
@@ -3128,7 +3352,7 @@
 							<div class="grid gap-4 rounded-xl border border-white/5 bg-surface-container-low p-5 md:grid-cols-2">
 								<div>
 									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Suggested rest</p>
-									<p class="mt-2 text-2xl font-bold text-on-surface">{formatClock(currentBlock.restSeconds ?? 0)}</p>
+									<p class="mt-2 text-2xl font-bold text-on-surface">{formatClock(currentBlock.restSeconds ?? 120)}</p>
 								</div>
 								<div>
 									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Set completion</p>

@@ -290,6 +290,7 @@ func exerciseBlock(exercise, reps string, sets int) templateBlockSeed {
 			"exercise_name": exercise,
 			"sets":          sets,
 			"reps":          reps,
+			"rest_seconds":  90,
 		},
 	}
 }

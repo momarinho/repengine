@@ -22,7 +22,12 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 function asNumber(value: unknown): number | undefined {
-	return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+	if (typeof value === 'number' && Number.isFinite(value)) return value;
+	if (typeof value === 'string' && value.trim() !== '') {
+		const parsed = Number(value);
+		return Number.isFinite(parsed) ? parsed : undefined;
+	}
+	return undefined;
 }
 
 function asString(value: unknown): string | undefined {
@@ -225,6 +230,19 @@ function mapWaveWeeks(data: Record<string, unknown>): { weeks: WaveWeek[]; activ
 	};
 }
 
+function defaultRestSecondsForType(type: PlayerBlockType): number | undefined {
+	switch (type) {
+		case 'exercise':
+			return 90;
+		case 'linear_progression':
+		case 'superset':
+		case 'wave':
+			return 120;
+		default:
+			return undefined;
+	}
+}
+
 function mapPlayerBlock(block: WorkflowBlockApi, index: number, section: SectionContext | null): PlayerBlock | null {
 	const type = resolveBlockType(block.node_type_slug);
 	if (!type) return null;
@@ -234,7 +252,7 @@ function mapPlayerBlock(block: WorkflowBlockApi, index: number, section: Section
 	const load = asNumber(data.load) ?? asNumber(data.load_value) ?? asNumber(data.start_load);
 	const loadUnit = asString(data.load_unit) ?? (load !== undefined ? 'kg' : undefined);
 	const durationSeconds = asNumber(data.duration);
-	const restSeconds = asNumber(data.rest_seconds) ?? asNumber(data.rest);
+	const restSeconds = asNumber(data.rest_seconds) ?? asNumber(data.rest) ?? defaultRestSecondsForType(type);
 	const times = asNumber(data.times) ?? asNumber(data.rounds);
 	const wave = type === 'wave' ? mapWaveWeeks(data) : null;
 
