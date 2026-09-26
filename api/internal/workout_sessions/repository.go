@@ -37,9 +37,9 @@ func (r *Repository) StartSession(ctx context.Context, in StartSessionInput) (Wo
 	row := r.pool.QueryRow(ctx,
 		`
 		INSERT INTO workout_sessions (
-  			workflow_id, user_id, section_id, section_title, status
+  			workflow_id, user_id, section_id, section_title, status, client_id
   		)
-  		SELECT $1, $2, $3, $4, $5
+  		SELECT $1, $2, $3, $4, $5, NULLIF($6, '')
   		WHERE EXISTS (
   			SELECT 1 FROM workflows
   			WHERE id = $1 AND user_id = $2
@@ -47,8 +47,9 @@ func (r *Repository) StartSession(ctx context.Context, in StartSessionInput) (Wo
   		RETURNING id, workflow_id, user_id,
   		          COALESCE(section_id, ''),
   		          COALESCE(section_title, ''),
-  		          status, started_at, completed_at, COALESCE(notes, ''), 0
-		`, in.WorkflowID, in.UserID, in.SectionID, in.SectionTitle, SessionStatusActive)
+  		          status, started_at, completed_at, COALESCE(notes, ''), 0,
+  		          COALESCE(client_id, '')
+		`, in.WorkflowID, in.UserID, in.SectionID, in.SectionTitle, SessionStatusActive, in.ClientID)
 
 	session, err := scanWorkoutSession(row)
 	if err == nil {
@@ -56,6 +57,11 @@ func (r *Repository) StartSession(ctx context.Context, in StartSessionInput) (Wo
 	}
 
 	if IsUniqueViolation(err) {
+		if in.ClientID != "" {
+			if existing, clientErr := r.GetSessionByClientID(ctx, in.UserID, in.ClientID); clientErr == nil {
+				return existing, nil
+			}
+		}
 		return r.GetActiveSessionByWorkflow(ctx, in.UserID, in.WorkflowID)
 	}
 
@@ -68,7 +74,8 @@ func (r *Repository) GetActiveSessionByWorkflow(ctx context.Context, userID, wor
 		       COALESCE(section_id, ''),
 		       COALESCE(section_title, ''),
 		       status, started_at, completed_at, COALESCE(notes, ''),
-		       (SELECT COUNT(*) FROM workout_set_logs WHERE session_id = workout_sessions.id) AS log_count
+		       (SELECT COUNT(*) FROM workout_set_logs WHERE session_id = workout_sessions.id) AS log_count,
+		       COALESCE(client_id, '')
 		FROM workout_sessions
 		WHERE user_id = $1
 		  AND workflow_id = $2
@@ -80,7 +87,39 @@ func (r *Repository) GetActiveSessionByWorkflow(ctx context.Context, userID, wor
 	return scanWorkoutSession(row)
 }
 
+func (r *Repository) GetSessionByClientID(ctx context.Context, userID int, clientID string) (WorkoutSession, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT id, workflow_id, user_id,
+		       COALESCE(section_id, ''),
+		       COALESCE(section_title, ''),
+		       status, started_at, completed_at, COALESCE(notes, ''),
+		       (SELECT COUNT(*) FROM workout_set_logs WHERE session_id = workout_sessions.id) AS log_count,
+		       COALESCE(client_id, '')
+		FROM workout_sessions
+		WHERE user_id = $1
+		  AND client_id = $2
+		LIMIT 1
+	`, userID, clientID)
+
+	session, err := scanWorkoutSession(row)
+	if err != nil {
+		return WorkoutSession{}, err
+	}
+	logs, err := r.ListSessionLogs(ctx, session.ID)
+	if err != nil {
+		return WorkoutSession{}, err
+	}
+	session.Logs = logs
+	return session, nil
+}
+
 func (r *Repository) InsertSetLog(ctx context.Context, in InsertSetLogInput) (WorkoutSetLog, error) {
+	if in.ClientID != "" {
+		if existing, err := r.GetSetLogByClientID(ctx, in.UserID, in.ClientID); err == nil {
+			return existing, nil
+		}
+	}
+
 	actualLoadValue := fitness.OptionalFirstNumberString(in.ActualLoad)
 	actualRPEValue := fitness.OptionalFirstNumberString(in.ActualRPE)
 	actualRIRValue := fitness.OptionalFirstNumberString(in.ActualRIR)
@@ -104,14 +143,16 @@ func (r *Repository) InsertSetLog(ctx context.Context, in InsertSetLogInput) (Wo
 			actual_rpe_value,
 			actual_rir_value,
 			completed,
-			notes
+			notes,
+			client_id
 		)
 		SELECT
 			$1, $2, $3, $4, $5,
 			$6, $7, $8, $9,
 			$10, $11, $12, $13,
 			$14, $15, $16,
-			$17, $18
+			$17, $18,
+			NULLIF($21, '')
 		WHERE EXISTS (
 			SELECT 1 FROM workout_sessions
 			WHERE id = $1
@@ -135,13 +176,14 @@ func (r *Repository) InsertSetLog(ctx context.Context, in InsertSetLogInput) (Wo
 			actual_rpe_value     = EXCLUDED.actual_rpe_value,
 			actual_rir_value     = EXCLUDED.actual_rir_value,
 			completed            = EXCLUDED.completed,
-			notes                = EXCLUDED.notes
+			notes                = EXCLUDED.notes,
+			client_id            = COALESCE(EXCLUDED.client_id, workout_set_logs.client_id)
 		RETURNING id, session_id, workflow_block_id, block_client_id, node_type_slug,
 		          set_index, COALESCE(prescribed_reps, ''), COALESCE(prescribed_load, ''),
 		          COALESCE(prescribed_intensity, ''), COALESCE(prescribed_rpe, ''),
 		          COALESCE(actual_reps, ''), COALESCE(actual_load, ''), COALESCE(actual_rpe, ''),
 		          COALESCE(actual_rir, ''),
-		          completed, COALESCE(notes, ''), created_at
+		          completed, COALESCE(notes, ''), COALESCE(client_id, ''), created_at
 	`,
 		in.SessionID,           // $1
 		in.WorkflowBlockID,     // $2
@@ -163,7 +205,38 @@ func (r *Repository) InsertSetLog(ctx context.Context, in InsertSetLogInput) (Wo
 		in.Notes,               // $18
 		in.UserID,              // $19
 		SessionStatusActive,    // $20
+		in.ClientID,            // $21
 	)
+
+	log, err := scanWorkoutSetLog(row)
+	if err == nil {
+		return log, nil
+	}
+
+	if IsUniqueViolation(err) && in.ClientID != "" {
+		if existing, clientErr := r.GetSetLogByClientID(ctx, in.UserID, in.ClientID); clientErr == nil {
+			return existing, nil
+		}
+	}
+
+	return WorkoutSetLog{}, err
+}
+
+func (r *Repository) GetSetLogByClientID(ctx context.Context, userID int, clientID string) (WorkoutSetLog, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT logs.id, logs.session_id, logs.workflow_block_id, COALESCE(logs.block_client_id, ''),
+		       logs.node_type_slug, logs.set_index, COALESCE(logs.prescribed_reps, ''),
+		       COALESCE(logs.prescribed_load, ''), COALESCE(logs.prescribed_intensity, ''),
+		       COALESCE(logs.prescribed_rpe, ''), COALESCE(logs.actual_reps, ''),
+		       COALESCE(logs.actual_load, ''), COALESCE(logs.actual_rpe, ''),
+		       COALESCE(logs.actual_rir, ''), logs.completed, COALESCE(logs.notes, ''),
+		       COALESCE(logs.client_id, ''), logs.created_at
+		FROM workout_set_logs logs
+		JOIN workout_sessions sessions ON sessions.id = logs.session_id
+		WHERE sessions.user_id = $1
+		  AND logs.client_id = $2
+		LIMIT 1
+	`, userID, clientID)
 
 	return scanWorkoutSetLog(row)
 }
@@ -245,7 +318,8 @@ func (r *Repository) UpdateSetLog(ctx context.Context, in UpdateSetLogInput) (Wo
 		          COALESCE(logs.prescribed_load, ''), COALESCE(logs.prescribed_intensity, ''),
 		          COALESCE(logs.prescribed_rpe, ''), COALESCE(logs.actual_reps, ''),
 		          COALESCE(logs.actual_load, ''), COALESCE(logs.actual_rpe, ''),
-		          COALESCE(logs.actual_rir, ''), logs.completed, COALESCE(logs.notes, ''), logs.created_at
+		          COALESCE(logs.actual_rir, ''), logs.completed, COALESCE(logs.notes, ''),
+		          COALESCE(logs.client_id, ''), logs.created_at
 	`,
 		in.WorkflowBlockID,
 		in.BlockClientID,
@@ -278,7 +352,8 @@ func (r *Repository) GetSession(ctx context.Context, sessionID, userID int) (Wor
 		       COALESCE(section_id, ''),
 		       COALESCE(section_title, ''),
 		       status, started_at, completed_at, COALESCE(notes, ''),
-		       (SELECT COUNT(*) FROM workout_set_logs WHERE session_id = workout_sessions.id) AS log_count
+		       (SELECT COUNT(*) FROM workout_set_logs WHERE session_id = workout_sessions.id) AS log_count,
+		       COALESCE(client_id, '')
 		FROM workout_sessions
 		WHERE id = $1 AND user_id = $2
 	`, sessionID, userID)
@@ -304,7 +379,7 @@ func (r *Repository) ListSessionLogs(ctx context.Context, sessionID int) ([]Work
 		       COALESCE(prescribed_intensity, ''), COALESCE(prescribed_rpe, ''),
 		       COALESCE(actual_reps, ''), COALESCE(actual_load, ''), COALESCE(actual_rpe, ''),
 		       COALESCE(actual_rir, ''),
-		       completed, COALESCE(notes, ''), created_at
+		       completed, COALESCE(notes, ''), COALESCE(client_id, ''), created_at
 		FROM workout_set_logs
 		WHERE session_id = $1
 		ORDER BY id ASC
@@ -341,7 +416,8 @@ func (r *Repository) ListSessions(
 		       COALESCE(section_id, ''),
 		       COALESCE(section_title, ''),
 		       status, started_at, completed_at, COALESCE(notes, ''),
-		       (SELECT COUNT(*) FROM workout_set_logs WHERE session_id = workout_sessions.id) AS log_count
+		       (SELECT COUNT(*) FROM workout_set_logs WHERE session_id = workout_sessions.id) AS log_count,
+		       COALESCE(client_id, '')
 		FROM workout_sessions
 		WHERE user_id = $1
 		  AND ($2 = 0 OR workflow_id = $2)
@@ -461,6 +537,7 @@ func scanWorkoutSession(row pgx.Row) (WorkoutSession, error) {
 		&session.CompletedAt,
 		&session.Notes,
 		&session.LogCount,
+		&session.ClientID,
 	)
 	if err != nil {
 		return WorkoutSession{}, err
@@ -488,6 +565,7 @@ func scanWorkoutSetLog(row pgx.Row) (WorkoutSetLog, error) {
 		&log.ActualRIR,
 		&log.Completed,
 		&log.Notes,
+		&log.ClientID,
 		&log.CreatedAt,
 	)
 	if err != nil {

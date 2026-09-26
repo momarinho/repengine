@@ -16,6 +16,7 @@ type PaginatedWorkoutSessions = workoutsessionsvc.PaginatedWorkoutSessions
 type StartWorkoutSessionRequest struct {
 	SectionID    string `json:"section_id"`
 	SectionTitle string `json:"section_title"`
+	ClientID     string `json:"client_id,omitempty"`
 }
 
 type CreateWorkoutSetLogRequest struct {
@@ -33,6 +34,7 @@ type CreateWorkoutSetLogRequest struct {
 	ActualRIR           string `json:"actual_rir"`
 	Completed           bool   `json:"completed"`
 	Notes               string `json:"notes"`
+	ClientID            string `json:"client_id,omitempty"`
 }
 
 type UpdateWorkoutSetLogRequest = CreateWorkoutSetLogRequest
@@ -114,6 +116,7 @@ func (a *App) StartWorkoutSession(c *fiber.Ctx) error {
 		WorkflowID:   workflowID,
 		SectionID:    req.SectionID,
 		SectionTitle: req.SectionTitle,
+		ClientID:     req.ClientID,
 	})
 	if serviceErr != nil {
 		return apperrors.WriteAppError(c, serviceErr)
@@ -183,6 +186,7 @@ func (a *App) CreateWorkoutSetLog(c *fiber.Ctx) error {
 		ActualRIR:           req.ActualRIR,
 		Completed:           req.Completed,
 		Notes:               req.Notes,
+		ClientID:            req.ClientID,
 	})
 	if serviceErr != nil {
 		return apperrors.WriteAppError(c, serviceErr)
@@ -294,6 +298,7 @@ func (a *App) UpdateWorkoutSetLog(c *fiber.Ctx) error {
 		ActualRIR:           req.ActualRIR,
 		Completed:           req.Completed,
 		Notes:               req.Notes,
+		ClientID:            req.ClientID,
 	})
 	if serviceErr != nil {
 		return apperrors.WriteAppError(c, serviceErr)

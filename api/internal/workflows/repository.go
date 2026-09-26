@@ -36,7 +36,7 @@ func (r *Repository) ListWorkflows(ctx context.Context, userID int, cursor int64
 			COUNT(b.id)::INTEGER AS block_count
 		FROM workflows w
 		LEFT JOIN workflow_blocks b ON b.workflow_id = w.id
-		WHERE w.user_id = $1 AND ($2 = 0 OR w.id < $2)
+		WHERE w.user_id = $1 AND w.deleted_at IS NULL AND ($2 = 0 OR w.id < $2)
 		GROUP BY w.id
 		ORDER BY w.id DESC
 		LIMIT $3
@@ -132,7 +132,7 @@ func (r *Repository) InsertBlocksTx(ctx context.Context, tx dbtx, workflowID int
 func (r *Repository) GetOwnerAndUpdatedAt(ctx context.Context, workflowID int) (int, time.Time, error) {
 	var ownerID int
 	var updatedAt time.Time
-	err := r.pool.QueryRow(ctx, `SELECT user_id, updated_at FROM workflows WHERE id = $1`, workflowID).Scan(&ownerID, &updatedAt)
+	err := r.pool.QueryRow(ctx, `SELECT user_id, updated_at FROM workflows WHERE id = $1 AND deleted_at IS NULL`, workflowID).Scan(&ownerID, &updatedAt)
 	if err != nil {
 		return 0, time.Time{}, err
 	}
@@ -156,6 +156,7 @@ func (r *Repository) UpdateWorkflowIfVersionMatchesTx(
 		WHERE id = $4
 		  AND user_id = $5
 		  AND updated_at = $6
+		  AND deleted_at IS NULL
 		RETURNING updated_at
 	`, in.Name, in.Description, in.IsPublic, in.WorkflowID, in.UserID, in.UpdatedAt).Scan(&newUpdatedAt)
 	if err != nil {
@@ -196,7 +197,7 @@ func (r *Repository) GetWorkflowWithBlocksTx(ctx context.Context, tx dbtx, workf
 	err := tx.QueryRow(ctx, `
 		SELECT id, user_id, name, description, is_public, created_at, updated_at
 		FROM workflows
-		WHERE id = $1 AND user_id = $2
+		WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
 	`, workflowID, userID).Scan(
 		&w.ID, &w.UserID, &w.Name, &w.Description, &w.IsPublic, &w.CreatedAt, &w.UpdatedAt,
 	)
@@ -219,7 +220,7 @@ func (r *Repository) GetWorkflowVisibleToUser(ctx context.Context, workflowID, u
 	err := r.pool.QueryRow(ctx, `
 		SELECT id, user_id, name, description, is_public, created_at, updated_at
 		FROM workflows
-		WHERE id = $1 AND (user_id = $2 OR is_public = true)
+		WHERE id = $1 AND (user_id = $2 OR is_public = true) AND deleted_at IS NULL
 	`, workflowID, userID).Scan(
 		&w.ID, &w.UserID, &w.Name, &w.Description, &w.IsPublic, &w.CreatedAt, &w.UpdatedAt,
 	)
@@ -238,7 +239,7 @@ func (r *Repository) GetWorkflowVisibleToUser(ctx context.Context, workflowID, u
 }
 
 func (r *Repository) DeleteWorkflowByOwner(ctx context.Context, workflowID, userID int) (bool, error) {
-	result, err := r.pool.Exec(ctx, `DELETE FROM workflows WHERE id = $1 AND user_id = $2`, workflowID, userID)
+	result, err := r.pool.Exec(ctx, `UPDATE workflows SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`, workflowID, userID)
 	if err != nil {
 		return false, err
 	}
@@ -247,7 +248,7 @@ func (r *Repository) DeleteWorkflowByOwner(ctx context.Context, workflowID, user
 
 func (r *Repository) GetWorkflowOwner(ctx context.Context, workflowID int) (int, error) {
 	var userID int
-	err := r.pool.QueryRow(ctx, `SELECT user_id FROM workflows WHERE id = $1`, workflowID).Scan(&userID)
+	err := r.pool.QueryRow(ctx, `SELECT user_id FROM workflows WHERE id = $1 AND deleted_at IS NULL`, workflowID).Scan(&userID)
 	if err != nil {
 		return 0, err
 	}
@@ -258,7 +259,7 @@ func (r *Repository) WorkflowExistsForUser(ctx context.Context, workflowID, user
 	var exists bool
 	err := r.pool.QueryRow(ctx, `
 		SELECT EXISTS(
-			SELECT 1 FROM workflows WHERE id = $1 AND user_id = $2
+			SELECT 1 FROM workflows WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
 		)
 	`, workflowID, userID).Scan(&exists)
 	return exists, err
@@ -279,7 +280,7 @@ func (r *Repository) CreateVersion(ctx context.Context, workflowID int, commitMe
 	if err := tx.QueryRow(ctx, `
 		SELECT id
 		FROM workflows
-		WHERE id = $1
+		WHERE id = $1 AND deleted_at IS NULL
 		FOR UPDATE
 	`, workflowID).Scan(new(int)); err != nil {
 		return WorkflowVersion{}, err
@@ -400,6 +401,7 @@ func (r *Repository) RestoreWorkflowSnapshotTx(
 			updated_at = NOW()
 		WHERE id = $4
 		  AND user_id = $5
+		  AND deleted_at IS NULL
 	`, name, description, isPublic, workflowID, userID)
 	if err != nil {
 		return err

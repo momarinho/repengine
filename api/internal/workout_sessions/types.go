@@ -19,6 +19,7 @@ type WorkoutSession struct {
 	CompletedAt  *time.Time      `json:"completed_at"`
 	Notes        string          `json:"notes"`
 	LogCount     int             `json:"log_count"`
+	ClientID     string          `json:"client_id,omitempty"`
 	Logs         []WorkoutSetLog `json:"logs,omitempty"`
 }
 
@@ -39,6 +40,7 @@ type WorkoutSetLog struct {
 	ActualRIR           string    `json:"actual_rir"`
 	Completed           bool      `json:"completed"`
 	Notes               string    `json:"notes"`
+	ClientID            string    `json:"client_id,omitempty"`
 	CreatedAt           time.Time `json:"created_at"`
 }
 
@@ -64,6 +66,7 @@ type StartSessionInput struct {
 	WorkflowID   int
 	SectionID    string
 	SectionTitle string
+	ClientID     string
 }
 
 type InsertSetLogInput struct {
@@ -83,6 +86,7 @@ type InsertSetLogInput struct {
 	ActualRIR           string
 	Completed           bool
 	Notes               string
+	ClientID            string
 }
 
 type CompleteSessionInput struct {
@@ -115,6 +119,7 @@ type UpdateSetLogInput struct {
 	ActualRIR           string
 	Completed           bool
 	Notes               string
+	ClientID            string
 }
 
 type GetSessionInput struct {
