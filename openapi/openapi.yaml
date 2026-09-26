@@ -849,6 +849,10 @@ components:
         updated_at:
           type: string
           format: date-time
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
         blocks:
           type: array
           items:
@@ -990,6 +994,9 @@ components:
           type: boolean
         notes:
           type: string
+        client_id:
+          type: string
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -1030,6 +1037,9 @@ components:
           type: string
         log_count:
           type: integer
+        client_id:
+          type: string
+          nullable: true
         logs:
           type: array
           items:
