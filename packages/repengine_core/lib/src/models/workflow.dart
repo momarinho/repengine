@@ -13,21 +13,21 @@ class WorkflowBlock {
     this.workflowId,
     required this.nodeTypeSlug,
     required this.position,
-    required this.data,
+    this.data = const {},
   });
 
   Map<String, dynamic> toJson() => {
     if (id != null) 'id': id,
-    if (workflowId != null) 'workflowId': workflowId,
-    'nodeTypeSlug': nodeTypeSlug,
+    if (workflowId != null) 'workflow_id': workflowId,
+    'node_type_slug': nodeTypeSlug,
     'position': position,
     'data': data,
   };
 
   factory WorkflowBlock.fromJson(Map<String, dynamic> json) => WorkflowBlock(
     id: json['id'] as int?,
-    workflowId: json['workflowId'] as int?,
-    nodeTypeSlug: json['nodeTypeSlug'] as String,
+    workflowId: json['workflow_id'] as int?,
+    nodeTypeSlug: json['node_type_slug'] as String,
     position: json['position'] as int? ?? 0,
     data: (json['data'] as Map<String, dynamic>?) ?? const {},
   );

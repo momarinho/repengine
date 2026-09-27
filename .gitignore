@@ -32,3 +32,9 @@ htmlcov/
 .venv/
 env/
 venv/
+
+# Dart & Flutter
+.dart_tool/
+.packages
+build/
+
