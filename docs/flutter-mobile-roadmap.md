@@ -53,30 +53,33 @@ flowchart TD
 ### 🛠️ SPRINT 0: Revisão de Schema & Evolução no Go Core
 > **Objetivo**: Garantir que o banco de dados central suporte sincronização distribuída e idempotência sem regressão dos dados já persistidos.
 
-- [ ] **Auditoria de Schema**:
+- [x] **Auditoria de Schema**:
   - Verificar índices únicos e colunas existentes (`workout_set_logs.block_client_id`, `workflows.updated_at`).
-- [ ] **Migration Go Core `017_offline_sync_support.sql`**:
-  - `ALTER TABLE workout_sessions ADD COLUMN IF NOT EXISTS client_id VARCHAR(100) UNIQUE;`
-  - `ALTER TABLE workflows ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE;`
-  - `ALTER TABLE workout_set_logs ADD COLUMN IF NOT EXISTS client_id VARCHAR(100) UNIQUE;`
-- [ ] **Verificação**:
-  - Rodar migrations automáticas no Go e validar integridade via `docker compose`.
+- [x] **Migration Go Core `017_offline_sync_support.sql`**:
+  - `ALTER TABLE workout_sessions ADD COLUMN IF NOT EXISTS client_id VARCHAR(100);` com índice único parcial.
+  - `ALTER TABLE workflows ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE;` com índice.
+  - `ALTER TABLE workout_set_logs ADD COLUMN IF NOT EXISTS client_id VARCHAR(100);` com índice único parcial.
+- [x] **Verificação**:
+  - Migrações automáticas aplicadas com sucesso no Go, queries e handlers atualizados com suporte a `client_id`, testes 100% aprovados.
 
 ---
 
 ### 📦 SPRINT 1: Geração de DTOs do OpenAPI & Pacote Compartilhado (`packages/repengine_core`)
 > **Objetivo**: Estabelecer tipagem estática ponta a ponta sem duplicação manual de código entre Dart Frog e Flutter.
 
-- [ ] **Geração via OpenAPI**:
-  - Extrair modelos Dart diretamente do `openapi.yaml` do Go Core via script de automação (`openapi-generator-cli`).
-- [ ] **Pacote Compartilhado `packages/repengine_core`**:
-  - Modelar DTOs com **Freezed** e **json_serializable**:
+- [x] **Alinhamento com Contrato OpenAPI**:
+  - OpenAPI [`openapi/openapi.yaml`](file:///home/mateus/Projects/repengine/openapi/openapi.yaml) atualizado com `client_id` e `deleted_at`.
+- [x] **Pacote Compartilhado `packages/repengine_core`**:
+  - Modelos de domínio e envelopes do protocolo de sincronização implementados em Dart puro (`lib/repengine_core.dart`):
+    - `Workflow` e `WorkflowBlock`: Modelagem de rotinas do treinador com suporte a soft-delete.
+    - `WorkoutSession` e `WorkoutSetLog`: Modelagem com identificador de cliente (`client_id`).
     - `SyncPushPayload`: Lote com sessões e séries concluídas offline pelo atleta.
-    - `SyncPushResult`: Status por UUID (`accepted`, `ignored_duplicate`, `conflict_flagged`).
-    - `SyncPullRequest`: Contendo `last_synced_at`.
-    - `SyncPullResponse`: Workflows atualizados e deletados desde o último timestamp.
-- [ ] **Testes da Sprint**:
-  - Testes unitários em Dart validando serialização/deserialização JSON de todos os modelos.
+    - `SyncPushResult` e `SyncPushItemStatus`: Recibo com status por item (`accepted`, `ignoredDuplicate`, `conflictFlagged`).
+    - `SyncPullRequest`: Requisição com timestamp `last_synced_at`.
+    - `SyncPullResponse`: Resposta delta com workflows atualizados e IDs de rotinas deletadas.
+- [x] **Integração no Mobile & Testes da Sprint**:
+  - App [`mobile/`](file:///home/mateus/Projects/repengine/mobile) configurado com arquitetura Feature-First e importando `repengine_core`.
+  - Testes unitários de serialização em Dart (`dart test`) e testes de widget (`flutter test`) 100% aprovados sem alertas de análise.
 
 ---
 
