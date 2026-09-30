@@ -16,23 +16,27 @@ Handler middleware(Handler handler) {
 
     final token = authHeader.substring(7).trim();
 
+    final int userId;
+
     try {
       final jwt = JWT.verify(token, SecretKey(_jwtSecret));
-      final payload = jwt.payload as Map<String, dynamic>;
+      final dynamic rawPayload = jwt.payload;
+      final payload =
+          rawPayload is Map ? rawPayload : const <dynamic, dynamic>{};
 
       final userIdRaw = payload['user_id'] ?? payload['sub'];
-      final userId =
-          userIdRaw is int ? userIdRaw : int.parse(userIdRaw.toString());
+      final parsedId =
+          userIdRaw is int
+              ? userIdRaw
+              : int.tryParse(userIdRaw?.toString() ?? '');
 
-      if (userId <= 0) {
+      if (parsedId == null || parsedId <= 0) {
         return Response.json(
           statusCode: HttpStatus.unauthorized,
           body: {'error': 'Invalid user_id in token'},
         );
       }
-
-      final updatedContext = context.provide<int>(() => userId);
-      return await handler(updatedContext);
+      userId = parsedId;
     } on JWTExpiredException {
       return Response.json(
         statusCode: HttpStatus.unauthorized,
@@ -43,11 +47,14 @@ Handler middleware(Handler handler) {
         statusCode: HttpStatus.unauthorized,
         body: {'error': 'Invalid token: ${e.message}'},
       );
-    } catch (_) {
+    } catch (e) {
       return Response.json(
         statusCode: HttpStatus.unauthorized,
-        body: {'error': 'Authentication failed'},
+        body: {'error': 'Authentication failed: $e'},
       );
     }
+
+    final updatedContext = context.provide<int>(() => userId);
+    return handler(updatedContext);
   };
 }

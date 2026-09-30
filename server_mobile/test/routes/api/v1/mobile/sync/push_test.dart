@@ -59,7 +59,8 @@ void main() {
               }
             ],
             'set_logs': <Map<String, dynamic>>[],
-          });
+          },
+        );
 
       when(() => client.forwardSession(any(), any())).thenAnswer(
         (_) async => const SyncPushItemStatus(

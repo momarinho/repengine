@@ -1,0 +1,10 @@
+.git
+.github
+mobile
+web
+analytics
+api
+docs
+**/.dart_tool
+**/build
+server_mobile/build

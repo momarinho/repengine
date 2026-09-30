@@ -86,19 +86,19 @@ flowchart TD
 ### 🚀 SPRINT 2: Dart Frog BFF & Motor de Sincronização
 > **Objetivo**: Construir o gateway de sincronização mobile em Dart Frog rodando no Docker.
 
-- [ ] **Estrutura Dart Frog**:
+- [x] **Estrutura Dart Frog**:
   - Configuração do projeto Dart Frog com injeção de dependência (`repengine_core`, client HTTP interno do Go Core).
   - Middleware de autenticação JWT compartilhando o mesmo segredo do Go.
-- [ ] **Endpoints de Sincronização**:
+- [x] **Endpoints de Sincronização**:
   - `POST /api/v1/mobile/sync/push`:
     - Recebe lote de mutações do Flutter.
     - Deduplicação por `client_id` (idempotência).
-    - Despacha chamadas para o Go Core (`/api/workout-sessions`, `/api/workout-sessions/:id/logs`).
+    - Despacha chamadas para o Go Core (`/workflows/:id/sessions`, `/workout-sessions/:id/logs`).
   - `GET /api/v1/mobile/sync/pull`:
     - Busca dados recentes no Go Core e devolve o delta filtrado por `updated_at`.
-- [ ] **Integração Docker**:
+- [x] **Integração Docker**:
   - Adicionar o serviço `mobile-bff` ao `docker-compose.dev.yml` (porta 8081).
-- [ ] **Testes da Sprint**:
+- [x] **Testes da Sprint**:
   - Testes de integração em Dart simulando retransmissão de lote para provar idempotência.
 
 ---

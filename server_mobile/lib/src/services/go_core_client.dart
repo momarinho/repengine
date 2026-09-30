@@ -22,7 +22,8 @@ class GoCoreClient {
     String authHeader,
   ) async {
     final clientId = session.clientId ?? 'session-${session.id}';
-    final url = Uri.parse('$baseUrl/api/workout-sessions');
+    final workflowId = session.workflowId;
+    final url = Uri.parse('$baseUrl/workflows/$workflowId/sessions');
 
     try {
       final response = await _httpClient.post(
@@ -86,7 +87,7 @@ class GoCoreClient {
       );
     }
 
-    final url = Uri.parse('$baseUrl/api/workout-sessions/$sessionId/logs');
+    final url = Uri.parse('$baseUrl/workout-sessions/$sessionId/logs');
 
     try {
       final response = await _httpClient.post(
@@ -148,7 +149,7 @@ class GoCoreClient {
 
   /// Busca a lista de workflows do usuário no Go Core para sync delta (Pull).
   Future<List<Workflow>> fetchWorkflows(String authHeader) async {
-    final url = Uri.parse('$baseUrl/api/workflows?limit=100');
+    final url = Uri.parse('$baseUrl/workflows?limit=100');
 
     final response = await _httpClient.get(
       url,

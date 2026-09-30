@@ -68,22 +68,24 @@ class WorkoutSetLog {
       id: json['id'] as int?,
       sessionId: json['session_id'] as int?,
       workflowBlockId: json['workflow_block_id'] as int?,
-      blockClientId: json['block_client_id'] as String? ?? '',
-      nodeTypeSlug: json['node_type_slug'] as String? ?? '',
-      setIndex: json['set_index'] as int? ?? 0,
-      prescribedReps: json['prescribed_reps'] as String? ?? '',
-      prescribedLoad: json['prescribed_load'] as String? ?? '',
-      prescribedIntensity: json['prescribed_intensity'] as String? ?? '',
-      prescribedRpe: json['prescribed_rpe'] as String? ?? '',
-      actualReps: json['actual_reps'] as String? ?? '',
-      actualLoad: json['actual_load'] as String? ?? '',
-      actualRpe: json['actual_rpe'] as String? ?? '',
-      actualRir: json['actual_rir'] as String? ?? '',
+      blockClientId: json['block_client_id']?.toString() ?? '',
+      nodeTypeSlug: json['node_type_slug']?.toString() ?? '',
+      setIndex: json['set_index'] is int
+          ? json['set_index'] as int
+          : int.tryParse(json['set_index']?.toString() ?? '0') ?? 0,
+      prescribedReps: json['prescribed_reps']?.toString() ?? '',
+      prescribedLoad: json['prescribed_load']?.toString() ?? '',
+      prescribedIntensity: json['prescribed_intensity']?.toString() ?? '',
+      prescribedRpe: json['prescribed_rpe']?.toString() ?? '',
+      actualReps: json['actual_reps']?.toString() ?? '',
+      actualLoad: json['actual_load']?.toString() ?? '',
+      actualRpe: json['actual_rpe']?.toString() ?? '',
+      actualRir: json['actual_rir']?.toString() ?? '',
       completed: json['completed'] as bool? ?? false,
-      notes: json['notes'] as String? ?? '',
-      clientId: json['client_id'] as String?,
+      notes: json['notes']?.toString() ?? '',
+      clientId: json['client_id']?.toString(),
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
+          ? DateTime.parse(json['created_at'].toString())
           : DateTime.now().toUtc(),
     );
   }
