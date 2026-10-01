@@ -14,21 +14,25 @@ O app mobile atuará como o **Gym Execution HUD** da plataforma RepEngine, compl
 flowchart TD
     subgraph Clients["📱 / 💻 Clientes"]
         Desktop["Desktop SvelteKit<br>(Routine Architect)"]
-        Flutter["Mobile Flutter<br>(Gym HUD + Drift SQLite)"]
+        Flutter["Mobile Flutter<br>(Gym HUD + Drift SQLite + Sports Science Offline)"]
     end
 
-    subgraph BFF["⚡ Mobile Gateway"]
-        DartFrog["Dart Frog BFF (Porta 8081)<br>(Batch Sync, Idempotência & Envelopamento)"]
+    subgraph CoreContracts["📦 Pacote Compartilhado"]
+        RepengineCore["repengine_core (Dart Puro)<br>(Contratos DTOs + Ciência do Esporte: 1RM, INOL, ACWR)"]
+    end
+
+    subgraph BFF["⚡ Mobile Gateway & Analytics"]
+        DartFrog["Dart Frog BFF (Porta 8081)<br>(Batch Sync, Idempotência & Analytics em Dart)"]
     end
 
     subgraph Core["🏛️ Core Platform"]
         GoAPI["Go Core API (Porta 8080)<br>(Dono do Schema PostgreSQL & Regras Centrais)"]
-        PyAnalytics["Python Analytics (Porta 8000)<br>(Ciência do Esporte & 1RM)"]
         Postgres[(PostgreSQL 16)]
     end
 
+    Flutter --> RepengineCore
+    DartFrog --> RepengineCore
     Desktop -->|REST / OpenAPI| GoAPI
-    Desktop -->|REST| PyAnalytics
     Flutter <-->|Delta Sync / REST| DartFrog
     DartFrog -->|HTTP Interno / OpenAPI| GoAPI
     GoAPI --> Postgres
@@ -106,8 +110,8 @@ flowchart TD
 ### 📱 SPRINT 3: Flutter Base, Riverpod 2.x & Drift (SQLite Local)
 > **Objetivo**: Fundação do app Flutter com arquitetura Feature-First, banco local reativo e injeção de dependências.
 
-- [ ] **Configuração do Projeto Flutter**:
-  - Setup do projeto `mobile/` com Riverpod 2.x (`@riverpod`, `AsyncNotifier`) e `go_router`.
+- [x] **Configuração do Projeto Flutter & Design Tokens**:
+  - Setup do projeto `mobile/` com Riverpod 2.x (`ProviderScope`, `@riverpod`) e `go_router`.
   - Design tokens (Atelier Dark Theme, tipografia Space Grotesk / Manrope).
 - [ ] **Drift Local Database (`AppDatabase`)**:
   - Tabelas: `RoutinesTable`, `WorkoutSessionsTable`, `SetLogsTable`.
@@ -117,6 +121,22 @@ flowchart TD
   - `WorkoutRepository`: Leitura sempre no Drift local (latência zero); escrita salva no Drift e insere na fila de sync.
 - [ ] **Testes da Sprint**:
   - Testes unitários de repositório e banco Drift em memória (`NativeDatabase.memory()`).
+
+---
+
+### 🔬 SPRINT 3.5: Ciência do Esporte em Dart Puro & Descomissionamento do Python
+> **Objetivo**: Migrar 100% da inteligência analítica do microsserviço Python (`analytics/`) para Dart puro no pacote compartilhado `packages/repengine_core`, permitindo cálculos de 1RM, INOL e fadiga 100% offline no celular e servidos pelo Dart Frog BFF.
+
+- [ ] **Módulo `repengine_core/sports_science`**:
+  - `one_rep_max.dart`: Fórmulas analíticas (Brzycki, Epley, Mayhew, Wathen, Lombardi), média de consenso, desvio padrão e projeção de 1 a 12 repetições.
+  - `inol.dart`: Intensity Number of Lifts por série e acumulado da sessão com zonas de fadiga e tempo de recuperação recomendado.
+  - `workload_acwr.dart`: Acute:Chronic Workload Ratio (EWMA e coupled rolling window) para monitoramento de risco de lesão.
+  - `autoregulation.dart`: Motor de ajuste fino de carga baseado no RPE/RIR real vs prescrito.
+  - Testes unitários puros com 100% de paridade com as fórmulas anteriores do Python (`dart test`).
+- [ ] **Exposição no Dart Frog BFF & Descomissionamento do Python**:
+  - Dart Frog BFF expõe endpoints `/api/v1/analytics/*` consumindo o `repengine_core`.
+  - Atualização do Desktop Web (SvelteKit) para apontar rotas de analytics para o BFF (`http://mobile-bff:8080`).
+  - Remoção do contêiner `analytics` do `docker-compose.dev.yml` (economia de ~200MB de RAM e menos complexidade de deployment).
 
 ---
 
