@@ -32,9 +32,16 @@ func (s *Service) StartSession(ctx context.Context, in StartSessionInput) (Worko
 
 	activeSession, err := s.repo.GetActiveSessionByWorkflow(ctx, in.UserID, in.WorkflowID)
 	if err == nil {
-		return activeSession, nil
+		reqSection := strings.TrimSpace(in.SectionID)
+		if reqSection != "" && activeSession.SectionID != "" && activeSession.SectionID != reqSection {
+			// If the user requested a specific day/section and the active session is for a different section,
+			// auto-abandon the stale conflicting active session so the user can start their new day.
+			_ = s.repo.AbandonSession(ctx, activeSession.ID, in.UserID, "Auto-abandoned: user started a different workout section")
+		} else {
+			return activeSession, nil
+		}
 	}
-	if !IsNotFound(err) {
+	if !IsNotFound(err) && err != nil {
 		return WorkoutSession{}, apperrors.ErrInternal()
 	}
 
@@ -76,6 +83,17 @@ func (s *Service) InsertSetLog(ctx context.Context, in InsertSetLogInput) (Worko
 		return WorkoutSetLog{}, apperrors.ErrWorkoutSessionInactive()
 	}
 
+	prescribedReps := strings.TrimSpace(in.PrescribedReps)
+	prescribedLoad := strings.TrimSpace(in.PrescribedLoad)
+	actualReps := strings.TrimSpace(in.ActualReps)
+	if actualReps == "" && prescribedReps != "" {
+		actualReps = strings.TrimSuffix(prescribedReps, "+")
+	}
+	actualLoad := strings.TrimSpace(in.ActualLoad)
+	if actualLoad == "" && prescribedLoad != "" {
+		actualLoad = prescribedLoad
+	}
+
 	log, err := s.repo.InsertSetLog(ctx, InsertSetLogInput{
 		UserID:              in.UserID,
 		SessionID:           in.SessionID,
@@ -83,12 +101,12 @@ func (s *Service) InsertSetLog(ctx context.Context, in InsertSetLogInput) (Worko
 		BlockClientID:       strings.TrimSpace(in.BlockClientID),
 		NodeTypeSlug:        strings.TrimSpace(in.NodeTypeSlug),
 		SetIndex:            in.SetIndex,
-		PrescribedReps:      strings.TrimSpace(in.PrescribedReps),
-		PrescribedLoad:      strings.TrimSpace(in.PrescribedLoad),
+		PrescribedReps:      prescribedReps,
+		PrescribedLoad:      prescribedLoad,
 		PrescribedIntensity: strings.TrimSpace(in.PrescribedIntensity),
 		PrescribedRPE:       strings.TrimSpace(in.PrescribedRPE),
-		ActualReps:          strings.TrimSpace(in.ActualReps),
-		ActualLoad:          strings.TrimSpace(in.ActualLoad),
+		ActualReps:          actualReps,
+		ActualLoad:          actualLoad,
 		ActualRPE:           strings.TrimSpace(in.ActualRPE),
 		ActualRIR:           strings.TrimSpace(in.ActualRIR),
 		Completed:           in.Completed,

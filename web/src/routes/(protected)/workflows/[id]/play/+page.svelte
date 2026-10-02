@@ -7,7 +7,13 @@
 	import type { PlayerBlock, PlayerRoutine, PlayerSection, WaveWeek } from '$lib/player/types';
 	import type { WorkoutSession, WorkoutSetLog } from '$lib/workout-sessions/types';
 	import type { TrainingMax } from '$lib/training-maxes/types';
-	import { getNextAndLastCompletedSection, getSectionExercisePreview, formatRelativeDate } from '$lib/player/cycle';
+	import {
+		getNextAndLastCompletedSection,
+		getSectionExercisePreview,
+		formatRelativeDate,
+		getLastCompletedSessionForSection,
+		getSectionProgressionSummaries
+	} from '$lib/player/cycle';
 
 	type SessionActivityKind = 'set' | 'round' | 'block' | 'timer';
 
@@ -1213,6 +1219,10 @@
 			load = `${block.data?.start_load_a !== null && block.data?.start_load_a !== undefined ? block.data.start_load_a : '0'}/${block.data?.start_load_b !== null && block.data?.start_load_b !== undefined ? block.data.start_load_b : '0'}`;
 		}
 
+		const defaultCompletedReps = reps.replace(/\+$/, '').trim();
+		const finalActualReps = actual.actualReps && actual.actualReps.trim() !== '' ? actual.actualReps.trim() : defaultCompletedReps;
+		const finalActualLoad = actual.actualLoad && actual.actualLoad.trim() !== '' ? actual.actualLoad.trim() : load;
+
 		return {
 			workflow_block_id: block.workflowBlockID ?? null,
 			block_client_id: block.id,
@@ -1222,8 +1232,8 @@
 			prescribed_load: load,
 			prescribed_intensity: prescribedIntensity,
 			prescribed_rpe: prescribedRPE,
-			actual_reps: actual.actualReps,
-			actual_load: actual.actualLoad,
+			actual_reps: finalActualReps,
+			actual_load: finalActualLoad,
 			actual_rpe: actual.actualRPE,
 			actual_rir: actual.actualRIR,
 			completed: true,
@@ -1352,6 +1362,30 @@
 			sessionError = error instanceof Error ? error.message : 'Unable to finalize workout session.';
 		} finally {
 			isSyncingSession = false;
+		}
+	}
+
+	let showFinishConfirmModal = $state(false);
+
+	async function finishCurrentWorkoutEarly(): Promise<void> {
+		if (isSyncingSession) return;
+		showFinishConfirmModal = false;
+		sessionError = null;
+		isSessionComplete = true;
+		isTimerRunning = false;
+		clearIntraSetRest();
+		releaseWakeLock();
+		playAudioTone('complete');
+
+		if (activePersistedSession) {
+			isSyncingSession = true;
+			try {
+				await completePersistedSession();
+			} catch (error: unknown) {
+				sessionError = error instanceof Error ? error.message : 'Unable to finalize workout session.';
+			} finally {
+				isSyncingSession = false;
+			}
 		}
 	}
 
@@ -1522,6 +1556,18 @@
 		sessionError = null;
 
 		try {
+			if (activePersistedSession && section && activePersistedSession.section_id !== section.id) {
+				try {
+					await fetch(`/api/workout-sessions/${activePersistedSession.id}/abandon`, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ notes: 'Auto-abandoned: switching to different workout section' })
+					});
+				} catch {
+					// continue
+				}
+				activePersistedSession = null;
+			}
 			const session = await createPersistedSession(section);
 			activePersistedSession = session;
 			completedSessionSummary = null;
@@ -1755,7 +1801,11 @@
 				const currentPrescription = currentWeek?.prescriptions[currentSet];
 				const actual = readActualInputs(block.id);
 				isSyncingSession = true;
-				sessionError = null;
+				const blockExercise = (typeof block.data?.exercise_name === 'string' ? block.data.exercise_name : null) || block.title;
+				const calculatedLoad = calculateCalculatedLoad(blockExercise, currentPrescription?.intensity);
+				const defaultWaveReps = (currentPrescription?.reps ?? '').replace(/\+$/, '').trim();
+				const finalWaveReps = actual.actualReps && actual.actualReps.trim() !== '' ? actual.actualReps.trim() : defaultWaveReps;
+				const finalWaveLoad = actual.actualLoad && actual.actualLoad.trim() !== '' ? actual.actualLoad.trim() : (calculatedLoad || '');
 				try {
 					await persistSetLog(block, {
 						workflow_block_id: block.workflowBlockID ?? null,
@@ -1763,11 +1813,11 @@
 						node_type_slug: block.node_type_slug,
 						set_index: currentSet + 1,
 						prescribed_reps: currentPrescription?.reps ?? '',
-						prescribed_load: '',
+						prescribed_load: calculatedLoad || '',
 						prescribed_intensity: currentPrescription?.intensity ? `${currentPrescription.intensity}%` : '',
 						prescribed_rpe: currentPrescription?.rpe ? String(currentPrescription.rpe) : '',
-						actual_reps: actual.actualReps,
-						actual_load: actual.actualLoad,
+						actual_reps: finalWaveReps,
+						actual_load: finalWaveLoad,
 						actual_rpe: actual.actualRPE,
 						actual_rir: actual.actualRIR,
 						completed: true,
@@ -1817,6 +1867,7 @@
 				}
 				const currentRound = getCurrentRound(block);
 				const actual = readActualInputs(block.id);
+				const finalRepeatReps = actual.actualReps && actual.actualReps.trim() !== '' ? actual.actualReps.trim() : (block.reps ?? '');
 				isSyncingSession = true;
 				sessionError = null;
 				try {
@@ -1829,7 +1880,7 @@
 						prescribed_load: '',
 						prescribed_intensity: '',
 						prescribed_rpe: '',
-						actual_reps: actual.actualReps,
+						actual_reps: finalRepeatReps,
 						actual_load: actual.actualLoad,
 						actual_rpe: actual.actualRPE,
 						actual_rir: actual.actualRIR,
@@ -2307,6 +2358,7 @@
 				{#if nextCycleInfo.nextSection}
 					{@const next = nextCycleInfo.nextSection}
 					{@const previews = getSectionExercisePreview(routine.blocks, next, 4)}
+					{@const nextProgressions = getSectionProgressionSummaries(routine.blocks, next, progressionStates)}
 					<div class="mb-8 rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-surface-container-high/90 to-surface-container p-6 shadow-xl shadow-primary/5">
 						<div class="flex flex-wrap items-center justify-between gap-2">
 							<span class="inline-flex items-center gap-1.5 rounded-md bg-primary/20 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-primary">
@@ -2327,7 +2379,19 @@
 									{next.subtitle || `${next.blockCount} exercises & blocks`} · Starts at #{next.startBlockIndex + 1}
 								</p>
 
-								{#if previews.length > 0}
+								{#if nextProgressions.length > 0}
+									<div class="mt-3 flex flex-wrap gap-2">
+										{#each nextProgressions as prog}
+											<span class="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-surface-container-lowest/80 px-2.5 py-1 text-xs text-on-surface">
+												<span class="text-on-surface-variant font-medium">{prog.title}:</span>
+												<strong class="text-primary font-bold">{prog.suggestedLoad || prog.currentLoad}</strong>
+												{#if prog.outcome === 'increase'}
+													<span class="rounded bg-primary/20 px-1 py-0.2 text-[9px] font-bold text-primary">↗ +Progression</span>
+												{/if}
+											</span>
+										{/each}
+									</div>
+								{:else if previews.length > 0}
 									<div class="mt-3 flex flex-wrap gap-1.5">
 										{#each previews as exercise}
 											<span class="rounded-lg border border-white/10 bg-surface-container-lowest/60 px-2.5 py-1 text-xs text-on-surface">
@@ -2373,7 +2437,9 @@
 						{#each routine.sections as section}
 							{@const isNext = section.id === nextCycleInfo.nextSection?.id}
 							{@const isLast = section.id === nextCycleInfo.lastCompletedSection?.id}
+							{@const lastSectionSession = getLastCompletedSessionForSection(section, sessionHistory)}
 							{@const exercises = getSectionExercisePreview(routine.blocks, section, 3)}
+							{@const progressions = getSectionProgressionSummaries(routine.blocks, section, progressionStates)}
 							<button
 								type="button"
 								class="group rounded-xl border border-outline-variant/20 bg-surface-container p-5 text-left transition-all hover:border-primary/40 hover:bg-surface-container-high active:scale-[0.99] cursor-pointer"
@@ -2392,6 +2458,10 @@
 												<span class="rounded bg-surface-container-highest px-1.5 py-0.5 text-[10px] font-medium text-on-surface-variant">
 													Last done
 												</span>
+											{:else if lastSectionSession}
+												<span class="text-[10px] text-on-surface-variant font-medium">
+													{formatRelativeDate(lastSectionSession.completed_at || lastSectionSession.started_at)}
+												</span>
 											{/if}
 										</div>
 										<h4 class="text-xl font-bold text-on-surface group-hover:text-primary transition-colors">{section.title}</h4>
@@ -2400,7 +2470,18 @@
 									<span class="material-symbols-outlined text-primary group-hover:scale-110 transition-transform">play_circle</span>
 								</div>
 
-								{#if exercises.length > 0}
+								{#if progressions.length > 0}
+									<div class="mb-4 flex flex-wrap gap-1.5">
+										{#each progressions as p}
+											<span class="rounded-md border border-white/5 bg-surface-container-low px-2 py-0.5 text-[11px] text-on-surface">
+												<span class="text-on-surface-variant">{p.title}:</span> <strong class="text-primary font-bold">{p.suggestedLoad || p.currentLoad}</strong>
+												{#if p.outcome === 'increase'}
+													<span class="rounded bg-primary/20 px-1 py-0.2 text-[9px] font-bold text-primary">↗</span>
+												{/if}
+											</span>
+										{/each}
+									</div>
+								{:else if exercises.length > 0}
 									<div class="mb-4 flex flex-wrap gap-1.5">
 										{#each exercises as exercise}
 											<span class="rounded border border-white/5 bg-surface-container-low px-2 py-0.5 text-[11px] text-on-surface-variant">
@@ -2552,7 +2633,7 @@
 									<div class="mt-2 flex flex-wrap gap-2">
 										{#each prevLogs as log}
 											<span class="rounded bg-surface-container-high px-2 py-1 text-xs text-on-surface-variant">
-												Set {log.set_index}: {log.actual_reps} reps @ {log.actual_load || '-'}
+												Set {log.set_index}: {log.actual_reps || log.prescribed_reps || '-'} reps @ {log.actual_load || log.prescribed_load || '-'}
 											</span>
 										{/each}
 									</div>
@@ -2740,11 +2821,20 @@
 				{/if}
 			</div>
 
-			<div class="flex items-center gap-4">
+			<div class="flex items-center gap-3">
 				<div class="flex items-center gap-1.5 text-sm font-bold text-primary">
 					<span class="material-symbols-outlined text-sm">schedule</span>
 					{formatClock(sessionElapsedSeconds)}
 				</div>
+				<button
+					type="button"
+					class="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 hover:border-primary/50 transition-all cursor-pointer"
+					onclick={() => (showFinishConfirmModal = true)}
+					title="Finish workout and record progress"
+				>
+					<span class="material-symbols-outlined text-sm">flag</span>
+					<span class="hidden sm:inline">Finish Workout</span>
+				</button>
 				<a
 					href={`/workflows/${routine.id}/edit`}
 					class="flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-variant/40 hover:text-on-surface"
@@ -2865,14 +2955,65 @@
 						</div>
 
 						{#if currentBlock.node_type_slug === 'linear_progression'}
-							<div class="mb-4 grid gap-4 rounded-xl border border-primary/10 bg-primary/5 p-5 md:grid-cols-2">
-								<div>
-									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Progression rule</p>
-									<p class="mt-2 text-lg font-semibold capitalize text-on-surface">{currentBlock.progressionRule?.replaceAll('_', ' ') ?? 'add each session'}</p>
+							{@const progression = getBlockProgressionState(currentBlock)}
+							{@const prevLogs = getLastSessionLogs(currentBlock)}
+							{@const prevLoad = prevLogs.find((l) => l.actual_load || l.prescribed_load)?.actual_load || prevLogs.find((l) => l.actual_load || l.prescribed_load)?.prescribed_load}
+							{@const currentPrescribedLoad = getResolvedPrescribedLoad(currentBlock)}
+							{@const isIncrease = progression?.outcome === 'increase' || (prevLoad && currentPrescribedLoad && prevLoad !== currentPrescribedLoad)}
+
+							<div class="mb-4 rounded-xl border border-primary/30 bg-gradient-to-br from-primary/10 via-surface-container-high/60 to-surface-container p-5 shadow-md">
+								<div class="flex flex-wrap items-center justify-between gap-3">
+									<div class="flex items-center gap-2.5">
+										<span class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/20 text-primary">
+											<span class="material-symbols-outlined text-lg">trending_up</span>
+										</span>
+										<div>
+											<span class="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Linear Progression Tracker</span>
+											<h4 class="text-base font-bold text-on-surface">
+												{#if isIncrease}
+													Load increased: {prevLoad ? `${prevLoad} ➔ ` : ''}{currentPrescribedLoad} (+{currentBlock.increment ?? 0} {currentBlock.loadUnit ?? 'kg'})
+												{:else if progression?.outcome === 'reduce'}
+													Deload / Sequence reset: {currentPrescribedLoad}
+												{:else}
+													Current load: {currentPrescribedLoad}
+												{/if}
+											</h4>
+										</div>
+									</div>
+
+									{#if isIncrease}
+										<span class="inline-flex items-center gap-1 rounded-full bg-primary/20 border border-primary/30 px-3 py-1 text-xs font-bold text-primary">
+											<span class="material-symbols-outlined text-xs">check_circle</span>
+											Progression Active
+										</span>
+									{:else if prevLoad}
+										<span class="text-xs font-medium text-on-surface-variant">
+											Last session: {prevLoad}
+										</span>
+									{/if}
 								</div>
-								<div>
-									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Next increase</p>
-									<p class="mt-2 text-lg font-semibold text-on-surface">+{currentBlock.increment ?? 0} {currentBlock.loadUnit ?? ''}</p>
+
+								{#if progression?.summary}
+									<p class="mt-2 text-xs text-on-surface-variant/90 border-t border-white/5 pt-2">
+										{progression.summary}
+									</p>
+								{/if}
+
+								<div class="mt-3 grid grid-cols-2 gap-3 border-t border-white/5 pt-3 text-xs sm:grid-cols-3">
+									<div>
+										<span class="text-[10px] uppercase tracking-wider text-on-surface-variant">Rule</span>
+										<p class="font-semibold text-on-surface capitalize">{currentBlock.progressionRule?.replaceAll('_', ' ') ?? 'add each session'}</p>
+									</div>
+									<div>
+										<span class="text-[10px] uppercase tracking-wider text-on-surface-variant">Step Increment</span>
+										<p class="font-semibold text-primary">+{currentBlock.increment ?? 0} {currentBlock.loadUnit ?? 'kg'}</p>
+									</div>
+									{#if prevLoad}
+										<div>
+											<span class="text-[10px] uppercase tracking-wider text-on-surface-variant">Previous Session Load</span>
+											<p class="font-semibold text-on-surface">{prevLoad}</p>
+										</div>
+									{/if}
 								</div>
 							</div>
 						{/if}
@@ -2903,10 +3044,10 @@
 										<div class="rounded-lg border border-white/5 bg-surface-container-lowest p-3 text-center">
 											<p class="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">Set {log.set_index}</p>
 											<p class="mt-1 text-base font-bold text-on-surface">
-												{log.actual_reps || '-'} <span class="text-xs font-normal text-on-surface-variant">reps</span>
+												{log.actual_reps || log.prescribed_reps || '-'} <span class="text-xs font-normal text-on-surface-variant">reps</span>
 											</p>
-											{#if log.actual_load}
-												<p class="mt-0.5 text-xs font-semibold text-secondary">{log.actual_load}</p>
+											{#if log.actual_load || log.prescribed_load}
+												<p class="mt-0.5 text-xs font-semibold text-secondary">{log.actual_load || log.prescribed_load}</p>
 											{/if}
 											{#if log.actual_rpe || log.actual_rir}
 												<p class="mt-0.5 text-[10px] text-on-surface-variant/70">
@@ -3455,28 +3596,79 @@
 								</div>
 							</div>
 
-							<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
-								<div class="mb-4 flex items-center justify-between">
-									<span class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Wave progression</span>
-									<span class="text-xs font-medium text-secondary">{currentWaveWeek?.label}</span>
+							<div class="rounded-2xl border border-secondary/30 bg-surface-container-low p-6 shadow-lg shadow-secondary/5">
+								<div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+									<div class="flex items-center gap-2">
+										<span class="flex h-7 w-7 items-center justify-center rounded-lg bg-secondary/15 text-secondary">
+											<span class="material-symbols-outlined text-base">waves</span>
+										</span>
+										<div>
+											<h3 class="text-xs font-black uppercase tracking-wider text-on-surface">Wave Periodization Tracker</h3>
+											<p class="text-[11px] text-on-surface-variant">Step-by-step undulating load progression</p>
+										</div>
+									</div>
+									<div class="flex items-center gap-2">
+										{#if currentProgressionState?.suggested_intensity_offset}
+											<span class="rounded-md border border-secondary/30 bg-secondary/10 px-2 py-0.5 text-[11px] font-bold text-secondary">
+												Offset: {currentProgressionState.suggested_intensity_offset}
+											</span>
+										{/if}
+										<span class="rounded-md bg-secondary/20 px-2.5 py-1 text-xs font-bold text-secondary">
+											{currentWaveWeek?.label || 'Wave Step'}
+										</span>
+									</div>
 								</div>
-								<div class="flex gap-2">
+
+								<div class="flex gap-2 mb-5">
 									{#each currentBlock.waveSteps ?? [] as step, index}
-										<div class={`h-2 flex-1 rounded-full ${index <= (resolveWaveWeekIndex(currentBlock) ?? 0) ? 'bg-secondary' : 'bg-surface-variant'}`}></div>
+										{@const isCurrent = index === (resolveWaveWeekIndex(currentBlock) ?? 0)}
+										{@const isPast = index < (resolveWaveWeekIndex(currentBlock) ?? 0)}
+										<div class={`h-2 flex-1 rounded-full transition-all ${isCurrent ? 'bg-secondary ring-2 ring-secondary/40' : isPast ? 'bg-secondary/70' : 'bg-surface-variant'}`}></div>
 									{/each}
 								</div>
+
 								<div class="mt-5 grid gap-3 md:grid-cols-2">
 									{#each currentBlock.waveSteps ?? [] as step, index}
+										{@const isCurrent = index === (resolveWaveWeekIndex(currentBlock) ?? 0)}
+										{@const isPast = index < (resolveWaveWeekIndex(currentBlock) ?? 0)}
 										{@const weekHistory = getWaveWeekHistoryEntry(currentProgressionState, index)}
-										<div class={`rounded-xl border px-4 py-3 ${index === (resolveWaveWeekIndex(currentBlock) ?? 0) ? 'border-secondary/30 bg-secondary/10' : 'border-white/5 bg-surface-container'}`}>
-											<p class="text-sm font-semibold text-on-surface">{step.label}</p>
-											<p class="mt-1 text-xs text-on-surface-variant">{step.reps} • {applyWaveIntensityOffset(step.intensity, currentProgressionState?.state_type === 'wave' ? currentProgressionState.suggested_intensity_offset : '')} • RPE {step.rpe}</p>
+										{@const calcLoad = calculateCalculatedLoad((currentBlock?.data?.exercise_name as string) || currentBlock?.title, step.intensity)}
+										<div class={`rounded-xl border p-4 transition-all ${isCurrent ? 'border-secondary/50 bg-secondary/10 shadow-md shadow-secondary/5 ring-1 ring-secondary/30' : isPast ? 'border-white/10 bg-surface-container/80' : 'border-white/5 bg-surface-container/40 opacity-70'}`}>
+											<div class="flex items-center justify-between mb-2">
+												<p class="text-sm font-bold text-on-surface">{step.label}</p>
+												{#if isCurrent}
+													<span class="rounded bg-secondary/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-secondary">Active</span>
+												{:else if isPast}
+													<span class="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-on-surface-variant">Completed</span>
+												{:else}
+													<span class="text-[10px] text-on-surface-variant font-medium">Upcoming</span>
+												{/if}
+											</div>
+											<p class="text-xs text-on-surface-variant">
+												{step.reps} • {applyWaveIntensityOffset(step.intensity, currentProgressionState?.state_type === 'wave' ? currentProgressionState.suggested_intensity_offset : '')}
+												{#if calcLoad}
+													<span class="font-bold text-secondary">({calcLoad})</span>
+												{/if}
+												• RPE {step.rpe}
+											</p>
 											{#if weekHistory}
-												<div class="mt-3 rounded-lg border border-white/5 bg-background/40 px-3 py-2">
-													<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-secondary">Logged</p>
-													<p class="mt-1 text-[11px] text-on-surface-variant">Reps: {weekHistory.actual_reps}</p>
-													<p class="mt-1 text-[11px] text-on-surface-variant">Load: {weekHistory.actual_load}</p>
-													<p class="mt-1 text-[11px] text-on-surface-variant">RPE/RIR: {weekHistory.actual_rpe} / {weekHistory.actual_rir}</p>
+												<div class="mt-3 rounded-lg border border-white/5 bg-background/50 px-3 py-2 text-xs">
+													<div class="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-secondary mb-1">
+														<span>Logged Result</span>
+														{#if weekHistory.completed_at}
+															<span class="text-on-surface-variant font-normal lowercase">{formatRelativeDate(weekHistory.completed_at)}</span>
+														{/if}
+													</div>
+													<div class="grid grid-cols-2 gap-1 text-[11px] text-on-surface-variant">
+														<div>Reps: <strong class="text-on-surface">{weekHistory.actual_reps || weekHistory.prescribed_reps}</strong></div>
+														<div>Load: <strong class="text-on-surface">{weekHistory.actual_load || calcLoad || weekHistory.prescribed_intensity}</strong></div>
+														{#if weekHistory.actual_rpe || weekHistory.prescribed_rpe}
+															<div>RPE: <strong class="text-on-surface">{weekHistory.actual_rpe || weekHistory.prescribed_rpe}</strong></div>
+														{/if}
+														{#if weekHistory.actual_rir}
+															<div>RIR: <strong class="text-on-surface">{weekHistory.actual_rir}</strong></div>
+														{/if}
+													</div>
 												</div>
 											{/if}
 										</div>
@@ -4230,13 +4422,26 @@
 		<section class="custom-scrollbar fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 max-h-[62vh] overflow-y-auto rounded-t-[1.75rem] border-t border-white/10 bg-surface-container px-6 py-6 shadow-2xl lg:hidden">
 			<div class="mb-6 flex items-center justify-between">
 				<h3 class="text-sm font-bold text-on-surface">Queue</h3>
-				<button
-					type="button"
-					class="flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
-					onclick={() => (mobileQueueOpen = false)}
-				>
-					<span class="material-symbols-outlined">close</span>
-				</button>
+				<div class="flex items-center gap-2">
+					<button
+						type="button"
+						class="flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary hover:bg-primary/20 transition-all cursor-pointer"
+						onclick={() => {
+							mobileQueueOpen = false;
+							showFinishConfirmModal = true;
+						}}
+					>
+						<span class="material-symbols-outlined text-sm">flag</span>
+						Finish
+					</button>
+					<button
+						type="button"
+						class="flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+						onclick={() => (mobileQueueOpen = false)}
+					>
+						<span class="material-symbols-outlined">close</span>
+					</button>
+				</div>
 			</div>
 
 			<div class="space-y-6">
@@ -4297,6 +4502,49 @@
 		</div>
 	{/if}
 </div>
+
+{#if showFinishConfirmModal}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+		role="presentation"
+		onclick={(e) => {
+			if (e.target === e.currentTarget) showFinishConfirmModal = false;
+		}}
+	>
+		<div
+			class="w-full max-w-md rounded-2xl border border-white/10 bg-surface-container p-6 shadow-2xl"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="finish-dialog-title"
+		>
+			<div class="flex items-center gap-3 text-primary mb-3">
+				<span class="material-symbols-outlined text-3xl">sports_score</span>
+				<h3 id="finish-dialog-title" class="font-headline text-xl font-bold text-on-surface">Finish Workout?</h3>
+			</div>
+			<p class="text-sm text-on-surface-variant leading-relaxed">
+				Are you ready to complete this workout? All your logged sets will be saved, workout duration will be recorded, and linear & wave progressions will be calculated and updated.
+			</p>
+			<div class="mt-6 flex items-center justify-end gap-3">
+				<button
+					type="button"
+					class="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
+					onclick={() => (showFinishConfirmModal = false)}
+				>
+					Keep Training
+				</button>
+				<button
+					type="button"
+					class="btn-primary-gradient rounded-xl px-5 py-2.5 text-sm font-bold text-on-primary-fixed shadow-md hover:brightness-110 active:scale-[0.98] transition-all flex items-center gap-2 cursor-pointer"
+					onclick={() => void finishCurrentWorkoutEarly()}
+					disabled={isSyncingSession}
+				>
+					<span class="material-symbols-outlined text-base">check_circle</span>
+					{isSyncingSession ? 'Saving...' : 'Finish & Save'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
 {/if}
 
 <style>

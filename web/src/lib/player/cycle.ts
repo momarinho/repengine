@@ -117,3 +117,96 @@ export function formatRelativeDate(isoString: string | null | undefined): string
 		month: 'short'
 	});
 }
+
+export interface SectionProgressionSummary {
+	title: string;
+	exerciseName: string;
+	stateType: 'linear' | 'wave' | 'skill';
+	outcome: string;
+	currentLoad: string;
+	suggestedLoad: string;
+	suggestedWeek?: number;
+	summary?: string;
+}
+
+/**
+ * Finds the most recent completed session for a specific routine section.
+ */
+export function getLastCompletedSessionForSection(
+	section: PlayerSection,
+	sessionHistory: WorkoutSession[] | undefined | null
+): WorkoutSession | null {
+	if (!sessionHistory || sessionHistory.length === 0) return null;
+	const targetTitle = section.title.trim().toLowerCase();
+	return (
+		sessionHistory.find(
+			(s) =>
+				s.status === 'completed' &&
+				(s.section_id === section.id || (Boolean(s.section_title) && s.section_title.trim().toLowerCase() === targetTitle))
+		) ?? null
+	);
+}
+
+/**
+ * Extracts progression state summaries (loads, scheme, progression status) for blocks in a given section.
+ */
+export function getSectionProgressionSummaries(
+	blocks: PlayerBlock[] | undefined | null,
+	section: PlayerSection,
+	progressionStates: Array<{
+		workflow_block_id?: number;
+		exercise_name?: string;
+		state_type?: 'linear' | 'wave' | 'skill';
+		outcome?: string;
+		current_load?: string;
+		suggested_load?: string;
+		suggested_week?: number;
+		summary?: string;
+	}> | undefined | null
+): SectionProgressionSummary[] {
+	if (!blocks || blocks.length === 0) return [];
+	const sectionBlocks = blocks.slice(
+		section.startBlockIndex,
+		section.startBlockIndex + section.blockCount
+	);
+
+	type ProgressionItem = NonNullable<typeof progressionStates>[number];
+	const stateByBlockID = new Map<number, ProgressionItem>();
+	if (progressionStates && progressionStates.length > 0) {
+		for (const state of progressionStates) {
+			if (state.workflow_block_id) {
+				stateByBlockID.set(state.workflow_block_id, state);
+			}
+		}
+	}
+
+	const summaries: SectionProgressionSummary[] = [];
+	for (const block of sectionBlocks) {
+		const blockExercise = (typeof block.data?.exercise_name === 'string' ? block.data.exercise_name : null) || block.title;
+		if (block.workflowBlockID && stateByBlockID.has(block.workflowBlockID)) {
+			const state = stateByBlockID.get(block.workflowBlockID)!;
+			summaries.push({
+				title: block.title,
+				exerciseName: state.exercise_name || blockExercise,
+				stateType: state.state_type || 'linear',
+				outcome: state.outcome || 'maintain',
+				currentLoad: state.current_load || '',
+				suggestedLoad: state.suggested_load || '',
+				suggestedWeek: state.suggested_week,
+				summary: state.summary
+			});
+		} else if (block.node_type_slug === 'linear_progression' && (block.load || block.increment)) {
+			const blockLoad = block.load ? `${block.load} ${block.loadUnit || 'kg'}` : 'BW';
+			summaries.push({
+				title: block.title,
+				exerciseName: blockExercise,
+				stateType: 'linear',
+				outcome: 'increase',
+				currentLoad: blockLoad,
+				suggestedLoad: blockLoad
+			});
+		}
+	}
+
+	return summaries;
+}

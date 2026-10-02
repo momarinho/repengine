@@ -89,8 +89,8 @@ export const load = (async ({ params, cookies, fetch }) => {
 			const sessionDate = session.started_at.split('T')[0];
 
 			for (const log of session.logs) {
-				const load = parseFloat(log.actual_load || '0');
-				const reps = parseInt(log.actual_reps || '0', 10);
+				const load = parseFloat(log.actual_load || log.prescribed_load || '0');
+				const reps = parseInt(log.actual_reps || log.prescribed_reps || '0', 10);
 				const rpe = log.actual_rpe ? parseFloat(log.actual_rpe) : undefined;
 				if (load > 0 && reps > 0) {
 					sessionWorkload += load * reps;
@@ -112,8 +112,8 @@ export const load = (async ({ params, cookies, fetch }) => {
 					session_id: session.id,
 					date: sessionDate,
 					target_reps: parseInt(firstLog?.prescribed_reps || '5', 10) || 5,
-					completed_reps: parseInt(firstLog?.actual_reps || '5', 10) || 5,
-					load: parseFloat(firstLog?.actual_load || '100') || 100,
+					completed_reps: parseInt(firstLog?.actual_reps || firstLog?.prescribed_reps || '5', 10) || 5,
+					load: parseFloat(firstLog?.actual_load || firstLog?.prescribed_load || '100') || 100,
 					rpe: firstLog?.actual_rpe ? parseFloat(firstLog.actual_rpe) : undefined,
 					failed: session.status === 'abandoned'
 				});

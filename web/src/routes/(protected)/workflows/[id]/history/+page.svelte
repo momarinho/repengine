@@ -319,8 +319,8 @@
 												</div>
 											{:else}
 												<div class="mt-4 flex flex-wrap gap-3 text-sm text-on-surface-variant">
-													<span>Actual reps: <strong class="text-on-surface">{log.actual_reps || '-'}</strong></span>
-													<span>Load: <strong class="text-on-surface">{log.actual_load || '-'}</strong></span>
+													<span>Actual reps: <strong class="text-on-surface">{log.actual_reps || log.prescribed_reps || '-'}</strong></span>
+													<span>Load: <strong class="text-on-surface">{log.actual_load || log.prescribed_load || '-'}</strong></span>
 													<span>RPE: <strong class="text-on-surface">{log.actual_rpe || '-'}</strong></span>
 													<span>RIR: <strong class="text-on-surface">{log.actual_rir || '-'}</strong></span>
 													<span>Status: <strong class="text-on-surface">{log.completed ? 'completed' : 'incomplete'}</strong></span>

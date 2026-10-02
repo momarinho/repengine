@@ -865,7 +865,16 @@ func resolveLinearCurrentLoad(
 			return val
 		}
 	}
-	// 2. Check existing progression state if it has a non-zero suggested load
+	// 2. Check if the current session sets have a non-zero prescribed load
+	for _, log := range logs {
+		if val := strings.TrimSpace(log.PrescribedLoad); val != "" && val != "0" && val != "0 kg" && val != "0.0" && val != "0.0 kg" {
+			if num, ok := parseNumberString(val); ok {
+				return formatLoad(num, loadUnit)
+			}
+			return val
+		}
+	}
+	// 3. Check existing progression state if it has a non-zero suggested load
 	if hasExisting && strings.TrimSpace(existing.SuggestedLoad) != "" && existing.SuggestedLoad != "0" && existing.SuggestedLoad != "0 kg" && existing.SuggestedLoad != "0.0" && existing.SuggestedLoad != "0.0 kg" {
 		return existing.SuggestedLoad
 	}
@@ -1103,10 +1112,14 @@ func anyRepTargetMiss(logs []CompletedSetLog, lowerTarget float64) bool {
 		return false
 	}
 	for _, log := range logs {
-		if strings.TrimSpace(log.ActualReps) == "" {
+		repsStr := strings.TrimSpace(log.ActualReps)
+		if repsStr == "" {
+			repsStr = strings.TrimSpace(log.PrescribedReps)
+		}
+		if repsStr == "" {
 			continue
 		}
-		actualReps, ok := parseNumberString(log.ActualReps)
+		actualReps, ok := parseNumberString(repsStr)
 		if !ok {
 			continue
 		}

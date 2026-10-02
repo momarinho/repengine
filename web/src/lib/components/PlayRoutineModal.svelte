@@ -2,10 +2,17 @@
 	import { goto } from '$app/navigation';
 	import { normalizeWorkflow } from '$lib/editor/normalize';
 	import type { Workflow } from '$lib/editor/types';
-	import { getNextAndLastCompletedSection, getSectionExercisePreview, formatRelativeDate } from '$lib/player/cycle';
+	import {
+		getNextAndLastCompletedSection,
+		getSectionExercisePreview,
+		formatRelativeDate,
+		getLastCompletedSessionForSection,
+		getSectionProgressionSummaries
+	} from '$lib/player/cycle';
 	import { normalizePlayerRoutine } from '$lib/player/normalize';
 	import type { PlayerRoutine, PlayerSection } from '$lib/player/types';
 	import type { PaginatedWorkoutSessions, WorkoutSession } from '$lib/workout-sessions/types';
+	import type { ProgressionState } from '$lib/progression-states/types';
 
 	interface Props {
 		open: boolean;
@@ -20,6 +27,7 @@
 	let error = $state<string | null>(null);
 	let routine = $state<PlayerRoutine | null>(null);
 	let sessions = $state<WorkoutSession[]>([]);
+	let progressionStates = $state<ProgressionState[]>([]);
 
 	const cycleInfo = $derived.by(() => {
 		if (!routine?.sections) {
@@ -44,6 +52,7 @@
 		} else {
 			routine = null;
 			sessions = [];
+			progressionStates = [];
 			error = null;
 			loading = false;
 		}
@@ -54,9 +63,10 @@
 		error = null;
 
 		try {
-			const [workflowRes, sessionsRes] = await Promise.all([
+			const [workflowRes, sessionsRes, progressionRes] = await Promise.all([
 				fetch(`/api/workflows/${id}`),
-				fetch(`/api/workflows/${id}/sessions?limit=8`)
+				fetch(`/api/workflows/${id}/sessions?limit=8`),
+				fetch(`/api/workflows/${id}/progression-states`)
 			]);
 
 			if (!workflowRes.ok) {
@@ -71,6 +81,10 @@
 			if (sessionsRes.ok) {
 				const sessionPayload = (await sessionsRes.json()) as PaginatedWorkoutSessions;
 				sessionList = sessionPayload?.data ?? [];
+			}
+
+			if (progressionRes.ok) {
+				progressionStates = ((await progressionRes.json()) as ProgressionState[]) ?? [];
 			}
 
 			if (!normalizedRoutine) {
@@ -206,6 +220,7 @@
 				{#if cycleInfo.nextSection}
 					{@const next = cycleInfo.nextSection}
 					{@const previews = getSectionExercisePreview(routine.blocks, next, 3)}
+					{@const nextProgressions = getSectionProgressionSummaries(routine.blocks, next, progressionStates)}
 					<div class="mb-6 rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-surface-container-high to-surface-container p-5 shadow-lg shadow-primary/5">
 						<div class="flex items-center justify-between gap-2">
 							<span class="inline-flex items-center gap-1 rounded-md bg-primary/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
@@ -226,7 +241,19 @@
 							</p>
 						</div>
 
-						{#if previews.length > 0}
+						{#if nextProgressions.length > 0}
+							<div class="mt-3 flex flex-wrap gap-2">
+								{#each nextProgressions as prog}
+									<span class="inline-flex items-center gap-1.5 rounded-lg bg-surface-container-lowest/80 border border-primary/20 px-2.5 py-1 text-xs text-on-surface">
+										<span class="text-on-surface-variant font-medium">{prog.title}:</span>
+										<span class="font-bold text-primary">{prog.suggestedLoad || prog.currentLoad}</span>
+										{#if prog.outcome === 'increase'}
+											<span class="rounded bg-primary/20 px-1 py-0.2 text-[9px] font-bold text-primary">↗ +Progression</span>
+										{/if}
+									</span>
+								{/each}
+							</div>
+						{:else if previews.length > 0}
 							<div class="mt-3 flex flex-wrap gap-1.5">
 								{#each previews as exercise}
 									<span class="rounded-md border border-white/5 bg-surface-container-lowest/60 px-2 py-1 text-[11px] text-on-surface">
@@ -269,7 +296,9 @@
 						{#each routine.sections as section}
 							{@const isNext = section.id === cycleInfo.nextSection?.id}
 							{@const isLast = section.id === cycleInfo.lastCompletedSection?.id}
+							{@const lastSession = getLastCompletedSessionForSection(section, sessions)}
 							{@const exercises = getSectionExercisePreview(routine.blocks, section, 2)}
+							{@const progressions = getSectionProgressionSummaries(routine.blocks, section, progressionStates)}
 							<button
 								type="button"
 								class="group flex flex-col justify-between rounded-xl border border-outline-variant/20 bg-surface-container-high/40 p-4 text-left transition-all hover:border-primary/40 hover:bg-surface-container-high active:scale-[0.99] cursor-pointer"
@@ -280,15 +309,21 @@
 										<span class="text-[10px] font-bold uppercase tracking-wider text-tertiary">
 											{section.kind || 'Day'}
 										</span>
-										{#if isNext}
-											<span class="rounded bg-primary/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-primary">
-												Next
-											</span>
-										{:else if isLast}
-											<span class="rounded bg-surface-container-highest px-1.5 py-0.5 text-[9px] font-medium text-on-surface-variant">
-												Last done
-											</span>
-										{/if}
+										<div class="flex items-center gap-1.5">
+											{#if isNext}
+												<span class="rounded bg-primary/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-primary">
+													Next
+												</span>
+											{:else if isLast}
+												<span class="rounded bg-surface-container-highest px-1.5 py-0.5 text-[9px] font-medium text-on-surface-variant">
+													Last done
+												</span>
+											{:else if lastSession}
+												<span class="text-[10px] text-on-surface-variant font-medium">
+													{formatRelativeDate(lastSession.completed_at || lastSession.started_at)}
+												</span>
+											{/if}
+										</div>
 									</div>
 
 									<h5 class="font-headline text-base font-bold text-on-surface group-hover:text-primary transition-colors">
@@ -298,7 +333,18 @@
 										{section.subtitle || `${section.blockCount} blocks`}
 									</p>
 
-									{#if exercises.length > 0}
+									{#if progressions.length > 0}
+										<div class="mt-2.5 flex flex-wrap gap-1.5">
+											{#each progressions as p}
+												<span class="rounded-md border border-white/5 bg-surface-container-lowest/70 px-2 py-0.5 text-[10px] text-on-surface">
+													<span class="text-on-surface-variant">{p.title}:</span> <strong class="text-primary font-bold">{p.suggestedLoad || p.currentLoad}</strong>
+													{#if p.outcome === 'increase'}
+														<span class="text-primary font-bold"> ↗</span>
+													{/if}
+												</span>
+											{/each}
+										</div>
+									{:else if exercises.length > 0}
 										<p class="mt-2 text-[11px] text-on-surface-variant/80 truncate">
 											{exercises.join(' · ')}
 										</p>
