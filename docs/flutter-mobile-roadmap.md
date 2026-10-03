@@ -113,9 +113,9 @@ flowchart TD
 - [x] **Configuração do Projeto Flutter & Design Tokens**:
   - Setup do projeto `mobile/` com Riverpod 2.x (`ProviderScope`, `@riverpod`) e `go_router`.
   - Design tokens (Atelier Dark Theme, tipografia Space Grotesk / Manrope).
-- [ ] **Drift Local Database (`AppDatabase`)**:
-  - Tabelas: `RoutinesTable`, `WorkoutSessionsTable`, `SetLogsTable`.
-  - Tabela **`SyncQueueTable`**: `id`, `entity_id`, `action` (CREATE/UPDATE/DELETE), `payload`, `created_at`, `status`.
+- [x] **Drift Local Database (`AppDatabase`)**:
+  - Tabelas: `RoutinesTable`, `WorkoutSessionsTable`, `WorkoutSetLogsTable`.
+  - Tabela **`SyncQueueTable`**: `id`, `entity_client_id`, `entity_type`, `action`, `payload`, `status`, `attempts`.
   - Consultas reativas com **Streams (`watch()`)**: a UI escuta o Drift diretamente.
 - [ ] **Camada de Repositório**:
   - `WorkoutRepository`: Leitura sempre no Drift local (latência zero); escrita salva no Drift e insere na fila de sync.
