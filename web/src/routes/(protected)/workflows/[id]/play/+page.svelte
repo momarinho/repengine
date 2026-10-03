@@ -1166,7 +1166,6 @@
 			completedSessionSummary = session;
 			activePersistedSession = null;
 			activeSection = restoredSection ?? activeSection;
-			isSessionComplete = true;
 			syncSessionHistory(session);
 			return;
 		}
@@ -1556,9 +1555,13 @@
 		sessionError = null;
 
 		try {
-			if (activePersistedSession && section && activePersistedSession.section_id !== section.id) {
+			const activeToAbandon =
+				activePersistedSession ??
+				sessionHistory.find((session) => session.status === 'active') ??
+				null;
+			if (activeToAbandon && section && activeToAbandon.section_id !== section.id) {
 				try {
-					await fetch(`/api/workout-sessions/${activePersistedSession.id}/abandon`, {
+					await fetch(`/api/workout-sessions/${activeToAbandon.id}/abandon`, {
 						method: 'POST',
 						headers: { 'Content-Type': 'application/json' },
 						body: JSON.stringify({ notes: 'Auto-abandoned: switching to different workout section' })
@@ -1971,6 +1974,98 @@
 				? localStorage.getItem(legacyLocalSessionKey)
 				: null;
 		const rawState = nextScopedState ?? legacyState;
+
+		// 1. Explicit Section Selected via Query Parameter (e.g. from Dashboard "Start Workout" day selection)
+		if (hasSectionQuery && initialSection) {
+			hasRestoredSession = true;
+			isChoosingSection = false;
+			isSessionComplete = false;
+
+			let canResumeCurrentSection = false;
+			if (rawState) {
+				try {
+					const savedState = JSON.parse(rawState) as PersistedPlayerState;
+					const isSameSection = savedState.activeSectionID === initialSection.id;
+					const isNotFinished = !savedState.isSessionComplete;
+					if (isSameSection && isNotFinished) {
+						canResumeCurrentSection = true;
+						const blockIDs = new Set(routine.blocks.map((block) => block.id));
+						const sectionStart = initialSection.startBlockIndex;
+						const sectionEnd = initialSection.startBlockIndex + initialSection.blockCount - 1;
+						currentBlockIndex = Math.min(
+							Math.max(savedState.currentBlockIndex ?? sectionStart, sectionStart),
+							sectionEnd
+						);
+						completedBlockIds = (savedState.completedBlockIds ?? []).filter((id) => blockIDs.has(id));
+						currentSetByBlock = savedState.currentSetByBlock ?? {};
+						roundByBlock = savedState.roundByBlock ?? {};
+						waveSetByBlock = savedState.waveSetByBlock ?? {};
+						notesByBlock = savedState.notesByBlock ?? {};
+						actualRepsByBlock = savedState.actualRepsByBlock ?? {};
+						actualLoadByBlock = savedState.actualLoadByBlock ?? {};
+						actualRPEByBlock = savedState.actualRPEByBlock ?? {};
+						actualRIRByBlock = savedState.actualRIRByBlock ?? {};
+						sessionElapsedSeconds = Math.max(savedState.sessionElapsedSeconds ?? 0, 0);
+						activeSection = initialSection;
+						activityEntries = (savedState.activityEntries ?? []).filter((entry) => blockIDs.has(entry.blockID));
+						timerRemainingSeconds =
+							typeof savedState.timerRemainingSeconds === 'number'
+								? Math.max(savedState.timerRemainingSeconds, 0)
+								: getInitialTimerSeconds(routine.blocks[currentBlockIndex]);
+						isTimerRunning = Boolean(savedState.isTimerRunning) && timerRemainingSeconds > 0;
+						intraSetRest = sanitizeSavedRestState(savedState.intraSetRest, blockIDs);
+						isIntraSetRestRunning = Boolean(savedState.isIntraSetRestRunning) && Boolean(intraSetRest);
+
+						const block = routine.blocks[currentBlockIndex];
+						const phases = resolveIntervalPhases(block);
+						if (typeof savedState.activeIntervalPhaseIdx === 'number') {
+							activeIntervalPhaseIdx = savedState.activeIntervalPhaseIdx;
+						}
+						if (typeof savedState.intervalPhaseSecondsLeft === 'number') {
+							intervalPhaseSecondsLeft = savedState.intervalPhaseSecondsLeft;
+						} else if (phases && phases.length > 0) {
+							intervalPhaseSecondsLeft = phases[0].durationSeconds;
+						}
+						if (typeof savedState.intervalSoundEnabled === 'boolean') {
+							intervalSoundEnabled = savedState.intervalSoundEnabled;
+						}
+
+						const targetBackendID =
+							recentActiveSession && recentActiveSession.section_id === initialSection.id
+								? recentActiveSession.id
+								: savedState.backendSessionID;
+
+						if (targetBackendID) {
+							void restorePersistedSession(targetBackendID).catch(() => {
+								sessionError = 'Unable to restore workout session.';
+							});
+						}
+					}
+				} catch {
+					canResumeCurrentSection = false;
+				}
+			}
+
+			if (!canResumeCurrentSection) {
+				if (localSessionKey) {
+					localStorage.removeItem(localSessionKey);
+				}
+				if (legacyLocalSessionKey) {
+					localStorage.removeItem(legacyLocalSessionKey);
+				}
+				resetRuntimeState(initialBlockIndex, initialSection, false);
+				if (recentActiveSession && recentActiveSession.section_id === initialSection.id) {
+					void restorePersistedSession(recentActiveSession.id).catch(() => {
+						sessionError = 'Unable to restore workout session.';
+					});
+				} else {
+					void startSection(initialSection);
+				}
+			}
+			return;
+		}
+
+		// 2. Generic Access (No Section Query)
 		if (!rawState) {
 			hasRestoredSession = true;
 			if (recentActiveSession) {
@@ -1980,7 +2075,7 @@
 				void restorePersistedSession(recentActiveSession.id).catch(() => {
 					sessionError = 'Unable to restore workout session.';
 				});
-				if (routine.sections.length > 0 && !hasSectionQuery) {
+				if (routine.sections.length > 0) {
 					isChoosingSection = true;
 					hasActiveSavedRun = true;
 				}
@@ -2024,13 +2119,13 @@
 			if (savedState.isSessionComplete) {
 				localStorage.removeItem(localSessionKey);
 				isSessionComplete = false;
-				if (routine.sections.length > 0 && !hasSectionQuery) {
+				if (routine.sections.length > 0) {
 					isChoosingSection = true;
 				} else {
 					resetRuntimeState(initialBlockIndex, initialSection, false);
 				}
 			} else {
-				if (routine.sections.length > 0 && !hasSectionQuery) {
+				if (routine.sections.length > 0) {
 					isChoosingSection = true;
 					hasActiveSavedRun = true;
 					isSessionComplete = false;
@@ -2060,14 +2155,13 @@
 			if (typeof savedState.intervalSoundEnabled === 'boolean') {
 				intervalSoundEnabled = savedState.intervalSoundEnabled;
 			}
-			if (savedBackendSessionID) {
-				void restorePersistedSession(savedBackendSessionID).catch(() => {
-					sessionError = 'Unable to restore workout session.';
-				});
-			} else if (recentActiveSession) {
-				void restorePersistedSession(recentActiveSession.id).catch(() => {
-					sessionError = 'Unable to restore workout session.';
-				});
+			if (!savedState.isSessionComplete && (savedBackendSessionID || recentActiveSession)) {
+				const idToRestore = recentActiveSession?.id ?? savedBackendSessionID;
+				if (idToRestore) {
+					void restorePersistedSession(idToRestore).catch(() => {
+						sessionError = 'Unable to restore workout session.';
+					});
+				}
 			}
 		} catch {
 			localStorage.removeItem(localSessionKey);

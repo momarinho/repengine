@@ -1,11 +1,17 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { afterNavigate } from '$app/navigation';
 	import type { PageData } from './$types';
 	import QrCodeModal from '$lib/components/QrCodeModal.svelte';
 	import PlayRoutineModal from '$lib/components/PlayRoutineModal.svelte';
 
 	let { data }: { data: PageData } = $props();
 	const initialWorkflows = untrack(() => [...data.workflows]);
+
+	afterNavigate(() => {
+		playWorkflow = null;
+		qrWorkflow = null;
+	});
 
 	let filter = $state<'all' | 'private' | 'public'>('all');
 	let workflows = $state(initialWorkflows);

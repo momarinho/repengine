@@ -93,13 +93,11 @@
 
 			// If the routine has 0 or only 1 section, jump directly to player
 			if (normalizedRoutine.sections.length <= 1) {
-				onclose();
 				const targetSection = normalizedRoutine.sections[0];
-				if (targetSection) {
-					void goto(`/workflows/${id}/play?section=${encodeURIComponent(targetSection.id)}`);
-				} else {
-					void goto(`/workflows/${id}/play`);
-				}
+				const targetUrl = targetSection
+					? `/workflows/${id}/play?section=${encodeURIComponent(targetSection.id)}`
+					: `/workflows/${id}/play`;
+				void goto(targetUrl);
 				return;
 			}
 
@@ -109,15 +107,6 @@
 			error = err instanceof Error ? err.message : 'Unable to load routine.';
 		} finally {
 			loading = false;
-		}
-	}
-
-	function handleSelectSection(section: PlayerSection | null) {
-		onclose();
-		if (section) {
-			void goto(`/workflows/${routineId}/play?section=${encodeURIComponent(section.id)}`);
-		} else {
-			void goto(`/workflows/${routineId}/play`);
 		}
 	}
 
@@ -269,14 +258,13 @@
 						{/if}
 
 						<div class="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
-							<button
-								type="button"
-								class="btn-primary-gradient w-full text-on-primary-fixed font-headline font-bold text-sm py-3 px-5 rounded-xl shadow-md flex items-center justify-center gap-2 hover:brightness-110 active:scale-[0.98] transition-all"
-								onclick={() => handleSelectSection(next)}
+							<a
+								href={`/workflows/${routineId}/play?section=${encodeURIComponent(next.id)}`}
+								class="btn-primary-gradient w-full text-on-primary-fixed font-headline font-bold text-sm py-3 px-5 rounded-xl shadow-md flex items-center justify-center gap-2 hover:brightness-110 active:scale-[0.98] transition-all text-center"
 							>
 								<span class="material-symbols-outlined text-xl">play_arrow</span>
 								Continue to Next: {next.title}
-							</button>
+							</a>
 						</div>
 					</div>
 				{/if}
@@ -299,10 +287,9 @@
 							{@const lastSession = getLastCompletedSessionForSection(section, sessions)}
 							{@const exercises = getSectionExercisePreview(routine.blocks, section, 2)}
 							{@const progressions = getSectionProgressionSummaries(routine.blocks, section, progressionStates)}
-							<button
-								type="button"
+							<a
+								href={`/workflows/${routineId}/play?section=${encodeURIComponent(section.id)}`}
 								class="group flex flex-col justify-between rounded-xl border border-outline-variant/20 bg-surface-container-high/40 p-4 text-left transition-all hover:border-primary/40 hover:bg-surface-container-high active:scale-[0.99] cursor-pointer"
-								onclick={() => handleSelectSection(section)}
 							>
 								<div>
 									<div class="flex items-center justify-between gap-1 mb-1.5">
@@ -357,7 +344,7 @@
 										Start <span class="material-symbols-outlined text-sm">arrow_forward</span>
 									</span>
 								</div>
-							</button>
+							</a>
 						{/each}
 					</div>
 				</div>
@@ -370,13 +357,12 @@
 					>
 						Cancel
 					</button>
-					<button
-						type="button"
+					<a
+						href={`/workflows/${routineId}/play`}
 						class="text-xs font-semibold text-tertiary hover:underline"
-						onclick={() => handleSelectSection(null)}
 					>
 						Open routine without selecting day →
-					</button>
+					</a>
 				</div>
 			{/if}
 		</div>
