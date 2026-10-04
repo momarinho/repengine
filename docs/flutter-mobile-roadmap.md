@@ -117,9 +117,9 @@ flowchart TD
   - Tabelas: `RoutinesTable`, `WorkoutSessionsTable`, `WorkoutSetLogsTable`.
   - Tabela **`SyncQueueTable`**: `id`, `entity_client_id`, `entity_type`, `action`, `payload`, `status`, `attempts`.
   - Consultas reativas com **Streams (`watch()`)**: a UI escuta o Drift diretamente.
-- [ ] **Camada de Repositório**:
+- [x] **Camada de Repositório**:
   - `WorkoutRepository`: Leitura sempre no Drift local (latência zero); escrita salva no Drift e insere na fila de sync.
-- [ ] **Testes da Sprint**:
+- [x] **Testes da Sprint**:
   - Testes unitários de repositório e banco Drift em memória (`NativeDatabase.memory()`).
 
 ---
