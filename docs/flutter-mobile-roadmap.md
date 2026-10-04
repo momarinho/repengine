@@ -124,68 +124,56 @@ flowchart TD
 
 ---
 
-### 🔬 SPRINT 3.5: Ciência do Esporte em Dart Puro & Descomissionamento do Python
-> **Objetivo**: Migrar 100% da inteligência analítica do microsserviço Python (`analytics/`) para Dart puro no pacote compartilhado `packages/repengine_core`, permitindo cálculos de 1RM, INOL e fadiga 100% offline no celular e servidos pelo Dart Frog BFF.
+### ⚡ SPRINT 4 (Fatia Vertical 1): Gym Execution HUD + Ciência do Esporte (1RM/Fadiga) em Tempo Real
+> **Objetivo**: Unir a interface visual do Flutter com o motor local Drift e a matemática de 1RM do `repengine_core`. O atleta inicia um treino, digita carga/reps, vê o 1RM estimado sendo calculado em tempo real na tela, conclui séries com feedback tátil e vê a lista e o timer reagirem ao vivo a 120 FPS.
 
-- [ ] **Módulo `repengine_core/sports_science`**:
-  - `one_rep_max.dart`: Fórmulas analíticas (Brzycki, Epley, Mayhew, Wathen, Lombardi), média de consenso, desvio padrão e projeção de 1 a 12 repetições.
-  - `inol.dart`: Intensity Number of Lifts por série e acumulado da sessão com zonas de fadiga e tempo de recuperação recomendado.
-  - `workload_acwr.dart`: Acute:Chronic Workload Ratio (EWMA e coupled rolling window) para monitoramento de risco de lesão.
-  - `autoregulation.dart`: Motor de ajuste fino de carga baseado no RPE/RIR real vs prescrito.
-  - Testes unitários puros com 100% de paridade com as fórmulas anteriores do Python (`dart test`).
-- [ ] **Exposição no Dart Frog BFF & Descomissionamento do Python**:
-  - Dart Frog BFF expõe endpoints `/api/v1/analytics/*` consumindo o `repengine_core`.
-  - Atualização do Desktop Web (SvelteKit) para apontar rotas de analytics para o BFF (`http://mobile-bff:8080`).
-  - Remoção do contêiner `analytics` do `docker-compose.dev.yml` (economia de ~200MB de RAM e menos complexidade de deployment).
-
----
-
-### 🔄 SPRINT 4: Motor de Sincronização no Flutter (Outbox Pattern)
-> **Objetivo**: Tornar o app mobile 100% autônomo e resiliente a quedas de rede na academia.
-
-- [ ] **`SyncEngine` (Worker em Dart)**:
-  - Monitoramento de conexão com `connectivity_plus`.
-  - **Fluxo ao detectar internet**:
-    1. Lê a tabela `SyncQueueTable`.
-    2. Dispara `POST /api/v1/mobile/sync/push` para o Dart Frog BFF.
-    3. Remove os itens confirmados da fila local.
-    4. Dispara Pull para receber novidades do servidor.
-- [ ] **Resiliência e Políticas de Falha**:
-  - Tratamento de erro 5xx e timeouts com backoff exponencial.
-  - Indicador visual discreto de status de sync (Ícone de nuvem: *Sincronizado* / *Pendente offline*).
-- [ ] **Testes da Sprint**:
-  - Teste automatizado simulando interrupção de rede durante o sync push sem perda de registros.
+- [ ] **Módulo `repengine_core/sports_science` (1RM & INOL)**:
+  - Fórmulas analíticas (Brzycki, Epley, Mayhew, Wathen, Lombardi) e cálculo de fadiga relativa (INOL) em Dart puro.
+  - Testes unitários puros com 100% de paridade com o Python (`dart test`).
+- [ ] **Interface do Gym Execution HUD (`mobile/lib/features/workout_execution/presentation/`)**:
+  - Tela principal com header da sessão ativa e cards de exercícios com o tema Atelier Dark.
+  - Componente ergonômico *Thumb Zone* com inputs de Carga e Reps.
+  - Badge de 1RM dinâmico calculando via `OneRepMaxCalculator` em tempo real conforme o atleta digita.
+  - Botão "Concluir Série" disparando gravação atômica no SQLite via `WorkoutRepository`.
+  - Lista reativa de séries concluídas atualizando via `StreamProvider`.
+- [ ] **Cronômetro Circular em Canvas (`CustomPainter`)**:
+  - Timer de descanso animado desenhado em Canvas nativo a 120 FPS sem rebuild desnecessário da árvore.
+  - `HapticFeedback` vibratório nos 3 segundos finais do descanso.
 
 ---
 
-### ⚡ SPRINT 5: Gym Execution HUD no Flutter
-> **Objetivo**: Interface de treino físico de alta performance, ergonômica para uma mão só e integrada ao hardware.
+### 🔄 SPRINT 5 (Fatia Vertical 2): Sincronização Ponta a Ponta (Outbox Worker ↔ Dart Frog BFF) & Status Visual
+> **Objetivo**: Conectar o SQLite local com o Dart Frog BFF via rede, fornecendo feedback visual de nuvem e ferramentas de diagnóstico.
 
-- [ ] **UX para Academia (Thumb Zone)**:
-  - Ações primárias ("Log Set", "Skip Rest") concentradas na base da tela.
-  - Teclados numéricos nativos imediatos para carga e repetições.
-- [ ] **CustomPainter Timer**:
-  - Cronômetro circular suave desenhado em Canvas nativo (`CustomPainter`), rodando a 120 FPS sem rebuild de árvore desnecessário.
-- [ ] **Hardware & Background**:
-  - `wakelock_plus`: Impede que a tela apague durante os descansos.
-  - `HapticFeedback`: Vibrações táteis na contagem regressiva 3-2-1.
-  - `flutter_local_notifications`: Notificação persistente de cronômetro no Android para operar de tela bloqueada.
+- [ ] **Worker de Sincronização (`SyncEngine`)**:
+  - Monitoramento de conectividade (`connectivity_plus`).
+  - Varredura periódica da `SyncQueueTable` do Drift e despacho em lote para `POST /api/v1/mobile/sync/push`.
+  - Confirmação e expurgo dos itens enviados da fila local.
+  - Disparo de `GET /api/v1/mobile/sync/pull` para buscar novidades do servidor.
+- [ ] **Indicador Visual de Nuvem (Cloud Sync Badge)**:
+  - Widget na AppBar observando `watchPendingSyncCount()`:
+    - 🟢 "Sincronizado" (0 pendentes)
+    - 🟡 "Salvando offline (N pendentes)"
+    - 🔴 "Sem conexão"
 - [ ] **Painel de Diagnóstico Oculto (Debug Drawer)**:
-  - Toque triplo no logo abre o painel de inspeção do Drift e botão para forçar simulação de falha de rede.
+  - Toque triplo no logo abre gaveta para forçar sincronização, inspecionar itens da fila SQLite e simular falha de rede.
 
 ---
 
-### 🏆 SPRINT 6: Conflito Real Treinador x Aluno, Golden Tests & CI/CD
-> **Objetivo**: Fechar o produto com validação visual automatizada, gravação de demo e esteira de build do APK.
+### 🏆 SPRINT 6 (Fatia Vertical 3): Conflito Real Aluno x Treinador, CI/CD & Descomissionamento do Python
+> **Objetivo**: Finalizar o produto com reconciliação de conflitos, portar ACWR e Autoregulação restantes, aposentar o microsserviço Python e gerar esteira de release do APK.
 
-- [ ] **Cenário de Conflito Concorrente 100% Real**:
-  - Aluno offline no Flutter conclui séries.
-  - Treinador edita a carga do treino no SvelteKit desktop (persistido pelo Go).
-  - Aluno fica online -> Flutter envia lote -> Dart Frog grava as séries no Go Core e aplica política explícita: *o esforço físico do aluno nunca é apagado; a rotina é atualizada para a nova versão com aviso amigável*.
-- [ ] **Golden Tests (Regressão Visual)**:
-  - Testes com `alchemist` / `golden_toolkit` garantindo layout perfeito em temas escuro/claro e telas pequenas.
-- [ ] **Esteira CI/CD (GitHub Actions)**:
-  - Pipeline que roda `dart analyze`, testes unitários do Dart Frog e Drift, e gera o APK Android compilado de release (`app-release.apk`).
+- [ ] **Resolução Determinística de Conflitos no Dart Frog**:
+  - Cenário concorrente real: Treinador edita no SvelteKit ↔ Aluno conclui série offline.
+  - Regra de negócio: esforço físico do atleta nunca é descartado; rotina é atualizada para a nova versão com aviso amigável.
+- [ ] **Descomissionamento do Python (`analytics/`)**:
+  - Portar ACWR e Autoregulação restantes para `repengine_core`.
+  - Dart Frog BFF assume rotas `/api/v1/analytics/*` para atender o Desktop Web (SvelteKit).
+  - Remover container `analytics` do `docker-compose.dev.yml` (economia de ~200MB de RAM).
+- [ ] **Testes Visuais (Golden Tests) & CI/CD**:
+  - Testes visuais automatizados com `alchemist` garantindo layout perfeito em temas escuro/claro e telas pequenas.
+  - Pipeline no GitHub Actions gerando `app-release.apk`.
 - [ ] **README do Portfólio**:
   - QR Code para download direto do APK.
   - Demonstração em vídeo lado a lado: Desktop Web x Celular em Modo Avião.
+
