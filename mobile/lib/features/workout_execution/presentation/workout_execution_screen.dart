@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/network/server_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../controller/workout_execution_controller.dart';
 import '../data/workout_repository.dart';
 import 'widgets/circular_rest_timer.dart';
+import 'widgets/debug_settings_drawer.dart';
 import 'widgets/set_log_card.dart';
 import 'widgets/thumb_zone_pad.dart';
+import 'widgets/workout_summary_dialog.dart';
 
 class WorkoutExecutionScreen extends ConsumerWidget {
   const WorkoutExecutionScreen({super.key});
@@ -17,50 +20,35 @@ class WorkoutExecutionScreen extends ConsumerWidget {
     final activeSessionAsync = ref.watch(activeSessionStreamProvider);
     final pendingSyncCount = ref.watch(pendingSyncCountStreamProvider).value ?? 0;
     final restTimer = ref.watch(restTimerProvider);
+    final health = ref.watch(serverHealthProvider);
 
     return Scaffold(
+      endDrawer: const DebugSettingsDrawer(),
       appBar: AppBar(
-        title: const Text('RepEngine HUD'),
+        title: Builder(
+          builder: (context) => GestureDetector(
+            onDoubleTap: () => Scaffold.of(context).openEndDrawer(),
+            child: const Text('RepEngine HUD'),
+          ),
+        ),
         actions: [
-          // Cloud Sync Badge
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: pendingSyncCount == 0
-                  ? const Color(0x2298BB6C)
-                  : const Color(0x22EB6F92),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: pendingSyncCount == 0
-                    ? AppColors.success
-                    : AppColors.primaryContainer,
+          Builder(
+            builder: (context) => GestureDetector(
+              onTap: () => Scaffold.of(context).openEndDrawer(),
+              child: _CloudSyncBadge(
+                health: health,
+                pendingCount: pendingSyncCount,
               ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  pendingSyncCount == 0 ? Icons.cloud_done : Icons.cloud_upload,
-                  size: 16,
-                  color: pendingSyncCount == 0
-                      ? AppColors.success
-                      : AppColors.primary,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  pendingSyncCount == 0
-                      ? 'Nuvem OK'
-                      : '$pendingSyncCount offline',
-                  style: AppTypography.labelSmall.copyWith(
-                    color: pendingSyncCount == 0
-                        ? AppColors.success
-                        : AppColors.primary,
-                  ),
-                ),
-              ],
+          ),
+          Builder(
+            builder: (context) => IconButton(
+              icon: const Icon(Icons.tune_rounded, size: 20),
+              tooltip: 'Diagnóstico & Rede',
+              onPressed: () => Scaffold.of(context).openEndDrawer(),
             ),
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: activeSessionAsync.when(
@@ -175,37 +163,24 @@ class _ActiveSessionContent extends ConsumerWidget {
                 ],
               ),
               OutlinedButton.icon(
-                onPressed: () async {
-                  final confirmed = await showDialog<bool>(
+                onPressed: () {
+                  final logs = logsAsync.value ?? [];
+                  final session = ref.read(activeSessionStreamProvider).value;
+                  if (session == null) return;
+
+                  showDialog(
                     context: context,
-                    builder: (ctx) => AlertDialog(
-                      backgroundColor: AppColors.surfaceContainerHigh,
-                      title: const Text('Finalizar Treino?'),
-                      content: const Text(
-                        'Todas as séries concluídas foram salvas com segurança no SQLite local.',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('Continuar Treinando'),
-                        ),
-                        FilledButton(
-                          onPressed: () => Navigator.pop(ctx, true),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.primaryContainer,
-                          ),
-                          child: const Text('Finalizar'),
-                        ),
-                      ],
+                    builder: (ctx) => WorkoutSummaryDialog(
+                      session: session,
+                      logs: logs,
+                      onConfirm: () async {
+                        await ref
+                            .read(workoutRepositoryProvider)
+                            .completeSession(sessionClientId);
+                        ref.read(restTimerProvider.notifier).stop();
+                      },
                     ),
                   );
-
-                  if (confirmed == true) {
-                    await ref
-                        .read(workoutRepositoryProvider)
-                        .completeSession(sessionClientId);
-                    ref.read(restTimerProvider.notifier).stop();
-                  }
                 },
                 icon: const Icon(Icons.done_all, size: 16),
                 label: const Text('Finalizar'),
@@ -318,6 +293,91 @@ class _EmptyWorkoutView extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _CloudSyncBadge extends StatelessWidget {
+  final ServerConnectionState health;
+  final int pendingCount;
+
+  const _CloudSyncBadge({
+    required this.health,
+    required this.pendingCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final (Color bg, Color border, Color text, IconData icon, String label) = () {
+      if (health.state == ConnectionStateEnum.checking) {
+        return (
+          const Color(0x227AA89F),
+          AppColors.secondary,
+          AppColors.secondary,
+          Icons.sync_rounded,
+          'Testando...',
+        );
+      }
+      if (health.state == ConnectionStateEnum.offline) {
+        if (pendingCount > 0) {
+          return (
+            const Color(0x22E6C384),
+            const Color(0xFFE6C384),
+            const Color(0xFFE6C384),
+            Icons.offline_bolt_rounded,
+            'Modo Academia ($pendingCount)',
+          );
+        }
+        return (
+          const Color(0x22727169),
+          AppColors.outline,
+          AppColors.onSurfaceVariant,
+          Icons.cloud_off_rounded,
+          'PC Offline',
+        );
+      }
+      // Online
+      if (pendingCount == 0) {
+        return (
+          const Color(0x2298BB6C),
+          AppColors.success,
+          AppColors.success,
+          Icons.cloud_done_rounded,
+          'Sincronizado',
+        );
+      }
+      return (
+        const Color(0x22E6C384),
+        const Color(0xFFE6C384),
+        const Color(0xFFE6C384),
+        Icons.cloud_upload_rounded,
+        'Pendente ($pendingCount)',
+      );
+    }();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: text),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: AppTypography.labelSmall.copyWith(
+              color: text,
+              fontWeight: FontWeight.bold,
+              fontSize: 11,
+            ),
+          ),
+        ],
       ),
     );
   }

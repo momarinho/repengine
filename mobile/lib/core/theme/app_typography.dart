@@ -48,6 +48,13 @@ abstract final class AppTypography {
     color: AppColors.primary,
   );
 
+  static const labelMedium = TextStyle(
+    fontSize: 12,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.5,
+    color: AppColors.onSurface,
+  );
+
   static const labelSmall = TextStyle(
     fontSize: 11,
     fontWeight: FontWeight.w600,

@@ -46,6 +46,13 @@ class WorkoutRepository {
     return query.map((row) => row.read(countExp) ?? 0).watchSingle();
   }
 
+  /// Retorna stream com todos os itens da fila outbox para inspeção e diagnóstico.
+  Stream<List<SyncQueueData>> watchSyncQueue() {
+    return (_db.select(_db.syncQueueTable)
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+        .watch();
+  }
+
   // ==========================================
   // OPERAÇÕES ATÔMICAS (Gravação Local + Outbox)
   // ==========================================

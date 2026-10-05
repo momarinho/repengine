@@ -21,6 +21,12 @@ final pendingSyncCountStreamProvider = StreamProvider<int>((ref) {
   return repo.watchPendingSyncCount();
 });
 
+/// Stream de todos os itens da fila de sincronização (para o Debug Drawer)
+final syncQueueStreamProvider = StreamProvider<List<SyncQueueData>>((ref) {
+  final repo = ref.watch(workoutRepositoryProvider);
+  return repo.watchSyncQueue();
+});
+
 /// Estado do cronômetro de descanso
 class RestTimerState {
   final bool isActive;
