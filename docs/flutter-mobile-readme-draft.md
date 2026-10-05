@@ -61,20 +61,24 @@ sequenceDiagram
 *   **Resiliência Extrema**: Séries concluídas são gravadas localmente com UUIDs v4 exclusivos (`client_id`).
 *   **Proteção contra Quedas no Meio do Envio**: Se a internet cair enquanto o servidor processa a resposta, a retransmissão subsequente do mesmo lote é ignorada pelo BFF, impedindo a duplicação de séries no banco de dados.
 
-### 🛡️ 3. Resolução Determinística de Conflitos (Treinador x Aluno)
+### 🌐 3. Sincronização Inteligente Local (PC ↔ Academia) & Continuidade de Progressões
+*   **Heartbeat & Auto-Reconexão**: O app monitora a rede local e detecta automaticamente quando o Docker no PC está ativo, disparando o envio das séries e a busca de novas rotinas em segundo plano assim que o usuário entra no Wi-Fi.
+*   **Continuidade de Progressões Offline**: Se o atleta executar múltiplos treinos seguidos sem ligar o PC, o motor de regras no `repengine_core` calcula os incrementos de carga da progressão linear localmente a partir do histórico no SQLite, garantindo que o atleta nunca treine sem prescrição atualizada.
+
+### 🛡️ 4. Resolução Determinística de Conflitos (Treinador x Aluno)
 *   **Regra de Ouro**: O esforço físico do atleta nunca é descartado. Se um treinador alterar a rotina no Desktop enquanto o aluno estava sem internet executando o treino:
     1. Os logs do aluno são salvos com prioridade absoluta no histórico.
     2. A rotina é atualizada para a nova versão do treinador com uma flag visual amigável: *"Nova versão da rotina aplicada para os próximos treinos"*.
 
-### ⏱️ 4. Cronômetro Nativo CustomPainter (120 FPS)
+### ⏱️ 5. Cronômetro Nativo CustomPainter (120 FPS)
 *   Renderizado diretamente sobre o `Canvas` nativo do Flutter via `CustomPainter`, eliminando recomposições pesadas de widgets e garantindo 120 FPS cravados com consumo mínimo de bateria.
 
-### 🔔 5. Notificações Interativas & Hardware
+### 🔔 6. Notificações Interativas & Hardware
 *   **Wake Lock**: Usa `wakelock_plus` para impedir o bloqueio automático de tela durante descansos.
 *   **Haptics**: Vibrações táteis sincronizadas com a contagem de 3-2-1 segundos.
 *   **Controle na Tela de Bloqueio**: Notificação persistente no Android permitindo avançar de série ou adicionar tempo (+30s) sem destravar o aparelho.
 
-### 🧪 6. Pirâmide Completa de Testes
+### 🧪 7. Pirâmide Completa de Testes
 *   **Golden Tests**: Testes de regressão visual pixel-perfect para múltiplos temas (Dark/Light) e tamanhos de tela (iPhone SE ao Galaxy S24 Ultra).
 *   **Testes Unitários com Riverpod**: Testes de estado isolados com `ProviderContainer`.
 *   **Testes Drift In-Memory**: Testes de banco rodando sobre `NativeDatabase.memory()`, sem necessidade de emuladores para o CI.

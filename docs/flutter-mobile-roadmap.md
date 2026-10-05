@@ -50,6 +50,17 @@ flowchart TD
     - Aplicação nativa (Android/iOS) baseada em **Riverpod 2.x** e **Drift (SQLite local)**.
     - Padrão **Outbox (Fila de Mutações)**: grava tudo no SQLite local primeiro; sincroniza em segundo plano quando houver conexão.
 
+### 🌐 Ciclo de Sincronização Inteligente (PC Local ↔ Modo Academia)
+*   **1. Em Casa (Mesmo Wi-Fi do PC / Docker Ativo)**:
+    - O app Flutter detecta automaticamente o backend via heartbeat no IP configurado.
+    - Dispara o *Pull*: baixa rotinas novas/editadas no PC e os estados de progressão atuais (`progression_states` com cargas sugeridas e semanas ativas).
+*   **2. Na Academia (Modo Offline / Sem PC)**:
+    - O app opera com total autonomia e latência zero (0ms) no SQLite local.
+    - O atleta executa treinos, consulta cargas prescritas e tem os incrementos de progressão calculados localmente no Flutter caso faça múltiplos treinos seguidos sem ligar o PC.
+    - Cada série finalizada é inserida na `SyncQueueTable` com UUID v4 idempotente.
+*   **3. Ao Retornar para Casa ou Subir o Docker no PC**:
+    - Assim que os containers do Docker sobem no PC ou o celular entra no Wi-Fi, o worker detecta o servidor ativo e faz o *Push* em lote silencioso, descarregando as séries no PostgreSQL.
+
 ---
 
 ## 📋 Plano de Sprints
@@ -142,21 +153,33 @@ flowchart TD
 
 ---
 
-### 🔄 SPRINT 5 (Fatia Vertical 2): Sincronização Ponta a Ponta (Outbox Worker ↔ Dart Frog BFF) & Status Visual
-> **Objetivo**: Conectar o SQLite local com o Dart Frog BFF via rede, fornecendo feedback visual de nuvem e ferramentas de diagnóstico.
+### 🔄 SPRINT 5 (Fatia Vertical 2): Sincronização Inteligente Ponta a Ponta (Outbox Worker ↔ Dart Frog BFF) & Status Visual
+> **Objetivo**: Conectar o SQLite local com o Dart Frog BFF via rede local, viabilizando o fluxo "planeja no PC ➔ executa offline na academia ➔ sincroniza automaticamente ao reconectar", incluindo a descida e continuidade das progressões e ferramentas de diagnóstico.
 
-- [ ] **Worker de Sincronização (`SyncEngine`)**:
-  - Monitoramento de conectividade (`connectivity_plus`).
-  - Varredura periódica da `SyncQueueTable` do Drift e despacho em lote para `POST /api/v1/mobile/sync/push`.
-  - Confirmação e expurgo dos itens enviados da fila local.
-  - Disparo de `GET /api/v1/mobile/sync/pull` para buscar novidades do servidor.
-- [ ] **Indicador Visual de Nuvem (Cloud Sync Badge)**:
-  - Widget na AppBar observando `watchPendingSyncCount()`:
-    - 🟢 "Sincronizado" (0 pendentes)
-    - 🟡 "Salvando offline (N pendentes)"
-    - 🔴 "Sem conexão"
-- [ ] **Painel de Diagnóstico Oculto (Debug Drawer)**:
-  - Toque triplo no logo abre gaveta para forçar sincronização, inspecionar itens da fila SQLite e simular falha de rede.
+- [ ] **Worker de Sincronização Inteligente (`SyncEngine`)**:
+  - Monitoramento de conectividade (`connectivity_plus`) e **Heartbeat de Detecção do PC** (`GET /api/v1/health` no BFF na porta 8081).
+  - **Auto-Sync ao Ligar Docker / Reconectar ao Wi-Fi**: Despacha a fila de saída e busca novidades sem necessidade de intervenção do usuário.
+  - Varredura periódica e atômica da `SyncQueueTable` do Drift e despacho em lote para `POST /api/v1/mobile/sync/push`.
+  - Confirmação e expurgo dos itens enviados da fila local com base no recibo `SyncPushResult`.
+  - Disparo de `GET /api/v1/mobile/sync/pull` para buscar novidades do servidor (rotinas e estados de progressão).
+- [ ] **Sincronização e Continuidade de Progressões (`progression_states`)**:
+  - Incluir DTO de `ProgressionState` no `repengine_core` e retorná-lo no `SyncPullResponse`.
+  - Persistir as cargas sugeridas e semanas ativas no Drift local (`ProgressionStatesTable`).
+  - **Motor de Continuidade Offline (Fallback)**: Caso o atleta execute múltiplos treinos consecutivos sem religar o PC, o `repengine_core` no Flutter calcula o incremento linear diretamente a partir da última série salva no SQLite local, garantindo que a carga prescrita nunca fique desatualizada.
+- [ ] **Configuração Dinâmica do Host do PC**:
+  - Persistência do IP local da máquina (ex: `192.168.x.x`) via `shared_preferences` com teste de conexão na UI, evitando IPs fixos em código.
+- [ ] **Indicador Visual de Nuvem & "Modo Academia" (Cloud Sync Badge)**:
+  - Widget na AppBar observando `watchPendingSyncCount()` e o estado da conexão:
+    - 🟢 "Sincronizado com o PC" (0 pendentes)
+    - 🟡 "Modo Academia (N séries salvas offline)"
+    - 🔵 "Sincronizando com o PC..."
+    - ⚪ "PC Offline / Aguardando Docker"
+- [ ] **Painel de Diagnóstico Oculto & Ajustes de Rede (Debug & Settings Drawer)**:
+  - Toque triplo no logo abre gaveta para:
+    - Ajustar e testar o IP do PC na rede local.
+    - Forçar sincronização imediata (*pull & push*).
+    - Inspecionar itens acumulados na fila SQLite (`SyncQueueTable`).
+    - Simular falhas de rede e modo offline forçado.
 
 ---
 
