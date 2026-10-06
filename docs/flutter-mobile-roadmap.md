@@ -138,61 +138,69 @@ flowchart TD
 ### ⚡ SPRINT 4 (Fatia Vertical 1): Gym Execution HUD + Ciência do Esporte (1RM/Fadiga) em Tempo Real
 > **Objetivo**: Unir a interface visual do Flutter com o motor local Drift e a matemática de 1RM do `repengine_core`. O atleta inicia um treino, digita carga/reps, vê o 1RM estimado sendo calculado em tempo real na tela, conclui séries com feedback tátil e vê a lista e o timer reagirem ao vivo a 120 FPS.
 
-- [ ] **Módulo `repengine_core/sports_science` (1RM & INOL)**:
-  - Fórmulas analíticas (Brzycki, Epley, Mayhew, Wathen, Lombardi) e cálculo de fadiga relativa (INOL) em Dart puro.
-  - Testes unitários puros com 100% de paridade com o Python (`dart test`).
-- [ ] **Interface do Gym Execution HUD (`mobile/lib/features/workout_execution/presentation/`)**:
+- [x] **Módulo `repengine_core/sports_science` (1RM, INOL, ACWR & Autoregulação)**:
+  - Fórmulas analíticas (Brzycki, Epley, Mayhew, Wathen, Lombardi), zonas de recuperação INOL, ratio ACWR e motor de autorregulação por RPE em Dart puro.
+  - Testes unitários puros com 100% de paridade com o Python (`dart test` aprovado com 9 testes).
+- [x] **Interface do Gym Execution HUD (`mobile/lib/features/workout_execution/presentation/`)**:
   - Tela principal com header da sessão ativa e cards de exercícios com o tema Atelier Dark.
   - Componente ergonômico *Thumb Zone* com inputs de Carga e Reps.
-  - Badge de 1RM dinâmico calculando via `OneRepMaxCalculator` em tempo real conforme o atleta digita.
   - Botão "Concluir Série" disparando gravação atômica no SQLite via `WorkoutRepository`.
   - Lista reativa de séries concluídas atualizando via `StreamProvider`.
-- [ ] **Cronômetro Circular em Canvas (`CustomPainter`)**:
+  - Modal de resumo de conclusão de treino (`WorkoutSummaryDialog`) com volume total (kg) e tempo.
+- [x] **Cronômetro Circular em Canvas (`CustomPainter`)**:
   - Timer de descanso animado desenhado em Canvas nativo a 120 FPS sem rebuild desnecessário da árvore.
   - `HapticFeedback` vibratório nos 3 segundos finais do descanso.
+- [ ] **Conexão Direta do Módulo de 1RM no Flutter**:
+  - Conectar `OneRepMaxCalculator` no `ThumbZonePad` e `SetLogCard` para cálculo de consenso estatístico em tempo real.
+
+---
+
+### 🐍 ➔ 🎯 SPRINT 4.5: Exposição no Dart Frog BFF & Substituição do Python no Desktop Web
+> **Objetivo**: Fazer a Web Desktop (SvelteKit) consumir o módulo de Ciência do Esporte em Dart através do Dart Frog BFF, possibilitando o desligamento e remoção definitiva do contêiner Python do Docker Compose.
+
+- [x] **Endpoints Analíticos no Dart Frog BFF (`server_mobile/routes/api/v1/`)**:
+  - `POST /api/v1/1rm`: Consome `OneRepMaxCalculator` e retorna o mesmo JSON que o Python retornava.
+  - `POST /api/v1/autoregulation`: Consome `AutoregulationEngine` formatando ações para snake_case (`increase_load`, etc.).
+  - `POST /api/v1/acwr`: Consome `ACWRCalculator` com zonas ótimas e recomendações.
+  - Validação via testes de integração e chamadas `curl`.
+- [x] **Virada de Chave no Desktop Web (SvelteKit)**:
+  - Atualizar `docker-compose.dev.yml` para apontar `ANALYTICS_URL: http://mobile-bff:8080`.
+  - Confirmar renderização do card `ScientificInsights` na Web sem alterar uma linha sequer de Svelte/HTML.
+- [x] **Descomissionamento do Microsserviço Python**:
+  - Remover serviço `analytics` do `docker-compose.dev.yml` (economia de ~200MB de RAM e menos complexidade de deploy).
 
 ---
 
 ### 🔄 SPRINT 5 (Fatia Vertical 2): Sincronização Inteligente Ponta a Ponta (Outbox Worker ↔ Dart Frog BFF) & Status Visual
 > **Objetivo**: Conectar o SQLite local com o Dart Frog BFF via rede local, viabilizando o fluxo "planeja no PC ➔ executa offline na academia ➔ sincroniza automaticamente ao reconectar", incluindo a descida e continuidade das progressões e ferramentas de diagnóstico.
 
-- [ ] **Worker de Sincronização Inteligente (`SyncEngine`)**:
-  - Monitoramento de conectividade (`connectivity_plus`) e **Heartbeat de Detecção do PC** (`GET /api/v1/health` no BFF na porta 8081).
-  - **Auto-Sync ao Ligar Docker / Reconectar ao Wi-Fi**: Despacha a fila de saída e busca novidades sem necessidade de intervenção do usuário.
-  - Varredura periódica e atômica da `SyncQueueTable` do Drift e despacho em lote para `POST /api/v1/mobile/sync/push`.
-  - Confirmação e expurgo dos itens enviados da fila local com base no recibo `SyncPushResult`.
-  - Disparo de `GET /api/v1/mobile/sync/pull` para buscar novidades do servidor (rotinas e estados de progressão).
+- [x] **Configuração Dinâmica do Host do PC & Health Check**:
+  - Persistência do IP local da máquina via `shared_preferences` (`ServerConfigNotifier`).
+  - Endpoint `GET /api/v1/health` ativo no BFF e botão de teste de Ping com latência na UI.
+- [x] **Indicador Visual de Nuvem & "Modo Academia" (Cloud Sync Badge)**:
+  - Widget na AppBar observando status da rede e fila Drift (🟢 Sincronizado, 🟡 Modo Academia, 🔵 Testando, ⚪ PC Offline).
+- [x] **Painel de Diagnóstico Oculto & Ajustes de Rede (Debug & Settings Drawer)**:
+  - Gaveta com edição de IP, teste de ping, simulação de offline e inspetor da fila local `SyncQueueTable`.
+- [ ] **Worker de Sincronização Inteligente (`SyncEngine` & `SyncHttpClient`)**:
+  - Monitoramento de conectividade (`connectivity_plus`) e auto-sync ao reconectar.
+  - Varredura da `SyncQueueTable` do Drift e despacho em lote para `POST /api/v1/mobile/sync/push`.
+  - Confirmação e expurgo atômico dos itens enviados da fila local com base no recibo `SyncPushResult`.
+  - Disparo de `GET /api/v1/mobile/sync/pull` para buscar rotinas e novidades do servidor.
 - [ ] **Sincronização e Continuidade de Progressões (`progression_states`)**:
-  - Incluir DTO de `ProgressionState` no `repengine_core` e retorná-lo no `SyncPullResponse`.
-  - Persistir as cargas sugeridas e semanas ativas no Drift local (`ProgressionStatesTable`).
-  - **Motor de Continuidade Offline (Fallback)**: Caso o atleta execute múltiplos treinos consecutivos sem religar o PC, o `repengine_core` no Flutter calcula o incremento linear diretamente a partir da última série salva no SQLite local, garantindo que a carga prescrita nunca fique desatualizada.
-- [ ] **Configuração Dinâmica do Host do PC**:
-  - Persistência do IP local da máquina (ex: `192.168.x.x`) via `shared_preferences` com teste de conexão na UI, evitando IPs fixos em código.
-- [ ] **Indicador Visual de Nuvem & "Modo Academia" (Cloud Sync Badge)**:
-  - Widget na AppBar observando `watchPendingSyncCount()` e o estado da conexão:
-    - 🟢 "Sincronizado com o PC" (0 pendentes)
-    - 🟡 "Modo Academia (N séries salvas offline)"
-    - 🔵 "Sincronizando com o PC..."
-    - ⚪ "PC Offline / Aguardando Docker"
-- [ ] **Painel de Diagnóstico Oculto & Ajustes de Rede (Debug & Settings Drawer)**:
-  - Toque triplo no logo abre gaveta para:
-    - Ajustar e testar o IP do PC na rede local.
-    - Forçar sincronização imediata (*pull & push*).
+  - DTO de `ProgressionState` no `repengine_core` e retorno no `SyncPullResponse`.
+  - Persistência de cargas sugeridas no Drift local (`ProgressionStatesTable`).
+  - Fallback offline para cálculo de incremento linear no Flutter quando múltiplos treinos forem executados longe do PC.
     - Inspecionar itens acumulados na fila SQLite (`SyncQueueTable`).
     - Simular falhas de rede e modo offline forçado.
 
 ---
 
-### 🏆 SPRINT 6 (Fatia Vertical 3): Conflito Real Aluno x Treinador, CI/CD & Descomissionamento do Python
-> **Objetivo**: Finalizar o produto com reconciliação de conflitos, portar ACWR e Autoregulação restantes, aposentar o microsserviço Python e gerar esteira de release do APK.
+### 🏆 SPRINT 6 (Fatia Vertical 3): Conflito Real Aluno x Treinador, Golden Tests & CI/CD
+> **Objetivo**: Finalizar o produto com reconciliação determinística de conflitos, cobertura de regressão visual e esteira automatizada de release do APK.
 
 - [ ] **Resolução Determinística de Conflitos no Dart Frog**:
   - Cenário concorrente real: Treinador edita no SvelteKit ↔ Aluno conclui série offline.
   - Regra de negócio: esforço físico do atleta nunca é descartado; rotina é atualizada para a nova versão com aviso amigável.
-- [ ] **Descomissionamento do Python (`analytics/`)**:
-  - Portar ACWR e Autoregulação restantes para `repengine_core`.
-  - Dart Frog BFF assume rotas `/api/v1/analytics/*` para atender o Desktop Web (SvelteKit).
-  - Remover container `analytics` do `docker-compose.dev.yml` (economia de ~200MB de RAM).
 - [ ] **Testes Visuais (Golden Tests) & CI/CD**:
   - Testes visuais automatizados com `alchemist` garantindo layout perfeito em temas escuro/claro e telas pequenas.
   - Pipeline no GitHub Actions gerando `app-release.apk`.

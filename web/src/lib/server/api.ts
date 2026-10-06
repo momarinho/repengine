@@ -1,5 +1,5 @@
 const API_URL = process.env.API_URL || 'http://localhost:8080';
-const ANALYTICS_URL = process.env.ANALYTICS_URL || 'http://localhost:8000';
+const ANALYTICS_URL = process.env.ANALYTICS_URL || 'http://localhost:8081';
 
 export function apiUrl(path: string): string {
 	return `${API_URL}${path}`;

@@ -65,13 +65,26 @@ Este checklist complementa os Sprints do roadmap, rastreando individualmente cad
 
 ---
 
-## 🔬 4. Ciência do Esporte & Analytics (Programação de Amanhã)
-- [ ] **`packages/repengine_core/lib/src/sports_science/`**:
-  - [ ] `one_rep_max.dart`: Fórmulas Brzycki, Epley, Mayhew, Wathen, Lombardi + consenso e intervalos de 95%.
-  - [ ] `inol.dart`: Intensity Number of Lifts por série e acumulado com zonas de recuperação.
-  - [ ] `workload_acwr.dart`: Razão de carga crônica x aguda (EWMA / Sweet Spot 0.8 - 1.3).
-  - [ ] `autoregulation.dart`: Motor de ajuste de carga por RPE/falhas consecutivas.
-  - [ ] Testes unitários puros (`dart test`).
-- [ ] **Plugar no Mobile & BFF**:
-  - [ ] Atualizar `ThumbZonePad` e `SetLogCard` para usar o `OneRepMaxCalculator` do core.
-  - [ ] Endpoints no Dart Frog BFF (`/api/v1/1rm`, etc.) para aposentar o contêiner Python.
+## 🔬 4. Ciência do Esporte & Analytics em Dart Puro
+- [x] **`packages/repengine_core/lib/src/sports_science/`**:
+  - [x] `one_rep_max.dart`: Fórmulas Brzycki, Epley, Mayhew, Wathen, Lombardi + consenso e intervalos de 95% ([`one_rep_max.dart`](file:///home/mateus/Projects/repengine/packages/repengine_core/lib/src/sports_science/one_rep_max.dart)).
+  - [x] `inol.dart`: Intensity Number of Lifts por série e acumulado com zonas de recuperação ([`inol.dart`](file:///home/mateus/Projects/repengine/packages/repengine_core/lib/src/sports_science/inol.dart)).
+  - [x] `workload_acwr.dart`: Razão de carga crônica x aguda (EWMA / Sweet Spot 0.8 - 1.3) ([`workload_acwr.dart`](file:///home/mateus/Projects/repengine/packages/repengine_core/lib/src/sports_science/workload_acwr.dart)).
+  - [x] `autoregulation.dart`: Motor de ajuste de carga por RPE/falhas consecutivas ([`autoregulation.dart`](file:///home/mateus/Projects/repengine/packages/repengine_core/lib/src/sports_science/autoregulation.dart)).
+  - [x] Testes unitários puros com 100% de cobertura e paridade (`dart test` aprovado).
+
+### 📱 4.1 Integração no Mobile (Flutter HUD)
+- [ ] Conectar `OneRepMaxCalculator` no [`thumb_zone_pad.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/thumb_zone_pad.dart) para 1RM dinâmico enquanto digita carga/reps.
+- [ ] Conectar `OneRepMaxCalculator` no [`set_log_card.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/set_log_card.dart) para exibir o 1RM histórico de cada série concluída.
+
+### 🖥️ 4.2 Exposição no Dart Frog BFF & Substituição do Python no Desktop Web
+- [x] **Endpoints Analíticos no Dart Frog BFF (`server_mobile`)**:
+  - [x] `POST /api/v1/1rm`: Recebe carga/reps do Desktop e responde consenso e projeções.
+  - [x] `POST /api/v1/autoregulation`: Avalia histórico de sessões do Desktop e sugere ação (`increase_load`, etc.).
+  - [x] `POST /api/v1/acwr`: Calcula razão aguda:crônica a partir das cargas diárias.
+- [x] **Virada de Chave na Web Desktop (SvelteKit)**:
+  - [x] Atualizar `docker-compose.dev.yml`: `ANALYTICS_URL: http://mobile-bff:8080`.
+  - [x] Validar carregamento do card `ScientificInsights` na Web Desktop consumindo o Dart Frog.
+- [x] **Descomissionamento do Python**:
+  - [x] Remover o contêiner `analytics` do `docker-compose.dev.yml` (economia de ~200MB de RAM).
+  - [x] Aposentar pasta `analytics/`.
