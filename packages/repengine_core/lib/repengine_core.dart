@@ -7,3 +7,9 @@ export 'src/sync/sync_push_payload.dart';
 export 'src/sync/sync_push_result.dart';
 export 'src/sync/sync_pull_request.dart';
 export 'src/sync/sync_pull_response.dart';
+
+// Módulo de Ciência do Esporte & Analytics em Dart Puro
+export 'src/sports_science/autoregulation.dart';
+export 'src/sports_science/inol.dart';
+export 'src/sports_science/one_rep_max.dart';
+export 'src/sports_science/workload_acwr.dart';
