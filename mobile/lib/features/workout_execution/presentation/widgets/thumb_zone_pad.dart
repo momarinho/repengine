@@ -9,6 +9,7 @@ class ThumbZonePad extends StatefulWidget {
   final int initialReps;
   final String exerciseName;
   final double initialRpe;
+  final String? progressionNote;
   final void Function(double load, int reps, double? rpe) onLogSet;
 
   const ThumbZonePad({
@@ -17,6 +18,7 @@ class ThumbZonePad extends StatefulWidget {
     this.initialReps = 5,
     this.exerciseName = 'Exercício',
     this.initialRpe = 8.0,
+    this.progressionNote,
     required this.onLogSet,
   });
 
@@ -35,6 +37,16 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
     _load = widget.initialLoad;
     _reps = widget.initialReps;
     _rpe = widget.initialRpe;
+  }
+
+  @override
+  void didUpdateWidget(ThumbZonePad oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialLoad != widget.initialLoad ||
+        oldWidget.initialReps != widget.initialReps) {
+      _load = widget.initialLoad;
+      _reps = widget.initialReps;
+    }
   }
 
   void _adjustLoad(double delta) {
@@ -83,6 +95,37 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Tag de Sobrecarga / Recomendação de Progressão
+            if (widget.progressionNote != null) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryContainer.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.trending_up, size: 14, color: AppColors.primary),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        widget.progressionNote!,
+                        style: AppTypography.labelSmall.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             // Pill de estimativa em tempo real com Consenso Científico de 1RM
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),

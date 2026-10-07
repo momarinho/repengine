@@ -1,9 +1,24 @@
 import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:repengine_core/repengine_core.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/database_provider.dart';
+
+class ProgressionSuggestion {
+  final double load;
+  final int reps;
+  final String? reasoning;
+  final bool isProgressed;
+
+  const ProgressionSuggestion({
+    required this.load,
+    required this.reps,
+    this.reasoning,
+    this.isProgressed = false,
+  });
+}
 
 final workoutRepositoryProvider = Provider<WorkoutRepository>((ref) {
   return WorkoutRepository(ref.watch(appDatabaseProvider));
@@ -200,5 +215,112 @@ class WorkoutRepository {
             ),
           );
     });
+  }
+
+  /// Calcula dinamicamente a carga e repetições sugeridas para o próximo set do bloco,
+  /// integrando o histórico local do SQLite com o AutoregulationEngine da repengine_core.
+  Future<ProgressionSuggestion> getSuggestedProgressionForBlock(
+    String blockClientId, {
+    double fallbackLoad = 100.0,
+    int fallbackReps = 5,
+  }) async {
+    // 1. Verifica se já existem séries concluídas nesta sessão ativa
+    final activeSession = await (_db.select(_db.workoutSessionsTable)
+          ..where((t) => t.status.equals('active'))
+          ..limit(1))
+        .getSingleOrNull();
+
+    if (activeSession != null) {
+      final currentSessionSets = await (_db.select(_db.workoutSetLogsTable)
+            ..where((t) =>
+                t.sessionClientId.equals(activeSession.clientId) &
+                t.blockClientId.equals(blockClientId) &
+                t.completed.equals(true))
+            ..orderBy([(t) => OrderingTerm.desc(t.setIndex)]))
+          .get();
+
+      if (currentSessionSets.isNotEmpty) {
+        final lastSet = currentSessionSets.first;
+        final load = double.tryParse(lastSet.actualLoad) ?? fallbackLoad;
+        final reps = int.tryParse(lastSet.actualReps) ?? fallbackReps;
+        return ProgressionSuggestion(
+          load: load,
+          reps: reps,
+          reasoning: 'Mantendo carga da série anterior (#${lastSet.setIndex})',
+          isProgressed: false,
+        );
+      }
+    }
+
+    // 2. Se for o início do treino (sem séries ainda), consulta histórico de sessões finalizadas
+    final allHistoricalLogs = await (_db.select(_db.workoutSetLogsTable)
+          ..where((t) =>
+              t.blockClientId.equals(blockClientId) &
+              t.completed.equals(true))
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+        .get();
+
+    final pastLogs = activeSession != null
+        ? allHistoricalLogs
+            .where((l) => l.sessionClientId != activeSession.clientId)
+            .toList()
+        : allHistoricalLogs;
+
+    if (pastLogs.isEmpty) {
+      return ProgressionSuggestion(
+        load: fallbackLoad,
+        reps: fallbackReps,
+        reasoning: 'Carga inicial recomendada',
+        isProgressed: false,
+      );
+    }
+
+    // Agrupa as séries da sessão concluída mais recente
+    final lastSessionClientId = pastLogs.first.sessionClientId;
+    final lastSessionLogs = pastLogs
+        .where((l) => l.sessionClientId == lastSessionClientId)
+        .toList();
+
+    double maxLoad = 0.0;
+    int targetReps = fallbackReps;
+    double? lastRpe;
+    bool anyFailed = false;
+
+    for (final log in lastSessionLogs) {
+      final load = double.tryParse(log.actualLoad) ?? 0.0;
+      if (load > maxLoad) maxLoad = load;
+      final reps = int.tryParse(log.actualReps) ?? 0;
+      final prescribed = int.tryParse(log.prescribedReps) ?? fallbackReps;
+      targetReps = prescribed;
+      if (log.actualRpe.isNotEmpty) {
+        final rpe = double.tryParse(log.actualRpe);
+        if (rpe != null) lastRpe = rpe;
+      }
+      if (reps < prescribed) {
+        anyFailed = true;
+      }
+    }
+
+    final historicalSession = HistoricalSession(
+      date: lastSessionLogs.first.createdAt,
+      targetReps: targetReps,
+      completedReps: anyFailed ? targetReps - 1 : targetReps,
+      load: maxLoad > 0 ? maxLoad : fallbackLoad,
+      rpe: lastRpe ?? 8.0,
+      failed: anyFailed,
+    );
+
+    final autoregResult = AutoregulationEngine.evaluate(
+      exerciseName: lastSessionLogs.first.nodeTypeSlug,
+      sessions: [historicalSession],
+      loadIncrement: 2.5,
+    );
+
+    return ProgressionSuggestion(
+      load: autoregResult.recommendedLoad,
+      reps: targetReps,
+      reasoning: autoregResult.reasoning,
+      isProgressed: autoregResult.recommendedLoad > maxLoad,
+    );
   }
 }

@@ -61,3 +61,13 @@ final restTimerProvider =
     StateNotifierProvider<RestTimerNotifier, RestTimerState>((ref) {
   return RestTimerNotifier();
 });
+
+/// Provider reativo que calcula a sugestão de progressão para um bloco de exercício
+final progressionSuggestionProvider =
+    FutureProvider.family<ProgressionSuggestion, ({String blockClientId, int logCount})>(
+  (ref, params) async {
+    final repo = ref.watch(workoutRepositoryProvider);
+    return repo.getSuggestedProgressionForBlock(params.blockClientId);
+  },
+);
+

@@ -99,14 +99,24 @@ class WorkoutExecutionScreen extends ConsumerWidget {
       bottomNavigationBar: activeSessionAsync.maybeWhen(
         data: (session) {
           if (session == null) return null;
+          final logs = ref.watch(activeSessionLogsStreamProvider(session.clientId)).value ?? [];
+          final suggestion = ref.watch(
+            progressionSuggestionProvider((
+              blockClientId: 'blk_squat',
+              logCount: logs.length,
+            )),
+          ).value ?? const ProgressionSuggestion(load: 100.0, reps: 5);
+
           return ThumbZonePad(
-            initialLoad: 100.0,
-            initialReps: 5,
+            key: ValueKey('pad_${session.clientId}_${logs.length}_${suggestion.load}'),
+            initialLoad: suggestion.load,
+            initialReps: suggestion.reps,
+            progressionNote: suggestion.reasoning,
             exerciseName: 'Agachamento Livre',
             onLogSet: (load, reps, rpe) async {
               final repo = ref.read(workoutRepositoryProvider);
-              final logs = ref.read(activeSessionLogsStreamProvider(session.clientId)).value ?? [];
-              final nextIndex = logs.length + 1;
+              final currentLogs = ref.read(activeSessionLogsStreamProvider(session.clientId)).value ?? [];
+              final nextIndex = currentLogs.length + 1;
               final logUniqueId = 'log-${DateTime.now().millisecondsSinceEpoch}';
 
               await repo.logSet(
