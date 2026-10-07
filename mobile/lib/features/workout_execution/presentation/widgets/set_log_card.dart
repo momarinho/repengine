@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:repengine_core/repengine_core.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -10,11 +11,22 @@ class SetLogCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Cálculo do 1RM estimado (Epley)
+    // Cálculo do 1RM por Consenso Estatístico (repengine_core)
     final actualLoadNum = double.tryParse(log.actualLoad) ?? 0.0;
     final actualRepsNum = int.tryParse(log.actualReps) ?? 0;
-    final estimated1RM = actualRepsNum > 1
-        ? (actualLoadNum * (1.0 + actualRepsNum / 30.0)).toStringAsFixed(1)
+    final actualRpeNum = double.tryParse(log.actualRpe);
+
+    final oneRmResult = (actualLoadNum > 0 && actualRepsNum > 0)
+        ? OneRepMaxCalculator.calculate(
+            exerciseName: log.nodeTypeSlug,
+            load: actualLoadNum,
+            reps: actualRepsNum,
+            rpe: actualRpeNum,
+          )
+        : null;
+
+    final estimated1RM = oneRmResult != null
+        ? oneRmResult.consensus1RM.toStringAsFixed(1)
         : actualLoadNum.toStringAsFixed(1);
 
     return Container(

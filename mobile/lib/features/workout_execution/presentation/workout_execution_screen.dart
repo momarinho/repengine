@@ -102,6 +102,7 @@ class WorkoutExecutionScreen extends ConsumerWidget {
           return ThumbZonePad(
             initialLoad: 100.0,
             initialReps: 5,
+            exerciseName: 'Agachamento Livre',
             onLogSet: (load, reps, rpe) async {
               final repo = ref.read(workoutRepositoryProvider);
               final logs = ref.read(activeSessionLogsStreamProvider(session.clientId)).value ?? [];

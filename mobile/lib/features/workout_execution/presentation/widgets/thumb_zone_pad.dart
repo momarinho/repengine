@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:repengine_core/repengine_core.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 
 class ThumbZonePad extends StatefulWidget {
   final double initialLoad;
   final int initialReps;
+  final String exerciseName;
+  final double initialRpe;
   final void Function(double load, int reps, double? rpe) onLogSet;
 
   const ThumbZonePad({
     super.key,
     this.initialLoad = 100.0,
     this.initialReps = 5,
+    this.exerciseName = 'Exercício',
+    this.initialRpe = 8.0,
     required this.onLogSet,
   });
 
@@ -22,13 +27,14 @@ class ThumbZonePad extends StatefulWidget {
 class _ThumbZonePadState extends State<ThumbZonePad> {
   late double _load;
   late int _reps;
-  final double _rpe = 8.0;
+  late double _rpe;
 
   @override
   void initState() {
     super.initState();
     _load = widget.initialLoad;
     _reps = widget.initialReps;
+    _rpe = widget.initialRpe;
   }
 
   void _adjustLoad(double delta) {
@@ -45,13 +51,19 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
     HapticFeedback.selectionClick();
   }
 
-  double get _estimated1RM {
-    if (_reps <= 1) return _load;
-    return _load * (1.0 + _reps / 30.0);
+  OneRepMaxResult get _oneRmResult {
+    return OneRepMaxCalculator.calculate(
+      exerciseName: widget.exerciseName,
+      load: _load,
+      reps: _reps,
+      rpe: _rpe,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final result = _oneRmResult;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -71,7 +83,7 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Pill de estimativa em tempo real (1RM)
+            // Pill de estimativa em tempo real com Consenso Científico de 1RM
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
@@ -85,16 +97,52 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
                   const Icon(Icons.bolt, size: 16, color: AppColors.primary),
                   const SizedBox(width: 4),
                   Text(
-                    '1RM Estimado: ${_estimated1RM.toStringAsFixed(1)} kg',
+                    '1RM Consenso: ${result.consensus1RM.toStringAsFixed(1)} kg',
                     style: AppTypography.labelSmall.copyWith(
                       color: AppColors.primary,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '(±${result.stdDev.toStringAsFixed(1)} kg)',
+                    style: AppTypography.labelSmall.copyWith(
+                      color: AppColors.onSurfaceVariant,
+                      fontSize: 10,
+                    ),
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
+
+            // Seletor rápido de RPE ergonômico
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'RPE: ${_rpe.toStringAsFixed(1)}',
+                  style: AppTypography.labelSmall.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                for (final rpeValue in [7.0, 8.0, 8.5, 9.0, 10.0])
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: _RpeChip(
+                      value: rpeValue,
+                      isSelected: (_rpe - rpeValue).abs() < 0.1,
+                      onTap: () {
+                        setState(() => _rpe = rpeValue);
+                        HapticFeedback.selectionClick();
+                      },
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
 
             // Controles de Carga & Reps lado a lado
             Row(
@@ -232,3 +280,44 @@ class _QuickButton extends StatelessWidget {
     );
   }
 }
+
+class _RpeChip extends StatelessWidget {
+  final double value;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _RpeChip({
+    required this.value,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.primaryContainer
+              : AppColors.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.outlineVariant,
+          ),
+        ),
+        child: Text(
+          value.toStringAsFixed(value == value.roundToDouble() ? 0 : 1),
+          style: AppTypography.labelSmall.copyWith(
+            color: isSelected ? AppColors.onBackground : AppColors.onSurfaceVariant,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            fontSize: 11,
+          ),
+        ),
+      ),
+    );
+  }
+}
+

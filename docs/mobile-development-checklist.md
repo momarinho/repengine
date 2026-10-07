@@ -13,7 +13,7 @@ Este checklist complementa os Sprints do roadmap, rastreando individualmente cad
   - [x] Incrementos rápidos de carga (`-5`, `-2.5`, `+2.5`, `+5`).
   - [x] Incrementos de repetições (`-1`, `+1`).
   - [x] Botão massivo "CONCLUIR SÉRIE" no terço inferior da tela.
-  - [ ] Conexão com fórmula estatística real de 1RM *(aguarda `OneRepMaxCalculator` amanhã)*.
+  - [x] Conexão com fórmula estatística real de 1RM via `OneRepMaxCalculator` do core em tempo real.
 - [x] **Cronômetro Circular Nativo (120 FPS Canvas)**: [`circular_rest_timer.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/circular_rest_timer.dart) com vibração tátil nos 3s finais.
 - [x] **Cards de Séries Concluídas**: [`set_log_card.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/set_log_card.dart) com índice da série, carga, reps e 1RM estimado.
 - [x] **Modal de Resumo do Treino Concluído**: Dialog com volume total levantado (kg), tempo de treino e total de séries gravadas no SQLite ([`workout_summary_dialog.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/workout_summary_dialog.dart)).
@@ -74,8 +74,8 @@ Este checklist complementa os Sprints do roadmap, rastreando individualmente cad
   - [x] Testes unitários puros com 100% de cobertura e paridade (`dart test` aprovado).
 
 ### 📱 4.1 Integração no Mobile (Flutter HUD)
-- [ ] Conectar `OneRepMaxCalculator` no [`thumb_zone_pad.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/thumb_zone_pad.dart) para 1RM dinâmico enquanto digita carga/reps.
-- [ ] Conectar `OneRepMaxCalculator` no [`set_log_card.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/set_log_card.dart) para exibir o 1RM histórico de cada série concluída.
+- [x] Conectar `OneRepMaxCalculator` no [`thumb_zone_pad.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/thumb_zone_pad.dart) para 1RM dinâmico enquanto digita carga/reps.
+- [x] Conectar `OneRepMaxCalculator` no [`set_log_card.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/set_log_card.dart) para exibir o 1RM histórico de cada série concluída.
 
 ### 🖥️ 4.2 Exposição no Dart Frog BFF & Substituição do Python no Desktop Web
 - [x] **Endpoints Analíticos no Dart Frog BFF (`server_mobile`)**:

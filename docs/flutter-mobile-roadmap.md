@@ -150,7 +150,7 @@ flowchart TD
 - [x] **Cronômetro Circular em Canvas (`CustomPainter`)**:
   - Timer de descanso animado desenhado em Canvas nativo a 120 FPS sem rebuild desnecessário da árvore.
   - `HapticFeedback` vibratório nos 3 segundos finais do descanso.
-- [ ] **Conexão Direta do Módulo de 1RM no Flutter**:
+- [x] **Conexão Direta do Módulo de 1RM no Flutter**:
   - Conectar `OneRepMaxCalculator` no `ThumbZonePad` e `SetLogCard` para cálculo de consenso estatístico em tempo real.
 
 ---
