@@ -395,6 +395,28 @@ class WorkoutRepository {
         .go();
   }
 
+  /// Reconciles local routines with the full list of active workflows from server.
+  /// Removes any routine no longer present on server and upserts all active ones.
+  Future<void> reconcileWorkflows(List<Workflow> workflows) async {
+    final activeIds = workflows.map((w) => w.id).toSet();
+    if (activeIds.isNotEmpty) {
+      await (_db.delete(_db.routinesTable)
+            ..where((t) => t.id.isNotIn(activeIds)))
+          .go();
+    } else {
+      await _db.delete(_db.routinesTable).go();
+    }
+
+    if (workflows.isNotEmpty) {
+      await upsertWorkflows(workflows);
+    }
+  }
+
+  /// Clears all stored routines from SQLite.
+  Future<void> clearRoutines() async {
+    await _db.delete(_db.routinesTable).go();
+  }
+
   /// Atomically purges confirmed mutations from the sync queue.
   Future<void> deleteQueueItemsByClientIds(List<String> clientIds) async {
     if (clientIds.isEmpty) return;

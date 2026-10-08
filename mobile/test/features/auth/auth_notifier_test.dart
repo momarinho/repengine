@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:drift/native.dart';
+import 'package:repengine_mobile/core/database/app_database.dart';
+import 'package:repengine_mobile/core/database/database_provider.dart';
 import 'package:repengine_mobile/core/network/server_config.dart';
 import 'package:repengine_mobile/features/auth/data/auth_repository.dart';
 import 'package:repengine_mobile/features/auth/domain/auth_state.dart';
@@ -17,12 +20,20 @@ class FakeServerConfigNotifier extends ServerConfigNotifier {
 
 class FakeSyncEngine extends StateNotifier<SyncState> implements SyncEngine {
   bool syncNowCalled = false;
+  bool forceFullSyncValue = false;
+  bool clearSyncCacheCalled = false;
 
   FakeSyncEngine() : super(const SyncState());
 
   @override
-  Future<bool> syncNow() async {
+  Future<void> clearSyncCache() async {
+    clearSyncCacheCalled = true;
+  }
+
+  @override
+  Future<bool> syncNow({bool forceFullSync = false}) async {
     syncNowCalled = true;
+    forceFullSyncValue = forceFullSync;
     return true;
   }
 
@@ -45,9 +56,11 @@ void main() {
     });
 
     test('starts as guest when no token exists in preferences', () async {
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
       final container = ProviderContainer(
         overrides: [
           serverHostProvider.overrideWith((ref) => FakeServerConfigNotifier()),
+          appDatabaseProvider.overrideWithValue(db),
         ],
       );
 
@@ -63,6 +76,7 @@ void main() {
 
     test('login authenticates successfully, saves token and triggers syncNow', () async {
       final fakeSync = FakeSyncEngine();
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
 
       final mockHttp = MockClient((request) async {
         expect(request.method, equals('POST'));
@@ -86,6 +100,7 @@ void main() {
         overrides: [
           serverHostProvider.overrideWith((ref) => FakeServerConfigNotifier()),
           syncEngineProvider.overrideWith((ref) => fakeSync),
+          appDatabaseProvider.overrideWithValue(db),
         ],
       );
 
@@ -112,12 +127,14 @@ void main() {
       expect(prefs.getInt('repengine_auth_user_id'), equals(42));
       expect(prefs.getString('repengine_auth_email'), equals('athlete@repengine.com'));
 
-      // Check sync triggered
+      // Check sync triggered with forceFullSync = true
       expect(fakeSync.syncNowCalled, isTrue);
+      expect(fakeSync.forceFullSyncValue, isTrue);
     });
 
     test('login handles invalid credentials with error status and message', () async {
       final fakeSync = FakeSyncEngine();
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
 
       final mockHttp = MockClient((request) async {
         return http.Response(
@@ -130,6 +147,7 @@ void main() {
         overrides: [
           serverHostProvider.overrideWith((ref) => FakeServerConfigNotifier()),
           syncEngineProvider.overrideWith((ref) => fakeSync),
+          appDatabaseProvider.overrideWithValue(db),
         ],
       );
 
@@ -152,6 +170,8 @@ void main() {
     });
 
     test('logout clears preferences and reverts state to guest', () async {
+      final fakeSync = FakeSyncEngine();
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
       await prefs.setString('repengine_auth_token', 'token-123');
       await prefs.setInt('repengine_auth_user_id', 99);
       await prefs.setString('repengine_auth_email', 'user@example.com');
@@ -159,6 +179,8 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           serverHostProvider.overrideWith((ref) => FakeServerConfigNotifier()),
+          syncEngineProvider.overrideWith((ref) => fakeSync),
+          appDatabaseProvider.overrideWithValue(db),
         ],
       );
 

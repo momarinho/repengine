@@ -72,8 +72,18 @@ class SyncEngine extends StateNotifier<SyncState> {
     }
   }
 
-  /// Triggers a full 2-phase sync (Push mutations -> Pull workflows).
-  Future<bool> syncNow() async {
+  /// Clears the cached sync timestamp, forcing the next sync to be a full pull.
+  Future<void> clearSyncCache() async {
+    prefs ??= await SharedPreferences.getInstance();
+    await prefs?.remove(_lastSyncedKey);
+    state = state.copyWith(lastSyncedAt: null);
+  }
+
+  /// Triggers a 2-phase sync (Push mutations -> Pull workflows).
+  ///
+  /// When [forceFullSync] is true, ignores local timestamp cache and pulls
+  /// all active workflows from scratch, reconciling any deleted or updated routines.
+  Future<bool> syncNow({bool forceFullSync = false}) async {
     if (state.status == SyncStatus.syncing) {
       return false;
     }
@@ -140,22 +150,28 @@ class SyncEngine extends StateNotifier<SyncState> {
       // ==========================================
       // PHASE 2: PULL (Dart Frog BFF -> SQLite Workflows)
       // ==========================================
-      final lastSyncIso = prefs?.getString(_lastSyncedKey);
-      final lastSyncDate =
-          lastSyncIso != null ? DateTime.tryParse(lastSyncIso) : null;
+      DateTime? lastSyncDate;
+      if (!forceFullSync) {
+        final lastSyncIso = prefs?.getString(_lastSyncedKey);
+        lastSyncDate =
+            lastSyncIso != null ? DateTime.tryParse(lastSyncIso) : null;
+      }
 
       final pullResponse =
           await httpClient.pullWorkflows(lastSyncedAt: lastSyncDate);
 
       if (pullResponse != null) {
-        // Upsert newly created or updated workflows
-        if (pullResponse.updatedWorkflows.isNotEmpty) {
-          await repository.upsertWorkflows(pullResponse.updatedWorkflows);
-        }
-
-        // Delete workflows removed on server
-        if (pullResponse.deletedWorkflowIds.isNotEmpty) {
-          await repository.deleteWorkflows(pullResponse.deletedWorkflowIds);
+        if (lastSyncDate == null || forceFullSync) {
+          // Full sync: reconcile all active routines and remove obsolete ones
+          await repository.reconcileWorkflows(pullResponse.updatedWorkflows);
+        } else {
+          // Delta sync: upsert new/updated and delete explicitly removed
+          if (pullResponse.updatedWorkflows.isNotEmpty) {
+            await repository.upsertWorkflows(pullResponse.updatedWorkflows);
+          }
+          if (pullResponse.deletedWorkflowIds.isNotEmpty) {
+            await repository.deleteWorkflows(pullResponse.deletedWorkflowIds);
+          }
         }
 
         // Upsert progression states for multi-session offline continuity

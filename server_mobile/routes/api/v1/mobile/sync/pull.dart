@@ -50,11 +50,16 @@ Future<Response> onRequest(RequestContext context) async {
     // Sync incremental: filtra apenas novidades e deleções pós-timestamp
     final since = lastSyncedAt;
     updatedWorkflows = allWorkflows
-        .where((w) => !w.isDeleted && w.updatedAt.isAfter(since))
+        .where((w) =>
+            !w.isDeleted &&
+            (w.updatedAt.isAfter(since) || w.updatedAt.isAtSameMomentAs(since)))
         .toList();
 
     deletedIds = allWorkflows
-        .where((w) => w.deletedAt != null && w.deletedAt!.isAfter(since))
+        .where((w) =>
+            w.deletedAt != null &&
+            (w.deletedAt!.isAfter(since) ||
+                w.deletedAt!.isAtSameMomentAs(since)))
         .map((w) => w.id)
         .toList();
   }

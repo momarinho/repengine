@@ -178,14 +178,23 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
                   ? null
                   : () async {
                       HapticFeedback.lightImpact();
-                      final success = await ref.read(syncEngineProvider.notifier).syncNow();
+                      final success = await ref
+                          .read(syncEngineProvider.notifier)
+                          .syncNow(forceFullSync: true);
+                      if (success) {
+                        ref.read(selectedRoutineIdProvider.notifier).state = null;
+                        ref.read(selectedSectionIdProvider.notifier).state = null;
+                      }
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              success ? 'Sync completed successfully!' : 'Sync failed. Check connection.',
+                              success
+                                  ? 'Sincronização concluída com sucesso!'
+                                  : 'Falha na sincronização. Verifique a conexão.',
                             ),
-                            backgroundColor: success ? AppColors.success : AppColors.primary,
+                            backgroundColor:
+                                success ? AppColors.success : AppColors.primary,
                             duration: const Duration(seconds: 2),
                           ),
                         );

@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/network/server_config.dart';
 import '../../sync/application/sync_engine.dart';
+import '../../workout_execution/controller/workout_execution_controller.dart';
+import '../../workout_execution/data/workout_repository.dart';
 import '../domain/auth_state.dart';
 
 /// Gerenciador de estado de autenticação do atleta, conectando com a conta Web
@@ -90,6 +92,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         await prefs?.setInt(_userIdKey, userId);
         await prefs?.setString(_emailKey, cleanEmail);
 
+        // Limpa cache de sincronização anterior e reseta seleção de rotina
+        await ref.read(syncEngineProvider.notifier).clearSyncCache();
+        ref.read(selectedRoutineIdProvider.notifier).state = null;
+        ref.read(selectedSectionIdProvider.notifier).state = null;
+
         state = AuthState(
           status: AuthStatus.authenticated,
           token: token,
@@ -97,8 +104,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
           email: cleanEmail,
         );
 
-        // Dispara sincronização imediata para baixar treinos e blocos reais do Web
-        ref.read(syncEngineProvider.notifier).syncNow();
+        // Dispara sincronização completa imediata para baixar treinos e blocos reais do Web
+        await ref.read(syncEngineProvider.notifier).syncNow(forceFullSync: true);
 
         return true;
       } else {
@@ -126,6 +133,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await prefs?.remove(_tokenKey);
     await prefs?.remove(_userIdKey);
     await prefs?.remove(_emailKey);
+
+    await ref.read(syncEngineProvider.notifier).clearSyncCache();
+    await ref.read(workoutRepositoryProvider).clearRoutines();
+    ref.read(selectedRoutineIdProvider.notifier).state = null;
+    ref.read(selectedSectionIdProvider.notifier).state = null;
 
     state = const AuthState(status: AuthStatus.guest);
   }

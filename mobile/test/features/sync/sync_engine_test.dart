@@ -3,6 +3,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:repengine_core/repengine_core.dart';
 import 'package:repengine_mobile/core/database/app_database.dart';
 import 'package:repengine_mobile/core/network/server_config.dart';
 import 'package:repengine_mobile/features/sync/application/sync_engine.dart';
@@ -281,6 +282,81 @@ void main() {
     // Allow async execution
     await pumpEventQueue();
     expect(syncTriggered, isTrue);
+  });
+
+  test('forceFullSync pulls all active workflows without last_synced_at and reconciles routines removing deleted ones', () async {
+    // 1. Seed old routines into SQLite (e.g., GZCLP ID 2)
+    await repository.upsertWorkflows([
+      Workflow(
+        id: 2,
+        userId: 1,
+        name: 'GZCLP Hybrid 4-Day',
+        description: 'Old routine',
+        createdAt: DateTime.utc(2026, 10, 8, 8),
+        updatedAt: DateTime.utc(2026, 10, 8, 8),
+      ),
+    ]);
+
+    var initialRoutines = await db.select(db.routinesTable).get();
+    expect(initialRoutines, hasLength(1));
+    expect(initialRoutines.first.id, equals(2));
+
+    // Save existing last_synced_at to simulate previous sync
+    await prefs.setString('repengine_last_synced_at', '2026-10-08T12:00:00Z');
+
+    var pullQueryParams = <String, String>{};
+
+    final mockClient = MockClient((request) async {
+      if (request.url.path.endsWith('/pull')) {
+        pullQueryParams = request.url.queryParameters;
+        return http.Response(
+          jsonEncode({
+            'updated_workflows': [
+              {
+                'id': 3,
+                'user_id': 1,
+                'name': '4-Day PHUL Calisthenics Split',
+                'description': 'New cloned routine',
+                'is_public': false,
+                'created_at': '2026-10-08T11:00:00Z',
+                'updated_at': '2026-10-08T11:00:00Z',
+                'block_count': 34,
+                'blocks': [],
+              }
+            ],
+            'deleted_workflow_ids': [],
+            'server_timestamp': '2026-10-08T12:30:00Z',
+          }),
+          200,
+        );
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final httpClient = SyncHttpClient(
+      client: mockClient,
+      baseUrl: 'http://localhost:8081',
+    );
+
+    final syncEngine = SyncEngine(
+      httpClient: httpClient,
+      repository: repository,
+      db: db,
+      prefs: prefs,
+    );
+
+    // 2. Call syncNow with forceFullSync: true
+    final success = await syncEngine.syncNow(forceFullSync: true);
+    expect(success, isTrue);
+
+    // 3. Verify that last_synced_at was NOT sent in query parameters
+    expect(pullQueryParams.containsKey('last_synced_at'), isFalse);
+
+    // 4. Verify SQLite RoutinesTable: old routine 2 is purged, routine 3 is active!
+    final routines = await db.select(db.routinesTable).get();
+    expect(routines, hasLength(1));
+    expect(routines.first.id, equals(3));
+    expect(routines.first.name, equals('4-Day PHUL Calisthenics Split'));
   });
 }
 
