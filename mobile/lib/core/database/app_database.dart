@@ -29,7 +29,31 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (m) async {
+      await m.createAll();
+    },
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        try {
+          await m.addColumn(routinesTable, routinesTable.blocksJson);
+        } catch (_) {}
+        try {
+          await m.createTable(progressionStatesTable);
+        } catch (_) {}
+      }
+    },
+    beforeOpen: (details) async {
+      try {
+        await customStatement(
+          "ALTER TABLE routines ADD COLUMN blocks_json TEXT NOT NULL DEFAULT '[]'",
+        );
+      } catch (_) {}
+    },
+  );
 }
 
 LazyDatabase _openConnection() {
