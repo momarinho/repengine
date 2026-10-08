@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:repengine_mobile/core/database/app_database.dart';
+import 'package:repengine_mobile/core/network/server_config.dart';
 import 'package:repengine_mobile/features/sync/application/sync_engine.dart';
 import 'package:repengine_mobile/features/sync/data/sync_http_client.dart';
 import 'package:repengine_mobile/features/workout_execution/data/workout_repository.dart';
@@ -173,4 +174,113 @@ void main() {
     expect(queue, hasLength(1));
     expect(queue.first.entityClientId, equals('sess-retry-1'));
   });
+
+  test('SyncEngine persists progression states received during pull phase', () async {
+    final mockClient = MockClient((request) async {
+      if (request.url.path.endsWith('/pull')) {
+        final response = {
+          'updated_workflows': [],
+          'deleted_workflow_ids': [],
+          'progression_states': [
+            {
+              'id': 101,
+              'user_id': 1,
+              'workflow_id': 20,
+              'block_key': 'blk-ohp',
+              'node_type_slug': 'exercise_overhead_press',
+              'state_type': 'linear',
+              'outcome': 'progressed',
+              'suggested_load': '62.5',
+              'current_week': 3,
+              'suggested_week': 4,
+              'summary': 'Week 4 Target: +2.5 kg',
+              'updated_at': '2026-10-08T10:00:00Z',
+            }
+          ],
+          'server_timestamp': '2026-10-08T10:00:05Z',
+        };
+        return http.Response(jsonEncode(response), 200);
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final httpClient = SyncHttpClient(
+      client: mockClient,
+      baseUrl: 'http://localhost:8081',
+    );
+
+    final syncEngine = SyncEngine(
+      httpClient: httpClient,
+      repository: repository,
+      db: db,
+      prefs: prefs,
+    );
+
+    final success = await syncEngine.syncNow();
+    expect(success, isTrue);
+
+    // Verify progression state was saved to SQLite
+    final states = await db.select(db.progressionStatesTable).get();
+    expect(states, hasLength(1));
+    expect(states.first.blockKey, equals('blk-ohp'));
+    expect(states.first.suggestedLoad, equals('62.5'));
+    expect(states.first.summary, equals('Week 4 Target: +2.5 kg'));
+  });
+
+  test('handleHealthChange auto-syncs when online and respects simulateOffline', () async {
+    var syncTriggered = false;
+
+    final mockClient = MockClient((request) async {
+      if (request.url.path.endsWith('/pull')) {
+        syncTriggered = true;
+        return http.Response(jsonEncode({
+          'updated_workflows': [],
+          'deleted_workflow_ids': [],
+          'server_timestamp': '2026-10-08T10:00:00Z',
+        }), 200);
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final httpClient = SyncHttpClient(
+      client: mockClient,
+      baseUrl: 'http://localhost:8081',
+    );
+
+    final syncEngine = SyncEngine(
+      httpClient: httpClient,
+      repository: repository,
+      db: db,
+      prefs: prefs,
+    );
+
+    final nowTime = DateTime.utc(2026, 10, 8, 10);
+    final onlineHealth = ServerConnectionState(
+      state: ConnectionStateEnum.online,
+      latencyMs: 15,
+      lastCheckedAt: nowTime,
+      errorMessage: null,
+    );
+
+    // 1. Should NOT sync when simulateOffline is true
+    syncEngine.handleHealthChange(onlineHealth, true);
+    expect(syncTriggered, isFalse);
+
+    // 2. Should NOT sync when offline
+    final offlineHealth = ServerConnectionState(
+      state: ConnectionStateEnum.offline,
+      latencyMs: null,
+      lastCheckedAt: nowTime,
+      errorMessage: 'offline',
+    );
+    syncEngine.handleHealthChange(offlineHealth, false);
+    expect(syncTriggered, isFalse);
+
+    // 3. Should trigger auto-sync when online and not simulated offline
+    syncEngine.handleHealthChange(onlineHealth, false);
+    // Allow async execution
+    await pumpEventQueue();
+    expect(syncTriggered, isTrue);
+  });
 }
+

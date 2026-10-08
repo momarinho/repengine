@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/database_provider.dart';
+import '../../../core/network/server_config.dart';
 import '../../workout_execution/data/workout_repository.dart';
 import '../data/sync_http_client.dart';
 
@@ -157,6 +158,11 @@ class SyncEngine extends StateNotifier<SyncState> {
           await repository.deleteWorkflows(pullResponse.deletedWorkflowIds);
         }
 
+        // Upsert progression states for multi-session offline continuity
+        if (pullResponse.progressionStates.isNotEmpty) {
+          await repository.upsertProgressionStates(pullResponse.progressionStates);
+        }
+
         // Save latest server timestamp for next delta sync
         await prefs?.setString(
           _lastSyncedKey,
@@ -183,6 +189,24 @@ class SyncEngine extends StateNotifier<SyncState> {
       return false;
     }
   }
+
+  DateTime? _lastAutoSyncAttempt;
+
+  /// Reacts to server health changes for zero-touch auto-sync when reconnecting.
+  void handleHealthChange(ServerConnectionState health, bool simulateOffline) {
+    if (simulateOffline || !health.isOnline) return;
+    if (state.status == SyncStatus.syncing) return;
+
+    final now = DateTime.now();
+    // Debounce: don't auto-sync more often than once every 30 seconds
+    if (_lastAutoSyncAttempt != null &&
+        now.difference(_lastAutoSyncAttempt!) < const Duration(seconds: 30)) {
+      return;
+    }
+
+    _lastAutoSyncAttempt = now;
+    syncNow();
+  }
 }
 
 /// Provider for SyncEngine state and operations.
@@ -192,9 +216,17 @@ final syncEngineProvider =
   final repository = ref.watch(workoutRepositoryProvider);
   final db = ref.watch(appDatabaseProvider);
 
-  return SyncEngine(
+  final engine = SyncEngine(
     httpClient: httpClient,
     repository: repository,
     db: db,
   );
+
+  // Automatically trigger sync when server transitions to online
+  ref.listen<ServerConnectionState>(serverHealthProvider, (previous, next) {
+    final simulateOffline = ref.read(serverHostProvider.notifier).simulateOffline;
+    engine.handleHealthChange(next, simulateOffline);
+  });
+
+  return engine;
 });

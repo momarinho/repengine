@@ -181,12 +181,12 @@ flowchart TD
   - Widget na AppBar observando status da rede e fila Drift (🟢 Sincronizado, 🟡 Modo Academia, 🔵 Testando, ⚪ PC Offline).
 - [x] **Painel de Diagnóstico Oculto & Ajustes de Rede (Debug & Settings Drawer)**:
   - Gaveta com edição de IP, teste de ping, simulação de offline e inspetor da fila local `SyncQueueTable`.
-- [ ] **Worker de Sincronização Inteligente (`SyncEngine` & `SyncHttpClient`)**:
+- [x] **Worker de Sincronização Inteligente (`SyncEngine` & `SyncHttpClient`)**:
   - Monitoramento de conectividade (`connectivity_plus`) e auto-sync ao reconectar.
   - Varredura da `SyncQueueTable` do Drift e despacho em lote para `POST /api/v1/mobile/sync/push`.
   - Confirmação e expurgo atômico dos itens enviados da fila local com base no recibo `SyncPushResult`.
   - Disparo de `GET /api/v1/mobile/sync/pull` para buscar rotinas e novidades do servidor.
-- [ ] **Sincronização e Continuidade de Progressões (`progression_states`)**:
+- [x] **Sincronização e Continuidade de Progressões (`progression_states`)**:
   - DTO de `ProgressionState` no `repengine_core` e retorno no `SyncPullResponse`.
   - Persistência de cargas sugeridas no Drift local (`ProgressionStatesTable`).
   - Fallback offline para cálculo de incremento linear no Flutter quando múltiplos treinos forem executados longe do PC.

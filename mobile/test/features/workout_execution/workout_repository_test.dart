@@ -227,5 +227,41 @@ void main() {
     queue = await db.select(db.syncQueueTable).get();
     expect(queue, isEmpty);
   });
+
+  test('upsertProgressionStates saves prescribed loads and powers getSuggestedProgressionForBlock', () async {
+    const blockKey = 'blk-bench-heavy';
+    final now = DateTime.utc(2026, 10, 8, 10);
+
+    final progression = ProgressionState(
+      id: 50,
+      userId: 1,
+      workflowId: 2,
+      blockKey: blockKey,
+      nodeTypeSlug: 'exercise_bench',
+      stateType: 'linear',
+      outcome: 'success',
+      suggestedLoad: '92.5',
+      currentWeek: 2,
+      suggestedWeek: 3,
+      summary: 'Wave 2 Target: +2.5 kg',
+      updatedAt: now,
+    );
+
+    // 1. Save progression state to SQLite
+    await repository.upsertProgressionStates([progression]);
+
+    // 2. Verify saved in database
+    final saved = await repository.getProgressionStateForBlock(blockKey);
+    expect(saved, isNotNull);
+    expect(saved!.suggestedLoad, equals('92.5'));
+    expect(saved.summary, equals('Wave 2 Target: +2.5 kg'));
+
+    // 3. Verify getSuggestedProgressionForBlock picks up prescribed load 92.5 kg
+    final suggestion = await repository.getSuggestedProgressionForBlock(blockKey);
+    expect(suggestion.load, equals(92.5));
+    expect(suggestion.reasoning, equals('Wave 2 Target: +2.5 kg'));
+    expect(suggestion.isProgressed, isFalse);
+  });
 }
+
 

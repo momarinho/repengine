@@ -267,6 +267,17 @@ class WorkoutRepository {
         : allHistoricalLogs;
 
     if (pastLogs.isEmpty) {
+      final progressionState = await getProgressionStateForBlock(blockClientId);
+      if (progressionState != null && progressionState.suggestedLoad != null) {
+        final syncedLoad = double.tryParse(progressionState.suggestedLoad!) ?? fallbackLoad;
+        return ProgressionSuggestion(
+          load: syncedLoad,
+          reps: fallbackReps,
+          reasoning: progressionState.summary ?? 'Prescribed target load from coach',
+          isProgressed: false,
+        );
+      }
+
       return ProgressionSuggestion(
         load: fallbackLoad,
         reps: fallbackReps,
@@ -373,6 +384,56 @@ class WorkoutRepository {
     await (_db.delete(_db.syncQueueTable)
           ..where((t) => t.entityClientId.isIn(clientIds)))
         .go();
+  }
+
+  // ==========================================
+  // PROGRESSION STATES (Offline Continuity)
+  // ==========================================
+
+  /// Inserts or updates progression states received from server.
+  Future<void> upsertProgressionStates(List<ProgressionState> states) async {
+    if (states.isEmpty) return;
+
+    await _db.batch((batch) {
+      for (final state in states) {
+        batch.insert(
+          _db.progressionStatesTable,
+          ProgressionStatesTableCompanion.insert(
+            id: Value(state.id),
+            workflowId: state.workflowId,
+            workflowBlockId: Value(state.workflowBlockId),
+            blockKey: state.blockKey,
+            nodeTypeSlug: state.nodeTypeSlug,
+            stateType: state.stateType,
+            exerciseName: Value(state.exerciseName),
+            outcome: state.outcome,
+            currentLoad: Value(state.currentLoad),
+            suggestedLoad: Value(state.suggestedLoad),
+            currentWeek: Value(state.currentWeek),
+            suggestedWeek: Value(state.suggestedWeek),
+            summary: Value(state.summary),
+            updatedAt: state.updatedAt,
+          ),
+          mode: InsertMode.insertOrReplace,
+        );
+      }
+    });
+  }
+
+  /// Listens to all progression states for a workflow in SQLite.
+  Stream<List<ProgressionStateRow>> watchProgressionStates(int workflowId) {
+    return (_db.select(_db.progressionStatesTable)
+          ..where((t) => t.workflowId.equals(workflowId))
+          ..orderBy([(t) => OrderingTerm.asc(t.blockKey)]))
+        .watch();
+  }
+
+  /// Retrieves the current progression state for a block key.
+  Future<ProgressionStateRow?> getProgressionStateForBlock(String blockKey) {
+    return (_db.select(_db.progressionStatesTable)
+          ..where((t) => t.blockKey.equals(blockKey))
+          ..limit(1))
+        .getSingleOrNull();
   }
 }
 

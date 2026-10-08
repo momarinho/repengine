@@ -39,7 +39,7 @@ Este checklist complementa os Sprints do roadmap, rastreando individualmente cad
   - [x] `WorkoutSessionsTable` (sessões de treino).
   - [x] `WorkoutSetLogsTable` (séries concluídas com `client_id`).
   - [x] `SyncQueueTable` (fila outbox de mutações locais).
-  - [ ] `ProgressionStatesTable` (cargas sugeridas e semanas ativas salvas localmente).
+  - [x] `ProgressionStatesTable` (cargas sugeridas e semanas ativas salvas localmente).
 - [x] **Repositório Atômico (`WorkoutRepository`)**:
   - [x] `startSession()` com gravação simultânea na fila de sync.
   - [x] `logSet()` com gravação atômica da série + mutação outbox.
@@ -62,7 +62,7 @@ Este checklist complementa os Sprints do roadmap, rastreando individualmente cad
   - [x] Orquestrador de duas fases: Push de mutações locais -> Pull delta de rotinas.
   - [x] Expulso atômico dos itens confirmados da `SyncQueueTable` via `deleteQueueItemsByClientIds`.
   - [x] Integração reativa com badge na AppBar (`_CloudSyncBadge`) e drawer (`DebugSettingsDrawer`).
-  - [ ] Monitoramento automático de conectividade via `connectivity_plus`.
+  - [x] Auto-sync automático ao reconectar com o servidor do PC (listener reativo no heartbeat).
 
 ---
 

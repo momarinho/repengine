@@ -5,6 +5,7 @@ import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import 'tables/progression_states_table.dart';
 import 'tables/routines_table.dart';
 import 'tables/sync_queue_table.dart';
 import 'tables/workout_sessions_table.dart';
@@ -18,6 +19,7 @@ part 'app_database.g.dart';
     WorkoutSessionsTable,
     WorkoutSetLogsTable,
     SyncQueueTable,
+    ProgressionStatesTable,
   ],
 )
 class AppDatabase extends _$AppDatabase {

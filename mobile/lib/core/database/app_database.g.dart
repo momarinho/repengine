@@ -2282,6 +2282,844 @@ class SyncQueueTableCompanion extends UpdateCompanion<SyncQueueData> {
   }
 }
 
+class $ProgressionStatesTableTable extends ProgressionStatesTable
+    with TableInfo<$ProgressionStatesTableTable, ProgressionStateRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ProgressionStatesTableTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _workflowIdMeta = const VerificationMeta(
+    'workflowId',
+  );
+  @override
+  late final GeneratedColumn<int> workflowId = GeneratedColumn<int>(
+    'workflow_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _workflowBlockIdMeta = const VerificationMeta(
+    'workflowBlockId',
+  );
+  @override
+  late final GeneratedColumn<int> workflowBlockId = GeneratedColumn<int>(
+    'workflow_block_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _blockKeyMeta = const VerificationMeta(
+    'blockKey',
+  );
+  @override
+  late final GeneratedColumn<String> blockKey = GeneratedColumn<String>(
+    'block_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nodeTypeSlugMeta = const VerificationMeta(
+    'nodeTypeSlug',
+  );
+  @override
+  late final GeneratedColumn<String> nodeTypeSlug = GeneratedColumn<String>(
+    'node_type_slug',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _stateTypeMeta = const VerificationMeta(
+    'stateType',
+  );
+  @override
+  late final GeneratedColumn<String> stateType = GeneratedColumn<String>(
+    'state_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _exerciseNameMeta = const VerificationMeta(
+    'exerciseName',
+  );
+  @override
+  late final GeneratedColumn<String> exerciseName = GeneratedColumn<String>(
+    'exercise_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _outcomeMeta = const VerificationMeta(
+    'outcome',
+  );
+  @override
+  late final GeneratedColumn<String> outcome = GeneratedColumn<String>(
+    'outcome',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _currentLoadMeta = const VerificationMeta(
+    'currentLoad',
+  );
+  @override
+  late final GeneratedColumn<String> currentLoad = GeneratedColumn<String>(
+    'current_load',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _suggestedLoadMeta = const VerificationMeta(
+    'suggestedLoad',
+  );
+  @override
+  late final GeneratedColumn<String> suggestedLoad = GeneratedColumn<String>(
+    'suggested_load',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _currentWeekMeta = const VerificationMeta(
+    'currentWeek',
+  );
+  @override
+  late final GeneratedColumn<int> currentWeek = GeneratedColumn<int>(
+    'current_week',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _suggestedWeekMeta = const VerificationMeta(
+    'suggestedWeek',
+  );
+  @override
+  late final GeneratedColumn<int> suggestedWeek = GeneratedColumn<int>(
+    'suggested_week',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _summaryMeta = const VerificationMeta(
+    'summary',
+  );
+  @override
+  late final GeneratedColumn<String> summary = GeneratedColumn<String>(
+    'summary',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    workflowId,
+    workflowBlockId,
+    blockKey,
+    nodeTypeSlug,
+    stateType,
+    exerciseName,
+    outcome,
+    currentLoad,
+    suggestedLoad,
+    currentWeek,
+    suggestedWeek,
+    summary,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'progression_states';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ProgressionStateRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('workflow_id')) {
+      context.handle(
+        _workflowIdMeta,
+        workflowId.isAcceptableOrUnknown(data['workflow_id']!, _workflowIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_workflowIdMeta);
+    }
+    if (data.containsKey('workflow_block_id')) {
+      context.handle(
+        _workflowBlockIdMeta,
+        workflowBlockId.isAcceptableOrUnknown(
+          data['workflow_block_id']!,
+          _workflowBlockIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('block_key')) {
+      context.handle(
+        _blockKeyMeta,
+        blockKey.isAcceptableOrUnknown(data['block_key']!, _blockKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_blockKeyMeta);
+    }
+    if (data.containsKey('node_type_slug')) {
+      context.handle(
+        _nodeTypeSlugMeta,
+        nodeTypeSlug.isAcceptableOrUnknown(
+          data['node_type_slug']!,
+          _nodeTypeSlugMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_nodeTypeSlugMeta);
+    }
+    if (data.containsKey('state_type')) {
+      context.handle(
+        _stateTypeMeta,
+        stateType.isAcceptableOrUnknown(data['state_type']!, _stateTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_stateTypeMeta);
+    }
+    if (data.containsKey('exercise_name')) {
+      context.handle(
+        _exerciseNameMeta,
+        exerciseName.isAcceptableOrUnknown(
+          data['exercise_name']!,
+          _exerciseNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('outcome')) {
+      context.handle(
+        _outcomeMeta,
+        outcome.isAcceptableOrUnknown(data['outcome']!, _outcomeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_outcomeMeta);
+    }
+    if (data.containsKey('current_load')) {
+      context.handle(
+        _currentLoadMeta,
+        currentLoad.isAcceptableOrUnknown(
+          data['current_load']!,
+          _currentLoadMeta,
+        ),
+      );
+    }
+    if (data.containsKey('suggested_load')) {
+      context.handle(
+        _suggestedLoadMeta,
+        suggestedLoad.isAcceptableOrUnknown(
+          data['suggested_load']!,
+          _suggestedLoadMeta,
+        ),
+      );
+    }
+    if (data.containsKey('current_week')) {
+      context.handle(
+        _currentWeekMeta,
+        currentWeek.isAcceptableOrUnknown(
+          data['current_week']!,
+          _currentWeekMeta,
+        ),
+      );
+    }
+    if (data.containsKey('suggested_week')) {
+      context.handle(
+        _suggestedWeekMeta,
+        suggestedWeek.isAcceptableOrUnknown(
+          data['suggested_week']!,
+          _suggestedWeekMeta,
+        ),
+      );
+    }
+    if (data.containsKey('summary')) {
+      context.handle(
+        _summaryMeta,
+        summary.isAcceptableOrUnknown(data['summary']!, _summaryMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ProgressionStateRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ProgressionStateRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      workflowId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}workflow_id'],
+      )!,
+      workflowBlockId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}workflow_block_id'],
+      ),
+      blockKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}block_key'],
+      )!,
+      nodeTypeSlug: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}node_type_slug'],
+      )!,
+      stateType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}state_type'],
+      )!,
+      exerciseName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}exercise_name'],
+      ),
+      outcome: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}outcome'],
+      )!,
+      currentLoad: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}current_load'],
+      ),
+      suggestedLoad: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}suggested_load'],
+      ),
+      currentWeek: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}current_week'],
+      ),
+      suggestedWeek: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}suggested_week'],
+      ),
+      summary: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}summary'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $ProgressionStatesTableTable createAlias(String alias) {
+    return $ProgressionStatesTableTable(attachedDatabase, alias);
+  }
+}
+
+class ProgressionStateRow extends DataClass
+    implements Insertable<ProgressionStateRow> {
+  final int id;
+  final int workflowId;
+  final int? workflowBlockId;
+  final String blockKey;
+  final String nodeTypeSlug;
+  final String stateType;
+  final String? exerciseName;
+  final String outcome;
+  final String? currentLoad;
+  final String? suggestedLoad;
+  final int? currentWeek;
+  final int? suggestedWeek;
+  final String? summary;
+  final DateTime updatedAt;
+  const ProgressionStateRow({
+    required this.id,
+    required this.workflowId,
+    this.workflowBlockId,
+    required this.blockKey,
+    required this.nodeTypeSlug,
+    required this.stateType,
+    this.exerciseName,
+    required this.outcome,
+    this.currentLoad,
+    this.suggestedLoad,
+    this.currentWeek,
+    this.suggestedWeek,
+    this.summary,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['workflow_id'] = Variable<int>(workflowId);
+    if (!nullToAbsent || workflowBlockId != null) {
+      map['workflow_block_id'] = Variable<int>(workflowBlockId);
+    }
+    map['block_key'] = Variable<String>(blockKey);
+    map['node_type_slug'] = Variable<String>(nodeTypeSlug);
+    map['state_type'] = Variable<String>(stateType);
+    if (!nullToAbsent || exerciseName != null) {
+      map['exercise_name'] = Variable<String>(exerciseName);
+    }
+    map['outcome'] = Variable<String>(outcome);
+    if (!nullToAbsent || currentLoad != null) {
+      map['current_load'] = Variable<String>(currentLoad);
+    }
+    if (!nullToAbsent || suggestedLoad != null) {
+      map['suggested_load'] = Variable<String>(suggestedLoad);
+    }
+    if (!nullToAbsent || currentWeek != null) {
+      map['current_week'] = Variable<int>(currentWeek);
+    }
+    if (!nullToAbsent || suggestedWeek != null) {
+      map['suggested_week'] = Variable<int>(suggestedWeek);
+    }
+    if (!nullToAbsent || summary != null) {
+      map['summary'] = Variable<String>(summary);
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  ProgressionStatesTableCompanion toCompanion(bool nullToAbsent) {
+    return ProgressionStatesTableCompanion(
+      id: Value(id),
+      workflowId: Value(workflowId),
+      workflowBlockId: workflowBlockId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(workflowBlockId),
+      blockKey: Value(blockKey),
+      nodeTypeSlug: Value(nodeTypeSlug),
+      stateType: Value(stateType),
+      exerciseName: exerciseName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(exerciseName),
+      outcome: Value(outcome),
+      currentLoad: currentLoad == null && nullToAbsent
+          ? const Value.absent()
+          : Value(currentLoad),
+      suggestedLoad: suggestedLoad == null && nullToAbsent
+          ? const Value.absent()
+          : Value(suggestedLoad),
+      currentWeek: currentWeek == null && nullToAbsent
+          ? const Value.absent()
+          : Value(currentWeek),
+      suggestedWeek: suggestedWeek == null && nullToAbsent
+          ? const Value.absent()
+          : Value(suggestedWeek),
+      summary: summary == null && nullToAbsent
+          ? const Value.absent()
+          : Value(summary),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory ProgressionStateRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ProgressionStateRow(
+      id: serializer.fromJson<int>(json['id']),
+      workflowId: serializer.fromJson<int>(json['workflowId']),
+      workflowBlockId: serializer.fromJson<int?>(json['workflowBlockId']),
+      blockKey: serializer.fromJson<String>(json['blockKey']),
+      nodeTypeSlug: serializer.fromJson<String>(json['nodeTypeSlug']),
+      stateType: serializer.fromJson<String>(json['stateType']),
+      exerciseName: serializer.fromJson<String?>(json['exerciseName']),
+      outcome: serializer.fromJson<String>(json['outcome']),
+      currentLoad: serializer.fromJson<String?>(json['currentLoad']),
+      suggestedLoad: serializer.fromJson<String?>(json['suggestedLoad']),
+      currentWeek: serializer.fromJson<int?>(json['currentWeek']),
+      suggestedWeek: serializer.fromJson<int?>(json['suggestedWeek']),
+      summary: serializer.fromJson<String?>(json['summary']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'workflowId': serializer.toJson<int>(workflowId),
+      'workflowBlockId': serializer.toJson<int?>(workflowBlockId),
+      'blockKey': serializer.toJson<String>(blockKey),
+      'nodeTypeSlug': serializer.toJson<String>(nodeTypeSlug),
+      'stateType': serializer.toJson<String>(stateType),
+      'exerciseName': serializer.toJson<String?>(exerciseName),
+      'outcome': serializer.toJson<String>(outcome),
+      'currentLoad': serializer.toJson<String?>(currentLoad),
+      'suggestedLoad': serializer.toJson<String?>(suggestedLoad),
+      'currentWeek': serializer.toJson<int?>(currentWeek),
+      'suggestedWeek': serializer.toJson<int?>(suggestedWeek),
+      'summary': serializer.toJson<String?>(summary),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  ProgressionStateRow copyWith({
+    int? id,
+    int? workflowId,
+    Value<int?> workflowBlockId = const Value.absent(),
+    String? blockKey,
+    String? nodeTypeSlug,
+    String? stateType,
+    Value<String?> exerciseName = const Value.absent(),
+    String? outcome,
+    Value<String?> currentLoad = const Value.absent(),
+    Value<String?> suggestedLoad = const Value.absent(),
+    Value<int?> currentWeek = const Value.absent(),
+    Value<int?> suggestedWeek = const Value.absent(),
+    Value<String?> summary = const Value.absent(),
+    DateTime? updatedAt,
+  }) => ProgressionStateRow(
+    id: id ?? this.id,
+    workflowId: workflowId ?? this.workflowId,
+    workflowBlockId: workflowBlockId.present
+        ? workflowBlockId.value
+        : this.workflowBlockId,
+    blockKey: blockKey ?? this.blockKey,
+    nodeTypeSlug: nodeTypeSlug ?? this.nodeTypeSlug,
+    stateType: stateType ?? this.stateType,
+    exerciseName: exerciseName.present ? exerciseName.value : this.exerciseName,
+    outcome: outcome ?? this.outcome,
+    currentLoad: currentLoad.present ? currentLoad.value : this.currentLoad,
+    suggestedLoad: suggestedLoad.present
+        ? suggestedLoad.value
+        : this.suggestedLoad,
+    currentWeek: currentWeek.present ? currentWeek.value : this.currentWeek,
+    suggestedWeek: suggestedWeek.present
+        ? suggestedWeek.value
+        : this.suggestedWeek,
+    summary: summary.present ? summary.value : this.summary,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  ProgressionStateRow copyWithCompanion(ProgressionStatesTableCompanion data) {
+    return ProgressionStateRow(
+      id: data.id.present ? data.id.value : this.id,
+      workflowId: data.workflowId.present
+          ? data.workflowId.value
+          : this.workflowId,
+      workflowBlockId: data.workflowBlockId.present
+          ? data.workflowBlockId.value
+          : this.workflowBlockId,
+      blockKey: data.blockKey.present ? data.blockKey.value : this.blockKey,
+      nodeTypeSlug: data.nodeTypeSlug.present
+          ? data.nodeTypeSlug.value
+          : this.nodeTypeSlug,
+      stateType: data.stateType.present ? data.stateType.value : this.stateType,
+      exerciseName: data.exerciseName.present
+          ? data.exerciseName.value
+          : this.exerciseName,
+      outcome: data.outcome.present ? data.outcome.value : this.outcome,
+      currentLoad: data.currentLoad.present
+          ? data.currentLoad.value
+          : this.currentLoad,
+      suggestedLoad: data.suggestedLoad.present
+          ? data.suggestedLoad.value
+          : this.suggestedLoad,
+      currentWeek: data.currentWeek.present
+          ? data.currentWeek.value
+          : this.currentWeek,
+      suggestedWeek: data.suggestedWeek.present
+          ? data.suggestedWeek.value
+          : this.suggestedWeek,
+      summary: data.summary.present ? data.summary.value : this.summary,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProgressionStateRow(')
+          ..write('id: $id, ')
+          ..write('workflowId: $workflowId, ')
+          ..write('workflowBlockId: $workflowBlockId, ')
+          ..write('blockKey: $blockKey, ')
+          ..write('nodeTypeSlug: $nodeTypeSlug, ')
+          ..write('stateType: $stateType, ')
+          ..write('exerciseName: $exerciseName, ')
+          ..write('outcome: $outcome, ')
+          ..write('currentLoad: $currentLoad, ')
+          ..write('suggestedLoad: $suggestedLoad, ')
+          ..write('currentWeek: $currentWeek, ')
+          ..write('suggestedWeek: $suggestedWeek, ')
+          ..write('summary: $summary, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    workflowId,
+    workflowBlockId,
+    blockKey,
+    nodeTypeSlug,
+    stateType,
+    exerciseName,
+    outcome,
+    currentLoad,
+    suggestedLoad,
+    currentWeek,
+    suggestedWeek,
+    summary,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ProgressionStateRow &&
+          other.id == this.id &&
+          other.workflowId == this.workflowId &&
+          other.workflowBlockId == this.workflowBlockId &&
+          other.blockKey == this.blockKey &&
+          other.nodeTypeSlug == this.nodeTypeSlug &&
+          other.stateType == this.stateType &&
+          other.exerciseName == this.exerciseName &&
+          other.outcome == this.outcome &&
+          other.currentLoad == this.currentLoad &&
+          other.suggestedLoad == this.suggestedLoad &&
+          other.currentWeek == this.currentWeek &&
+          other.suggestedWeek == this.suggestedWeek &&
+          other.summary == this.summary &&
+          other.updatedAt == this.updatedAt);
+}
+
+class ProgressionStatesTableCompanion
+    extends UpdateCompanion<ProgressionStateRow> {
+  final Value<int> id;
+  final Value<int> workflowId;
+  final Value<int?> workflowBlockId;
+  final Value<String> blockKey;
+  final Value<String> nodeTypeSlug;
+  final Value<String> stateType;
+  final Value<String?> exerciseName;
+  final Value<String> outcome;
+  final Value<String?> currentLoad;
+  final Value<String?> suggestedLoad;
+  final Value<int?> currentWeek;
+  final Value<int?> suggestedWeek;
+  final Value<String?> summary;
+  final Value<DateTime> updatedAt;
+  const ProgressionStatesTableCompanion({
+    this.id = const Value.absent(),
+    this.workflowId = const Value.absent(),
+    this.workflowBlockId = const Value.absent(),
+    this.blockKey = const Value.absent(),
+    this.nodeTypeSlug = const Value.absent(),
+    this.stateType = const Value.absent(),
+    this.exerciseName = const Value.absent(),
+    this.outcome = const Value.absent(),
+    this.currentLoad = const Value.absent(),
+    this.suggestedLoad = const Value.absent(),
+    this.currentWeek = const Value.absent(),
+    this.suggestedWeek = const Value.absent(),
+    this.summary = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  });
+  ProgressionStatesTableCompanion.insert({
+    this.id = const Value.absent(),
+    required int workflowId,
+    this.workflowBlockId = const Value.absent(),
+    required String blockKey,
+    required String nodeTypeSlug,
+    required String stateType,
+    this.exerciseName = const Value.absent(),
+    required String outcome,
+    this.currentLoad = const Value.absent(),
+    this.suggestedLoad = const Value.absent(),
+    this.currentWeek = const Value.absent(),
+    this.suggestedWeek = const Value.absent(),
+    this.summary = const Value.absent(),
+    required DateTime updatedAt,
+  }) : workflowId = Value(workflowId),
+       blockKey = Value(blockKey),
+       nodeTypeSlug = Value(nodeTypeSlug),
+       stateType = Value(stateType),
+       outcome = Value(outcome),
+       updatedAt = Value(updatedAt);
+  static Insertable<ProgressionStateRow> custom({
+    Expression<int>? id,
+    Expression<int>? workflowId,
+    Expression<int>? workflowBlockId,
+    Expression<String>? blockKey,
+    Expression<String>? nodeTypeSlug,
+    Expression<String>? stateType,
+    Expression<String>? exerciseName,
+    Expression<String>? outcome,
+    Expression<String>? currentLoad,
+    Expression<String>? suggestedLoad,
+    Expression<int>? currentWeek,
+    Expression<int>? suggestedWeek,
+    Expression<String>? summary,
+    Expression<DateTime>? updatedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (workflowId != null) 'workflow_id': workflowId,
+      if (workflowBlockId != null) 'workflow_block_id': workflowBlockId,
+      if (blockKey != null) 'block_key': blockKey,
+      if (nodeTypeSlug != null) 'node_type_slug': nodeTypeSlug,
+      if (stateType != null) 'state_type': stateType,
+      if (exerciseName != null) 'exercise_name': exerciseName,
+      if (outcome != null) 'outcome': outcome,
+      if (currentLoad != null) 'current_load': currentLoad,
+      if (suggestedLoad != null) 'suggested_load': suggestedLoad,
+      if (currentWeek != null) 'current_week': currentWeek,
+      if (suggestedWeek != null) 'suggested_week': suggestedWeek,
+      if (summary != null) 'summary': summary,
+      if (updatedAt != null) 'updated_at': updatedAt,
+    });
+  }
+
+  ProgressionStatesTableCompanion copyWith({
+    Value<int>? id,
+    Value<int>? workflowId,
+    Value<int?>? workflowBlockId,
+    Value<String>? blockKey,
+    Value<String>? nodeTypeSlug,
+    Value<String>? stateType,
+    Value<String?>? exerciseName,
+    Value<String>? outcome,
+    Value<String?>? currentLoad,
+    Value<String?>? suggestedLoad,
+    Value<int?>? currentWeek,
+    Value<int?>? suggestedWeek,
+    Value<String?>? summary,
+    Value<DateTime>? updatedAt,
+  }) {
+    return ProgressionStatesTableCompanion(
+      id: id ?? this.id,
+      workflowId: workflowId ?? this.workflowId,
+      workflowBlockId: workflowBlockId ?? this.workflowBlockId,
+      blockKey: blockKey ?? this.blockKey,
+      nodeTypeSlug: nodeTypeSlug ?? this.nodeTypeSlug,
+      stateType: stateType ?? this.stateType,
+      exerciseName: exerciseName ?? this.exerciseName,
+      outcome: outcome ?? this.outcome,
+      currentLoad: currentLoad ?? this.currentLoad,
+      suggestedLoad: suggestedLoad ?? this.suggestedLoad,
+      currentWeek: currentWeek ?? this.currentWeek,
+      suggestedWeek: suggestedWeek ?? this.suggestedWeek,
+      summary: summary ?? this.summary,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (workflowId.present) {
+      map['workflow_id'] = Variable<int>(workflowId.value);
+    }
+    if (workflowBlockId.present) {
+      map['workflow_block_id'] = Variable<int>(workflowBlockId.value);
+    }
+    if (blockKey.present) {
+      map['block_key'] = Variable<String>(blockKey.value);
+    }
+    if (nodeTypeSlug.present) {
+      map['node_type_slug'] = Variable<String>(nodeTypeSlug.value);
+    }
+    if (stateType.present) {
+      map['state_type'] = Variable<String>(stateType.value);
+    }
+    if (exerciseName.present) {
+      map['exercise_name'] = Variable<String>(exerciseName.value);
+    }
+    if (outcome.present) {
+      map['outcome'] = Variable<String>(outcome.value);
+    }
+    if (currentLoad.present) {
+      map['current_load'] = Variable<String>(currentLoad.value);
+    }
+    if (suggestedLoad.present) {
+      map['suggested_load'] = Variable<String>(suggestedLoad.value);
+    }
+    if (currentWeek.present) {
+      map['current_week'] = Variable<int>(currentWeek.value);
+    }
+    if (suggestedWeek.present) {
+      map['suggested_week'] = Variable<int>(suggestedWeek.value);
+    }
+    if (summary.present) {
+      map['summary'] = Variable<String>(summary.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProgressionStatesTableCompanion(')
+          ..write('id: $id, ')
+          ..write('workflowId: $workflowId, ')
+          ..write('workflowBlockId: $workflowBlockId, ')
+          ..write('blockKey: $blockKey, ')
+          ..write('nodeTypeSlug: $nodeTypeSlug, ')
+          ..write('stateType: $stateType, ')
+          ..write('exerciseName: $exerciseName, ')
+          ..write('outcome: $outcome, ')
+          ..write('currentLoad: $currentLoad, ')
+          ..write('suggestedLoad: $suggestedLoad, ')
+          ..write('currentWeek: $currentWeek, ')
+          ..write('suggestedWeek: $suggestedWeek, ')
+          ..write('summary: $summary, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2291,6 +3129,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $WorkoutSetLogsTableTable workoutSetLogsTable =
       $WorkoutSetLogsTableTable(this);
   late final $SyncQueueTableTable syncQueueTable = $SyncQueueTableTable(this);
+  late final $ProgressionStatesTableTable progressionStatesTable =
+      $ProgressionStatesTableTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2300,6 +3140,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     workoutSessionsTable,
     workoutSetLogsTable,
     syncQueueTable,
+    progressionStatesTable,
   ];
 }
 
@@ -3501,6 +4342,418 @@ typedef $$SyncQueueTableTableProcessedTableManager =
       SyncQueueData,
       PrefetchHooks Function()
     >;
+typedef $$ProgressionStatesTableTableCreateCompanionBuilder =
+    ProgressionStatesTableCompanion Function({
+      Value<int> id,
+      required int workflowId,
+      Value<int?> workflowBlockId,
+      required String blockKey,
+      required String nodeTypeSlug,
+      required String stateType,
+      Value<String?> exerciseName,
+      required String outcome,
+      Value<String?> currentLoad,
+      Value<String?> suggestedLoad,
+      Value<int?> currentWeek,
+      Value<int?> suggestedWeek,
+      Value<String?> summary,
+      required DateTime updatedAt,
+    });
+typedef $$ProgressionStatesTableTableUpdateCompanionBuilder =
+    ProgressionStatesTableCompanion Function({
+      Value<int> id,
+      Value<int> workflowId,
+      Value<int?> workflowBlockId,
+      Value<String> blockKey,
+      Value<String> nodeTypeSlug,
+      Value<String> stateType,
+      Value<String?> exerciseName,
+      Value<String> outcome,
+      Value<String?> currentLoad,
+      Value<String?> suggestedLoad,
+      Value<int?> currentWeek,
+      Value<int?> suggestedWeek,
+      Value<String?> summary,
+      Value<DateTime> updatedAt,
+    });
+
+class $$ProgressionStatesTableTableFilterComposer
+    extends Composer<_$AppDatabase, $ProgressionStatesTableTable> {
+  $$ProgressionStatesTableTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get workflowId => $composableBuilder(
+    column: $table.workflowId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get workflowBlockId => $composableBuilder(
+    column: $table.workflowBlockId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get blockKey => $composableBuilder(
+    column: $table.blockKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nodeTypeSlug => $composableBuilder(
+    column: $table.nodeTypeSlug,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get stateType => $composableBuilder(
+    column: $table.stateType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get exerciseName => $composableBuilder(
+    column: $table.exerciseName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get outcome => $composableBuilder(
+    column: $table.outcome,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get currentLoad => $composableBuilder(
+    column: $table.currentLoad,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get suggestedLoad => $composableBuilder(
+    column: $table.suggestedLoad,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get currentWeek => $composableBuilder(
+    column: $table.currentWeek,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get suggestedWeek => $composableBuilder(
+    column: $table.suggestedWeek,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get summary => $composableBuilder(
+    column: $table.summary,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ProgressionStatesTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $ProgressionStatesTableTable> {
+  $$ProgressionStatesTableTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get workflowId => $composableBuilder(
+    column: $table.workflowId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get workflowBlockId => $composableBuilder(
+    column: $table.workflowBlockId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get blockKey => $composableBuilder(
+    column: $table.blockKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get nodeTypeSlug => $composableBuilder(
+    column: $table.nodeTypeSlug,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get stateType => $composableBuilder(
+    column: $table.stateType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get exerciseName => $composableBuilder(
+    column: $table.exerciseName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get outcome => $composableBuilder(
+    column: $table.outcome,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get currentLoad => $composableBuilder(
+    column: $table.currentLoad,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get suggestedLoad => $composableBuilder(
+    column: $table.suggestedLoad,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get currentWeek => $composableBuilder(
+    column: $table.currentWeek,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get suggestedWeek => $composableBuilder(
+    column: $table.suggestedWeek,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get summary => $composableBuilder(
+    column: $table.summary,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ProgressionStatesTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ProgressionStatesTableTable> {
+  $$ProgressionStatesTableTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get workflowId => $composableBuilder(
+    column: $table.workflowId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get workflowBlockId => $composableBuilder(
+    column: $table.workflowBlockId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get blockKey =>
+      $composableBuilder(column: $table.blockKey, builder: (column) => column);
+
+  GeneratedColumn<String> get nodeTypeSlug => $composableBuilder(
+    column: $table.nodeTypeSlug,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get stateType =>
+      $composableBuilder(column: $table.stateType, builder: (column) => column);
+
+  GeneratedColumn<String> get exerciseName => $composableBuilder(
+    column: $table.exerciseName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get outcome =>
+      $composableBuilder(column: $table.outcome, builder: (column) => column);
+
+  GeneratedColumn<String> get currentLoad => $composableBuilder(
+    column: $table.currentLoad,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get suggestedLoad => $composableBuilder(
+    column: $table.suggestedLoad,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get currentWeek => $composableBuilder(
+    column: $table.currentWeek,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get suggestedWeek => $composableBuilder(
+    column: $table.suggestedWeek,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get summary =>
+      $composableBuilder(column: $table.summary, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$ProgressionStatesTableTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ProgressionStatesTableTable,
+          ProgressionStateRow,
+          $$ProgressionStatesTableTableFilterComposer,
+          $$ProgressionStatesTableTableOrderingComposer,
+          $$ProgressionStatesTableTableAnnotationComposer,
+          $$ProgressionStatesTableTableCreateCompanionBuilder,
+          $$ProgressionStatesTableTableUpdateCompanionBuilder,
+          (
+            ProgressionStateRow,
+            BaseReferences<
+              _$AppDatabase,
+              $ProgressionStatesTableTable,
+              ProgressionStateRow
+            >,
+          ),
+          ProgressionStateRow,
+          PrefetchHooks Function()
+        > {
+  $$ProgressionStatesTableTableTableManager(
+    _$AppDatabase db,
+    $ProgressionStatesTableTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ProgressionStatesTableTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$ProgressionStatesTableTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$ProgressionStatesTableTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> workflowId = const Value.absent(),
+                Value<int?> workflowBlockId = const Value.absent(),
+                Value<String> blockKey = const Value.absent(),
+                Value<String> nodeTypeSlug = const Value.absent(),
+                Value<String> stateType = const Value.absent(),
+                Value<String?> exerciseName = const Value.absent(),
+                Value<String> outcome = const Value.absent(),
+                Value<String?> currentLoad = const Value.absent(),
+                Value<String?> suggestedLoad = const Value.absent(),
+                Value<int?> currentWeek = const Value.absent(),
+                Value<int?> suggestedWeek = const Value.absent(),
+                Value<String?> summary = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => ProgressionStatesTableCompanion(
+                id: id,
+                workflowId: workflowId,
+                workflowBlockId: workflowBlockId,
+                blockKey: blockKey,
+                nodeTypeSlug: nodeTypeSlug,
+                stateType: stateType,
+                exerciseName: exerciseName,
+                outcome: outcome,
+                currentLoad: currentLoad,
+                suggestedLoad: suggestedLoad,
+                currentWeek: currentWeek,
+                suggestedWeek: suggestedWeek,
+                summary: summary,
+                updatedAt: updatedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int workflowId,
+                Value<int?> workflowBlockId = const Value.absent(),
+                required String blockKey,
+                required String nodeTypeSlug,
+                required String stateType,
+                Value<String?> exerciseName = const Value.absent(),
+                required String outcome,
+                Value<String?> currentLoad = const Value.absent(),
+                Value<String?> suggestedLoad = const Value.absent(),
+                Value<int?> currentWeek = const Value.absent(),
+                Value<int?> suggestedWeek = const Value.absent(),
+                Value<String?> summary = const Value.absent(),
+                required DateTime updatedAt,
+              }) => ProgressionStatesTableCompanion.insert(
+                id: id,
+                workflowId: workflowId,
+                workflowBlockId: workflowBlockId,
+                blockKey: blockKey,
+                nodeTypeSlug: nodeTypeSlug,
+                stateType: stateType,
+                exerciseName: exerciseName,
+                outcome: outcome,
+                currentLoad: currentLoad,
+                suggestedLoad: suggestedLoad,
+                currentWeek: currentWeek,
+                suggestedWeek: suggestedWeek,
+                summary: summary,
+                updatedAt: updatedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $ProgressionStatesTableTable,
+                    ProgressionStateRow
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $ProgressionStatesTableTable,
+                    ProgressionStateRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ProgressionStatesTableTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ProgressionStatesTableTable,
+      ProgressionStateRow,
+      $$ProgressionStatesTableTableFilterComposer,
+      $$ProgressionStatesTableTableOrderingComposer,
+      $$ProgressionStatesTableTableAnnotationComposer,
+      $$ProgressionStatesTableTableCreateCompanionBuilder,
+      $$ProgressionStatesTableTableUpdateCompanionBuilder,
+      (
+        ProgressionStateRow,
+        BaseReferences<
+          _$AppDatabase,
+          $ProgressionStatesTableTable,
+          ProgressionStateRow
+        >,
+      ),
+      ProgressionStateRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -3513,4 +4766,9 @@ class $AppDatabaseManager {
       $$WorkoutSetLogsTableTableTableManager(_db, _db.workoutSetLogsTable);
   $$SyncQueueTableTableTableManager get syncQueueTable =>
       $$SyncQueueTableTableTableManager(_db, _db.syncQueueTable);
+  $$ProgressionStatesTableTableTableManager get progressionStatesTable =>
+      $$ProgressionStatesTableTableTableManager(
+        _db,
+        _db.progressionStatesTable,
+      );
 }
