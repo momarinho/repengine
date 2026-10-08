@@ -225,6 +225,48 @@ class WorkoutRepository {
     });
   }
 
+  /// Abandons an active workout session.
+  ///
+  /// Discards all logged sets for this session, cleans pending mutations
+  /// from the sync outbox ([SyncQueueTable]) so incomplete data is never sent to the backend,
+  /// and deletes the session row from SQLite (or marks as 'abandoned' if [deleteSession] is false).
+  Future<void> abandonSession(String sessionClientId, {bool deleteSession = true}) async {
+    await _db.transaction(() async {
+      // 1. Collect all set log client IDs belonging to this session
+      final sessionSets = await (_db.select(_db.workoutSetLogsTable)
+            ..where((t) => t.sessionClientId.equals(sessionClientId)))
+          .get();
+      final setClientIds = sessionSets.map((s) => s.clientId).toList();
+
+      // 2. Remove pending mutations for this session and its set logs from sync_queue
+      final clientIdsToRemove = [sessionClientId, ...setClientIds];
+      await (_db.delete(_db.syncQueueTable)
+            ..where((t) => t.entityClientId.isIn(clientIdsToRemove)))
+          .go();
+
+      // 3. Purge all set logs for this session
+      await (_db.delete(_db.workoutSetLogsTable)
+            ..where((t) => t.sessionClientId.equals(sessionClientId)))
+          .go();
+
+      // 4. Delete the session or mark as abandoned
+      if (deleteSession) {
+        await (_db.delete(_db.workoutSessionsTable)
+              ..where((t) => t.clientId.equals(sessionClientId)))
+            .go();
+      } else {
+        await (_db.update(_db.workoutSessionsTable)
+              ..where((t) => t.clientId.equals(sessionClientId)))
+            .write(
+          WorkoutSessionsTableCompanion(
+            status: const Value('abandoned'),
+            completedAt: Value(DateTime.now().toUtc()),
+          ),
+        );
+      }
+    });
+  }
+
   /// Dynamically computes recommended load and repetitions for the next set in the block,
   /// integrating local SQLite history with repengine_core AutoregulationEngine.
   Future<ProgressionSuggestion> getSuggestedProgressionForBlock(

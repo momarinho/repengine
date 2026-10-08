@@ -237,4 +237,34 @@ flowchart TD
   - Testes unitários do `AuthNotifier` no Flutter (`auth_notifier_test.dart`).
   - Zero erros e advertências no `flutter analyze`.
 
+---
+
+### 🏗️ SPRINT 8: Criador de Rotinas no Mobile (Mobile Routine Creator) & Recursos de Portfólio
+> **Objetivo**: Dar autonomia completa ao aplicativo mobile, permitindo que o atleta crie, customize e execute suas próprias rotinas e dias de treino diretamente pelo celular com 100% de persistência offline no SQLite, gerando blocos estruturados (`blocksJson`) e sincronizando com o backend.
+
+- [x] **Abandono de Treino com Purga Atômica (Abandon Workout)**:
+  - Botão de abandono rápido na barra de status da sessão ativa e botão alternativo "Discard Workout" no [`WorkoutSummaryDialog`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/workout_summary_dialog.dart).
+  - Modal de confirmação ergonômico [`AbandonWorkoutDialog`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/abandon_workout_dialog.dart) prevenindo toques acidentais.
+  - Purga transacional atômica no SQLite via `WorkoutRepository.abandonSession`: deleção da sessão ativa, séries temporárias e remoção das mutações pendentes na outbox (`SyncQueueTable`), impedindo que treinos cancelados subam para o servidor.
+  - 100% de cobertura de testes automatizados unitários e de widget (`workout_repository_test.dart` e `workout_execution_screen_test.dart`).
+- [ ] **Fluxo Ergonômico de Criação de Rotina (`RoutineCreatorScreen` / Modal)**:
+  - Metadados da rotina: Nome e descrição.
+  - Construtor dinâmico de seções (dias de treino): adicionar/remover seções (ex: "Day 1 - Push", "Day 2 - Pull").
+  - Adição de exercícios por seção com catálogo rápido pré-configurado (*Squat, Bench Press, Deadlift, OHP, Barbell Row, etc.*) ou nome livre.
+  - Prescrição por exercício: séries (sets), repetições alvo, carga recomendada inicial (kg) e tempo de descanso (segundos).
+- [ ] **Persistência Estruturada no SQLite (`WorkoutRepository.createRoutine`)**:
+  - Serialização determinística dos blocos no formato nativo de `blocksJson` compatível com o parser `routine_model.dart`.
+  - Inserção atômica no Drift local (`RoutinesTable`) e reflexo imediato no `watchRoutines()`.
+  - Enfileiramento na `SyncQueueTable` para replicação no Go Core.
+- [ ] **Ponto de Entrada e Integração na UI**:
+  - Botão de ação destacado `+ Create Routine` integrado ao [`RoutineSelectorView`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/routine_selector_view.dart).
+  - Seleção e execução imediata do treino recém-criado com HUD ativo, cronômetro de descanso pré-configurado e cálculo de 1RM.
+- [ ] **Calculadora de Anilhas (*Plate Calculator*) Integrada ao HUD**:
+  - Widget ergonômico no `ThumbZonePad` decompondo qualquer carga alvo nas anilhas necessárias para barra olímpica de 20kg (25kg, 20kg, 15kg, 10kg, 5kg, 2.5kg, 1.25kg).
+- [ ] **Histórico Local de Treinos Concluídos (`WorkoutHistoryView`)**:
+  - Tela para consultar treinos passados, logs de séries, duração e volume total computados do SQLite local.
+- [ ] **Testes Automatizados**:
+  - Testes unitários de repositório para criação e leitura de rotinas customizadas locais.
+  - Testes de widget para validação do formulário e feedback de criação.
+
 

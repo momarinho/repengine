@@ -9,8 +9,10 @@ import '../../sync/application/sync_engine.dart';
 import '../controller/workout_execution_controller.dart';
 import '../data/workout_repository.dart';
 import '../domain/routine_model.dart';
+import 'widgets/abandon_workout_dialog.dart';
 import 'widgets/circular_rest_timer.dart';
 import 'widgets/debug_settings_drawer.dart';
+import 'widgets/exercise_completed_pad.dart';
 import 'widgets/routine_selector_view.dart';
 import 'widgets/set_log_card.dart';
 import 'widgets/thumb_zone_pad.dart';
@@ -144,6 +146,63 @@ class WorkoutExecutionScreen extends ConsumerWidget {
           final currentExercise = exercises[activeExIndex];
 
           final logs = ref.watch(activeSessionLogsStreamProvider(session.clientId)).value ?? [];
+          final exerciseLogs = logs
+              .where((l) => l.blockClientId == currentExercise.blockClientId)
+              .toList();
+          final completedSetsCount = exerciseLogs.length;
+          final totalSets = currentExercise.sets > 0 ? currentExercise.sets : 3;
+          final isExerciseDone = completedSetsCount >= totalSets;
+
+          final allWorkoutDone = exercises.every((ex) {
+            final exDone = logs.where((l) => l.blockClientId == ex.blockClientId).length;
+            final exTotal = ex.sets > 0 ? ex.sets : 3;
+            return exDone >= exTotal;
+          });
+
+          if (isExerciseDone) {
+            // Find next uncompleted exercise
+            int nextUnfinishedIndex = -1;
+            for (var i = 0; i < exercises.length; i++) {
+              final exDone = logs.where((l) => l.blockClientId == exercises[i].blockClientId).length;
+              final exTotal = exercises[i].sets > 0 ? exercises[i].sets : 3;
+              if (exDone < exTotal) {
+                nextUnfinishedIndex = i;
+                break;
+              }
+            }
+
+            return ExerciseCompletedPad(
+              exerciseName: currentExercise.name,
+              completedSets: completedSetsCount,
+              totalSets: totalSets,
+              isAllWorkoutDone: allWorkoutDone,
+              nextExerciseName: nextUnfinishedIndex != -1 ? exercises[nextUnfinishedIndex].name : null,
+              onNextExercise: nextUnfinishedIndex != -1
+                  ? () {
+                      ref.read(activeExerciseIndexProvider.notifier).state = nextUnfinishedIndex;
+                    }
+                  : null,
+              onFinishWorkout: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => WorkoutSummaryDialog(
+                    session: session,
+                    logs: logs,
+                    onConfirm: () async {
+                      await ref.read(workoutRepositoryProvider).completeSession(session.clientId);
+                      ref.read(restTimerProvider.notifier).stop();
+                    },
+                    onAbandon: () async {
+                      await ref.read(workoutRepositoryProvider).abandonSession(session.clientId);
+                      ref.read(restTimerProvider.notifier).stop();
+                      ref.read(activeExerciseIndexProvider.notifier).state = 0;
+                    },
+                  ),
+                );
+              },
+            );
+          }
+
           final suggestion = ref.watch(
             progressionSuggestionProvider((
               blockClientId: currentExercise.blockClientId,
@@ -180,8 +239,38 @@ class WorkoutExecutionScreen extends ConsumerWidget {
                 createdAt: DateTime.now().toUtc(),
               );
 
-              // Automatically start rest timer for this exercise
-              ref.read(restTimerProvider.notifier).start(seconds: currentExercise.restSeconds);
+              // 1. Automatically start prescribed rest interval
+              if (currentExercise.restSeconds > 0) {
+                ref.read(restTimerProvider.notifier).start(seconds: currentExercise.restSeconds);
+              }
+
+              // 2. Automatically advance to next exercise if this was the last set!
+              final newDoneSets = completedSetsCount + 1;
+              if (newDoneSets >= totalSets) {
+                int nextTargetIndex = -1;
+                for (var i = activeExIndex + 1; i < exercises.length; i++) {
+                  final exDone = currentLogs.where((l) => l.blockClientId == exercises[i].blockClientId).length;
+                  final exTotal = exercises[i].sets > 0 ? exercises[i].sets : 3;
+                  if (exDone < exTotal) {
+                    nextTargetIndex = i;
+                    break;
+                  }
+                }
+                if (nextTargetIndex == -1) {
+                  for (var i = 0; i < activeExIndex; i++) {
+                    final exDone = currentLogs.where((l) => l.blockClientId == exercises[i].blockClientId).length;
+                    final exTotal = exercises[i].sets > 0 ? exercises[i].sets : 3;
+                    if (exDone < exTotal) {
+                      nextTargetIndex = i;
+                      break;
+                    }
+                  }
+                }
+
+                if (nextTargetIndex != -1) {
+                  ref.read(activeExerciseIndexProvider.notifier).state = nextTargetIndex;
+                }
+              }
             },
           );
         },
@@ -238,14 +327,14 @@ class _ActiveSessionContent extends ConsumerWidget {
                 'ACTIVE SESSION',
                 style: AppTypography.labelSmall.copyWith(
                   color: AppColors.primary,
-                  letterSpacing: 1.1,
+                  letterSpacing: 0.5,
                   fontWeight: FontWeight.bold,
-                  fontSize: 11,
+                  fontSize: 10,
                 ),
               ),
-              const SizedBox(width: 5),
+              const SizedBox(width: 4),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                 decoration: BoxDecoration(
                   color: const Color(0x2298BB6C),
                   borderRadius: BorderRadius.circular(4),
@@ -255,7 +344,7 @@ class _ActiveSessionContent extends ConsumerWidget {
                   'LIVE',
                   style: AppTypography.labelSmall.copyWith(
                     color: AppColors.success,
-                    fontSize: 9,
+                    fontSize: 8,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -265,13 +354,39 @@ class _ActiveSessionContent extends ConsumerWidget {
                 child: Text(
                   session.sectionTitle,
                   style: AppTypography.titleMedium.copyWith(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
+              IconButton(
+                tooltip: 'Abandon Workout',
+                icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.error),
+                style: IconButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(26, 26),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AbandonWorkoutDialog(
+                      sessionTitle: session.sectionTitle,
+                      onConfirmAbandon: () async {
+                        await ref
+                            .read(workoutRepositoryProvider)
+                            .abandonSession(session.clientId);
+                        ref.read(restTimerProvider.notifier).stop();
+                        ref.read(activeExerciseIndexProvider.notifier).state = 0;
+                      },
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 4),
               OutlinedButton.icon(
                 onPressed: () {
                   showDialog(
@@ -285,15 +400,22 @@ class _ActiveSessionContent extends ConsumerWidget {
                             .completeSession(session.clientId);
                         ref.read(restTimerProvider.notifier).stop();
                       },
+                      onAbandon: () async {
+                        await ref
+                            .read(workoutRepositoryProvider)
+                            .abandonSession(session.clientId);
+                        ref.read(restTimerProvider.notifier).stop();
+                        ref.read(activeExerciseIndexProvider.notifier).state = 0;
+                      },
                     ),
                   );
                 },
-                icon: const Icon(Icons.done_all, size: 14),
-                label: const Text('Finish'),
+                icon: const Icon(Icons.done_all, size: 13),
+                label: const Text('Finish', style: TextStyle(fontSize: 12)),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.onBackground,
                   side: const BorderSide(color: AppColors.outlineVariant),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -392,26 +514,27 @@ class _ActiveSessionContent extends ConsumerWidget {
                 Row(
                   children: [
                     Text(
-                      'SET ',
+                      completedSetsCount >= totalSets ? 'SETS ' : 'SET ',
                       style: AppTypography.labelSmall.copyWith(
-                        color: AppColors.onSurfaceVariant,
+                        color: completedSetsCount >= totalSets ? AppColors.success : AppColors.onSurfaceVariant,
                         fontSize: 9,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     Text(
-                      '$currentSetNumber',
+                      completedSetsCount >= totalSets ? '$totalSets' : '$currentSetNumber',
                       style: AppTypography.titleMedium.copyWith(
                         fontSize: 14,
-                        color: AppColors.primary,
+                        color: completedSetsCount >= totalSets ? AppColors.success : AppColors.primary,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     Text(
-                      '/$totalSets',
+                      completedSetsCount >= totalSets ? '/$totalSets ✓' : '/$totalSets',
                       style: AppTypography.labelSmall.copyWith(
                         fontSize: 10,
-                        color: AppColors.onSurfaceVariant,
+                        color: completedSetsCount >= totalSets ? AppColors.success : AppColors.onSurfaceVariant,
+                        fontWeight: completedSetsCount >= totalSets ? FontWeight.bold : FontWeight.normal,
                       ),
                     ),
                     const Spacer(),

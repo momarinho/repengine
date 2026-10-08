@@ -16,6 +16,11 @@ Este checklist complementa os Sprints do roadmap, rastreando individualmente cad
   - [x] Conexão com fórmula estatística real de 1RM via `OneRepMaxCalculator` do core em tempo real.
 - [x] **Cronômetro Circular Nativo (120 FPS Canvas)**: [`circular_rest_timer.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/circular_rest_timer.dart) com vibração tátil nos 3s finais.
 - [x] **Cards de Séries Concluídas**: [`set_log_card.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/set_log_card.dart) com índice da série, carga, reps e 1RM estimado.
+- [x] **Transição Automática de Exercícios & Pad de Conclusão**:
+  - [x] Disparo automático do cronômetro de descanso e avanço para o próximo exercício ao concluir a última série prescrita.
+  - [x] [`exercise_completed_pad.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/exercise_completed_pad.dart) bloqueando séries extras em exercícios já finalizados e guiando com botão `NEXT: [EXERCÍCIO]`.
+  - [x] Estado final `ALL EXERCISES COMPLETED!` com atalho direto para `REVIEW & FINISH WORKOUT`.
+  - [x] Testes de regressão de widget em [`routine_selection_test.dart`](file:///home/mateus/Projects/repengine/mobile/test/features/workout_execution/routine_selection_test.dart).
 - [x] **Modal de Resumo do Treino Concluído**: Dialog com volume total levantado (kg), tempo de treino e total de séries gravadas no SQLite ([`workout_summary_dialog.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/workout_summary_dialog.dart)).
 
 ### 🌐 1.2 Status de Nuvem & Diagnósticos (Modo Academia)
@@ -132,4 +137,31 @@ Este checklist complementa os Sprints do roadmap, rastreando individualmente cad
 - [x] **Testes Automatizados**:
   - [x] Testes no BFF (`go_core_client_test.dart`, `login_test.dart`, `_middleware_test.dart`).
   - [x] Testes no Mobile (`auth_notifier_test.dart`, `workout_execution_screen_test.dart`).
+
+---
+
+## 🏗️ 7. Sprint 8: Criador de Rotinas no Mobile & Recursos de Portfólio
+- [x] **Abandono de Treino com Purga Atômica (Abandon Workout)**:
+  - [x] Fluxo de confirmação com `AbandonWorkoutDialog` e botão ergonômico no topo do HUD.
+  - [x] Acesso alternativo com botão "Discard Workout" no [`WorkoutSummaryDialog`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/workout_summary_dialog.dart).
+  - [x] Limpeza atômica no SQLite: deleção de `workout_sessions`, purga de `workout_set_logs` e remoção de registros pendentes na `sync_queue` para não replicar dados descartados.
+  - [x] Testes unitários no [`workout_repository_test.dart`](file:///home/mateus/Projects/repengine/mobile/test/features/workout_execution/workout_repository_test.dart) e de widget no [`workout_execution_screen_test.dart`](file:///home/mateus/Projects/repengine/mobile/test/features/workout_execution/workout_execution_screen_test.dart).
+- [ ] **Criador de Rotinas no Celular (`RoutineCreatorScreen` / Modal)**:
+  - [ ] Formulário ergonômico no tema Kanagawa Dark com nome e descrição da rotina.
+  - [ ] Construtor dinâmico de seções (dias de treino: Treino A, B, etc.).
+  - [ ] Adição de exercícios com catálogo nativo (*Squat, Bench Press, Deadlift, OHP, etc.*) ou customizado.
+  - [ ] Prescrição de séries, repetições, carga alvo inicial e tempo de descanso por exercício.
+- [ ] **Gravação Atômica & Modelo Estruturado (`WorkoutRepository.createRoutine`)**:
+  - [ ] Serialização determinística de blocos compatível com `routine_model.dart` (`blocksJson`).
+  - [ ] Inserção no Drift local (`RoutinesTable`) com ID local e reflexo imediato no `watchRoutines()`.
+  - [ ] Enfileiramento na `SyncQueueTable` para replicação no backend.
+- [ ] **Interface & Ponto de Entrada**:
+  - [ ] Botão `+ Create Routine` no cabeçalho do [`RoutineSelectorView`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/routine_selector_view.dart).
+  - [ ] Execução imediata do treino criado pelo atleta no HUD móvel com 1RM e timer.
+- [ ] **Calculadora de Anilhas (*Plate Calculator*)**:
+  - [ ] Bottom Sheet no `ThumbZonePad` decompondo qualquer carga alvo nas anilhas de barra olímpica (25, 20, 15, 10, 5, 2.5, 1.25kg).
+- [ ] **Histórico Local de Treinos Concluídos (`WorkoutHistoryView`)**:
+  - [ ] Tela para visualização de sessões finalizadas com volume total, séries e datas salvas no SQLite.
+- [ ] **Testes Automatizados**:
+  - [ ] Testes unitários de repositório e testes de widget para o fluxo de criação de rotinas.
 

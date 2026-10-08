@@ -262,6 +262,119 @@ void main() {
     expect(suggestion.reasoning, equals('Wave 2 Target: +2.5 kg'));
     expect(suggestion.isProgressed, isFalse);
   });
+
+  test('abandonSession purges session, sets, and pending outbox mutations cleanly (deleteSession: true)', () async {
+    // 1. Start workout session
+    await repository.startSession(
+      clientId: 'sess-abandon-1',
+      workflowId: 1,
+      sectionId: 'sec_test',
+      sectionTitle: 'Workout Abandon Test',
+      startedAt: DateTime.utc(2026, 10, 8, 12),
+    );
+
+    // 2. Log 2 sets
+    await repository.logSet(
+      clientId: 'log-abandon-1',
+      sessionClientId: 'sess-abandon-1',
+      blockClientId: 'blk_1',
+      nodeTypeSlug: 'exercise_squat',
+      setIndex: 1,
+      prescribedReps: '5',
+      prescribedLoad: '100.0',
+      actualReps: '5',
+      actualLoad: '100.0',
+      actualRpe: '8.0',
+      completed: true,
+      createdAt: DateTime.utc(2026, 10, 8, 12, 5),
+    );
+
+    await repository.logSet(
+      clientId: 'log-abandon-2',
+      sessionClientId: 'sess-abandon-1',
+      blockClientId: 'blk_1',
+      nodeTypeSlug: 'exercise_squat',
+      setIndex: 2,
+      prescribedReps: '5',
+      prescribedLoad: '100.0',
+      actualReps: '5',
+      actualLoad: '100.0',
+      actualRpe: '8.5',
+      completed: true,
+      createdAt: DateTime.utc(2026, 10, 8, 12, 10),
+    );
+
+    // Verify outbox currently contains 3 items
+    var queue = await db.select(db.syncQueueTable).get();
+    expect(queue, hasLength(3));
+
+    // 3. Abandon session
+    await repository.abandonSession('sess-abandon-1', deleteSession: true);
+
+    // Verify active session is null
+    final active = await repository.watchActiveSession().first;
+    expect(active, isNull);
+
+    // Verify session row is deleted
+    final sessions = await db.select(db.workoutSessionsTable).get();
+    expect(sessions, isEmpty);
+
+    // Verify set logs are purged
+    final logs = await db.select(db.workoutSetLogsTable).get();
+    expect(logs, isEmpty);
+
+    // Verify outbox mutations are purged so nothing dirty syncs to server
+    queue = await db.select(db.syncQueueTable).get();
+    expect(queue, isEmpty);
+  });
+
+  test('abandonSession marks status as abandoned when deleteSession: false', () async {
+    // 1. Start workout session
+    await repository.startSession(
+      clientId: 'sess-abandon-2',
+      workflowId: 1,
+      sectionId: 'sec_test_2',
+      sectionTitle: 'Workout Abandon Status Test',
+      startedAt: DateTime.utc(2026, 10, 8, 13),
+    );
+
+    // 2. Log 1 set
+    await repository.logSet(
+      clientId: 'log-abandon-3',
+      sessionClientId: 'sess-abandon-2',
+      blockClientId: 'blk_2',
+      nodeTypeSlug: 'exercise_bench',
+      setIndex: 1,
+      prescribedReps: '5',
+      prescribedLoad: '80.0',
+      actualReps: '5',
+      actualLoad: '80.0',
+      actualRpe: '7.5',
+      completed: true,
+      createdAt: DateTime.utc(2026, 10, 8, 13, 5),
+    );
+
+    // 3. Abandon with deleteSession: false
+    await repository.abandonSession('sess-abandon-2', deleteSession: false);
+
+    // Verify active session is null
+    final active = await repository.watchActiveSession().first;
+    expect(active, isNull);
+
+    // Verify session row is retained with status 'abandoned'
+    final session = await (db.select(db.workoutSessionsTable)
+          ..where((t) => t.clientId.equals('sess-abandon-2')))
+        .getSingle();
+    expect(session.status, equals('abandoned'));
+    expect(session.completedAt, isNotNull);
+
+    // Verify set logs and queue are purged
+    final logs = await db.select(db.workoutSetLogsTable).get();
+    expect(logs, isEmpty);
+
+    final queue = await db.select(db.syncQueueTable).get();
+    expect(queue, isEmpty);
+  });
 }
 
 

@@ -213,4 +213,143 @@ void main() {
 
     await db.close();
   });
+
+  testWidgets('Athlete completing all sets of an exercise triggers rest timer and auto-advances to next exercise, and completing all exercises shows finished state', (
+    WidgetTester tester,
+  ) async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    final repo = WorkoutRepository(db);
+
+    // Seed routine with 1 section containing 2 exercises (2 sets each)
+    final workflow = Workflow(
+      id: 99,
+      userId: 1,
+      name: 'Upper Body Blast',
+      isPublic: true,
+      createdAt: DateTime.now().toUtc(),
+      updatedAt: DateTime.now().toUtc(),
+      blockCount: 3,
+      blocks: [
+        const WorkflowBlock(
+          id: 301,
+          workflowId: 99,
+          nodeTypeSlug: 'section',
+          position: 1,
+          data: {'title': 'Upper Body Focus'},
+        ),
+        const WorkflowBlock(
+          id: 302,
+          workflowId: 99,
+          nodeTypeSlug: 'exercise_ohp',
+          position: 2,
+          data: {'exercise_name': 'Barbell Overhead Press', 'sets': 2, 'reps': '5', 'load': 50.0, 'rest_seconds': 60},
+        ),
+        const WorkflowBlock(
+          id: 303,
+          workflowId: 99,
+          nodeTypeSlug: 'exercise_deadlift',
+          position: 3,
+          data: {'exercise_name': 'Deadlift', 'sets': 2, 'reps': '5', 'load': 120.0, 'rest_seconds': 90},
+        ),
+      ],
+    );
+
+    await repo.upsertWorkflows([workflow]);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(db),
+          serverHealthProvider.overrideWith((ref) => ServerHealthNotifier(ref, autoStartTimer: false)),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.darkTheme,
+          home: const WorkoutExecutionScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Start workout
+    await tester.tap(find.text('START UPPER BODY FOCUS'));
+    await tester.pumpAndSettle();
+
+    // Verify first exercise is active
+    expect(find.text('Barbell Overhead Press'), findsWidgets);
+    expect(find.text('Deadlift'), findsOneWidget);
+    expect(find.text('LOG SET (50.0 kg × 5)'), findsOneWidget);
+
+    // 1. Log set 1 of OHP (1/2 sets)
+    await tester.tap(find.text('LOG SET (50.0 kg × 5)'));
+    await tester.pumpAndSettle();
+
+    // Rest timer starts, exercise is still OHP (1/2 done)
+    expect(find.text('REST TIMER'), findsOneWidget);
+    await tester.tap(find.byTooltip('Skip Rest'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('LOG SET (50.0 kg × 5)'), findsOneWidget);
+
+    // 2. Log set 2 of OHP (2/2 sets - completed!)
+    await tester.tap(find.text('LOG SET (50.0 kg × 5)'));
+    await tester.pumpAndSettle();
+
+    // Rest timer starts automatically
+    expect(find.text('REST TIMER'), findsOneWidget);
+    await tester.tap(find.byTooltip('Skip Rest'));
+    await tester.pumpAndSettle();
+
+    // Verify automatic advancement to Deadlift!
+    // ThumbZonePad should now show Deadlift's target load (120.0 kg x 5)
+    expect(find.text('LOG SET (120.0 kg × 5)'), findsOneWidget);
+
+    // If athlete taps back on Barbell Overhead Press chip:
+    await tester.tap(find.text('Barbell Overhead Press').first);
+    await tester.pumpAndSettle();
+
+    // It should display ExerciseCompletedPad, NOT ThumbZonePad!
+    expect(find.text('BARBELL OVERHEAD PRESS COMPLETED (2/2)'), findsOneWidget);
+    expect(find.text('NEXT: DEADLIFT'), findsOneWidget);
+    expect(find.text('LOG SET (50.0 kg × 5)'), findsNothing);
+
+    // Tapping "NEXT: DEADLIFT" returns to Deadlift
+    await tester.tap(find.text('NEXT: DEADLIFT'));
+    await tester.pumpAndSettle();
+    expect(find.text('LOG SET (120.0 kg × 5)'), findsOneWidget);
+
+    // 3. Log set 1 of Deadlift
+    await tester.tap(find.text('LOG SET (120.0 kg × 5)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Skip Rest'));
+    await tester.pumpAndSettle();
+
+    // 4. Log set 2 of Deadlift (Final set of the whole workout!)
+    await tester.tap(find.text('LOG SET (120.0 kg × 5)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Skip Rest'));
+    await tester.pumpAndSettle();
+
+    // All exercises are done!
+    // Should display ExerciseCompletedPad with "ALL EXERCISES COMPLETED!"
+    expect(find.text('ALL EXERCISES COMPLETED!'), findsOneWidget);
+    expect(find.text('REVIEW & FINISH WORKOUT'), findsOneWidget);
+
+    // Tapping "REVIEW & FINISH WORKOUT" opens the summary dialog
+    await tester.tap(find.text('REVIEW & FINISH WORKOUT'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Finish Workout?'), findsOneWidget);
+    expect(find.text('SETS / REPS'), findsOneWidget);
+    expect(find.text('4 / 20'), findsOneWidget);
+
+    // Confirm completion
+    await tester.tap(find.text('Complete'));
+    await tester.pumpAndSettle();
+
+    // UI returns to ready state
+    expect(find.text('Ready to Train?'), findsOneWidget);
+
+    await db.close();
+  });
 }
+

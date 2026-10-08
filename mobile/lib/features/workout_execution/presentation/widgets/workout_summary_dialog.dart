@@ -7,12 +7,14 @@ class WorkoutSummaryDialog extends StatelessWidget {
   final WorkoutSessionData session;
   final List<WorkoutSetLogData> logs;
   final VoidCallback onConfirm;
+  final VoidCallback? onAbandon;
 
   const WorkoutSummaryDialog({
     super.key,
     required this.session,
     required this.logs,
     required this.onConfirm,
+    this.onAbandon,
   });
 
   @override
@@ -189,6 +191,22 @@ class WorkoutSummaryDialog extends StatelessWidget {
                 ),
               ],
             ),
+            if (onAbandon != null) ...[
+              const SizedBox(height: 12),
+              Center(
+                child: TextButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    onAbandon!();
+                  },
+                  icon: const Icon(Icons.delete_outline_rounded, size: 16, color: AppColors.error),
+                  label: Text(
+                    'Discard Workout',
+                    style: AppTypography.labelMedium.copyWith(color: AppColors.error),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
