@@ -226,22 +226,68 @@ class ParsedRoutine {
           title: title,
           subtitle: subtitle,
         );
+      } else if (slug == 'rest') {
+        // Standalone rest block: updates rest time of previous exercise if available
+        if (currentExercises.isNotEmpty) {
+          final restSec = int.tryParse(
+                data['duration']?.toString() ??
+                    data['rest_seconds']?.toString() ??
+                    '',
+              ) ??
+              90;
+          final last = currentExercises.removeLast();
+          currentExercises.add(RoutineExercise(
+            blockClientId: last.blockClientId,
+            nodeTypeSlug: last.nodeTypeSlug,
+            name: last.name,
+            sets: last.sets,
+            reps: last.reps,
+            targetLoad: last.targetLoad,
+            restSeconds: restSec,
+          ));
+        }
       } else {
-        // Exercise / linear_progression / timed block
-        final exerciseName = data['exercise_name']?.toString() ??
-            data['title']?.toString() ??
-            'Exercise ${currentExercises.length + 1}';
+        // Exercise / linear_progression / superset / timed / repeat block
+        String exerciseName;
+        if (data['exercise_name'] != null &&
+            data['exercise_name'].toString().trim().isNotEmpty) {
+          exerciseName = data['exercise_name'].toString().trim();
+        } else if (data['title'] != null &&
+            data['title'].toString().trim().isNotEmpty) {
+          exerciseName = data['title'].toString().trim();
+        } else if (data['exercise_a_name'] != null &&
+            data['exercise_b_name'] != null) {
+          exerciseName =
+              '${data['exercise_a_name']} + ${data['exercise_b_name']}';
+        } else {
+          exerciseName = 'Exercise ${currentExercises.length + 1}';
+        }
+
         final sets = int.tryParse(data['sets']?.toString() ?? '') ?? 3;
-        final reps = data['reps']?.toString() ?? '5';
-        final load = double.tryParse(
-              data['load']?.toString() ??
-                  data['load_value']?.toString() ??
-                  data['start_load']?.toString() ??
-                  '',
-            ) ??
-            100.0;
+        final reps = data['reps']?.toString() ??
+            (data['reps_a'] != null && data['reps_b'] != null
+                ? '${data['reps_a']} / ${data['reps_b']}'
+                : (data['duration'] != null ? '${data['duration']}s' : '5'));
+
+        final parsedLoad = double.tryParse(
+          data['load']?.toString() ??
+              data['load_value']?.toString() ??
+              data['start_load']?.toString() ??
+              data['start_load_a']?.toString() ??
+              '',
+        );
+        final isBodyweightOrCardio = slug.contains('timed') ||
+            slug.contains('repeat') ||
+            exerciseName.toLowerCase().contains('jump rope') ||
+            exerciseName.toLowerCase().contains('plank') ||
+            exerciseName.toLowerCase().contains('pull-up') ||
+            exerciseName.toLowerCase().contains('push-up');
+
+        final load = parsedLoad ?? (isBodyweightOrCardio ? 0.0 : 100.0);
+
         final rest = int.tryParse(data['rest_seconds']?.toString() ??
                 data['rest']?.toString() ??
+                data['duration']?.toString() ??
                 '') ??
             90;
 
