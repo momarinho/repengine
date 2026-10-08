@@ -7,20 +7,20 @@ abstract final class AppColors {
   static const surfaceDim = Color(0xFF14121E);
   static const surfaceBright = Color(0xFF3A3746);
 
-  // Surface Containers (Camadas de elevação M3)
+  // Surface Containers (M3 elevation layers)
   static const surfaceContainerLowest = Color(0xFF0E0D19);
   static const surfaceContainerLow = Color(0xFF1C1A27);
   static const surfaceContainer = Color(0xFF201E2B);
   static const surfaceContainerHigh = Color(0xFF2B2836);
   static const surfaceContainerHighest = Color(0xFF353341);
 
-  // Primary (Rosa / Rose Accent)
+  // Primary (Rose Accent)
   static const primary = Color(0xFFFFB1C3);
   static const primaryContainer = Color(0xFFEB6F92);
   static const onPrimary = Color(0xFF65012C);
   static const onPrimaryContainer = Color(0xFF64012C);
 
-  // Secondary (Lavanda / Roxo Suave)
+  // Secondary (Lavender / Soft Purple)
   static const secondary = Color(0xFFD8BAFB);
   static const secondaryContainer = Color(0xFF543B73);
   static const onSecondary = Color(0xFF3C245B);
@@ -31,16 +31,16 @@ abstract final class AppColors {
   static const tertiaryContainer = Color(0xFF6EA0A8);
   static const onTertiary = Color(0xFF00363D);
 
-  // Textos & Destaques
+  // Text & Highlights
   static const onBackground = Color(0xFFE5E0F3);
   static const onSurface = Color(0xFFE5E0F3);
   static const onSurfaceVariant = Color(0xFFDBC0C4);
 
-  // Bordas & Divisores
+  // Borders & Dividers
   static const outline = Color(0xFFA38B8F);
   static const outlineVariant = Color(0xFF554246);
 
-  // Status & Erro
+  // Status & Error
   static const error = Color(0xFFFFB4AB);
   static const errorContainer = Color(0xFF93000A);
   static const onError = Color(0xFF690005);

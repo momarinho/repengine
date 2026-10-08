@@ -34,7 +34,7 @@ abstract final class AppTheme {
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppColors.background,
 
-      // AppBar limpa, sem elevação ou separador cinza feio
+      // Clean AppBar without elevation or grey divider
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.background,
         elevation: 0,
@@ -43,7 +43,7 @@ abstract final class AppTheme {
         iconTheme: IconThemeData(color: AppColors.onBackground),
       ),
 
-      // Cards do treino (exercícios e séries) usando Surface Container
+      // Workout cards (exercises and sets) using Surface Container
       cardTheme: CardThemeData(
         color: AppColors.surfaceContainer,
         elevation: 0,
@@ -54,7 +54,7 @@ abstract final class AppTheme {
         margin: EdgeInsets.zero,
       ),
 
-      // Botões primários ("Log Set", "Start Workout")
+      // Primary buttons ("Log Set", "Start Workout")
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primaryContainer,
@@ -71,7 +71,7 @@ abstract final class AppTheme {
         ),
       ),
 
-      // Inputs de carga e repetições (Thumb-friendly com borda sutil)
+      // Load & reps inputs (Thumb-friendly with subtle border)
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surfaceContainerHigh,

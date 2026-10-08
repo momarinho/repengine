@@ -30,31 +30,36 @@ class SetLogCard extends StatelessWidget {
         : actualLoadNum.toStringAsFixed(1);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: AppColors.surfaceContainer,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.outlineVariant),
+        border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Row(
         children: [
           // Set number
           Container(
-            width: 36,
-            height: 36,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
               color: AppColors.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.3)),
             ),
             child: Center(
               child: Text(
                 '#${log.setIndex}',
-                style: AppTypography.labelLarge.copyWith(fontSize: 14),
+                style: AppTypography.labelLarge.copyWith(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.onSurface,
+                ),
               ),
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 10),
           // Load x Reps & 1RM
           Expanded(
             child: Column(
@@ -62,22 +67,38 @@ class SetLogCard extends StatelessWidget {
               children: [
                 Text(
                   '${log.actualLoad} kg × ${log.actualReps} reps',
-                  style: AppTypography.titleMedium.copyWith(fontSize: 16),
+                  style: AppTypography.titleMedium.copyWith(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.onSurface,
+                  ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 Row(
                   children: [
-                    Text(
-                      '1RM: $estimated1RM kg',
-                      style: AppTypography.labelSmall.copyWith(
-                        color: AppColors.primary,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryContainer.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '1RM: $estimated1RM kg',
+                        style: AppTypography.labelSmall.copyWith(
+                          color: AppColors.primary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     if (log.actualRpe.isNotEmpty) ...[
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       Text(
                         '• RPE ${log.actualRpe}',
-                        style: AppTypography.labelSmall,
+                        style: AppTypography.labelSmall.copyWith(
+                          color: AppColors.onSurfaceVariant,
+                          fontSize: 11,
+                        ),
                       ),
                     ],
                   ],
@@ -87,14 +108,15 @@ class SetLogCard extends StatelessWidget {
           ),
           // Completion checkmark
           Container(
-            padding: const EdgeInsets.all(4),
-            decoration: const BoxDecoration(
-              color: Color(0x2298BB6C),
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: const Color(0x2298BB6C),
               shape: BoxShape.circle,
+              border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
             ),
             child: const Icon(
               Icons.check,
-              size: 20,
+              size: 16,
               color: AppColors.success,
             ),
           ),

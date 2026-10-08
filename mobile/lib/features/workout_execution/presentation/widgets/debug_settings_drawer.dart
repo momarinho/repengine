@@ -190,8 +190,8 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
                           SnackBar(
                             content: Text(
                               success
-                                  ? 'Sincronização concluída com sucesso!'
-                                  : 'Falha na sincronização. Verifique a conexão.',
+                                  ? 'Sync completed successfully!'
+                                  : 'Sync failed. Please check your connection.',
                             ),
                             backgroundColor:
                                 success ? AppColors.success : AppColors.primary,
@@ -373,7 +373,7 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
                 size: 20,
               ),
               const SizedBox(width: 8),
-              const Text('Conta RepEngine Web', style: AppTypography.labelMedium),
+              const Text('RepEngine Web Account', style: AppTypography.labelMedium),
               const Spacer(),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -388,7 +388,7 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
                   ),
                 ),
                 child: Text(
-                  isAuthenticated ? 'Conectado' : 'Convidado / Offline',
+                  isAuthenticated ? 'Connected' : 'Guest / Offline',
                   style: AppTypography.labelSmall.copyWith(
                     color: isAuthenticated ? AppColors.success : AppColors.onSurfaceVariant,
                     fontSize: 10,
@@ -401,7 +401,7 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
           const SizedBox(height: 10),
           if (isAuthenticated) ...[
             Text(
-              'Sessão ativa com acesso às rotinas da plataforma desktop.',
+              'Active session with access to desktop routines.',
               style: AppTypography.labelSmall.copyWith(color: AppColors.onSurfaceVariant),
             ),
             const SizedBox(height: 12),
@@ -418,7 +418,7 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      authState.email ?? 'Atleta',
+                      authState.email ?? 'Athlete',
                       style: AppTypography.bodyMedium.copyWith(
                         fontWeight: FontWeight.w600,
                         color: AppColors.onSurface,
@@ -448,14 +448,14 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Desconectado. Aplicativo operando em modo offline.'),
+                        content: Text('Disconnected. App operating in offline mode.'),
                         duration: Duration(seconds: 2),
                       ),
                     );
                   }
                 },
                 icon: const Icon(Icons.logout, size: 16),
-                label: const Text('Desconectar / Trocar de Conta'),
+                label: const Text('Disconnect / Switch Account'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.onSurfaceVariant,
                   side: const BorderSide(color: AppColors.outlineVariant),
@@ -465,7 +465,7 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
             ),
           ] else ...[
             Text(
-              'Conecte com seu e-mail e senha cadastrados no Desktop para baixar seus treinos reais.',
+              'Sign in with your email and password registered on Desktop to sync your routines.',
               style: AppTypography.labelSmall.copyWith(color: AppColors.onSurfaceVariant),
             ),
             const SizedBox(height: 12),
@@ -501,7 +501,7 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
                 filled: true,
                 fillColor: AppColors.surfaceContainerLowest,
                 prefixIcon: const Icon(Icons.lock_outline, size: 18, color: AppColors.onSurfaceVariant),
-                hintText: 'Sua senha',
+                hintText: 'Your password',
                 hintStyle: AppTypography.bodyMedium.copyWith(color: AppColors.outline),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -547,7 +547,7 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
                             _passwordController.clear();
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Conta conectada! Seus treinos foram sincronizados.'),
+                                content: Text('Account connected! Routines synchronized.'),
                                 backgroundColor: AppColors.success,
                                 duration: Duration(seconds: 2),
                               ),
@@ -562,7 +562,7 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
                         child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onPrimary),
                       )
                     : const Icon(Icons.login, size: 18),
-                label: Text(isAuthenticating ? 'Conectando...' : 'Conectar Conta Web'),
+                label: Text(isAuthenticating ? 'Connecting...' : 'Connect Web Account'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.onPrimary,

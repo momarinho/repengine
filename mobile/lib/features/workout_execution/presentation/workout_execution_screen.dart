@@ -205,32 +205,75 @@ class _ActiveSessionContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final logsAsync = ref.watch(activeSessionLogsStreamProvider(session.clientId));
+    final logs = logsAsync.value ?? [];
+    final currentExercise = exercises[activeExerciseIndex];
+
+    // Filter sets logged specifically for the active exercise block
+    final exerciseLogs = logs
+        .where((l) => l.blockClientId == currentExercise.blockClientId)
+        .toList();
+    final completedSetsCount = exerciseLogs.length;
+    final totalSets = currentExercise.sets > 0 ? currentExercise.sets : 3;
+    final currentSetNumber = (completedSetsCount + 1).clamp(1, totalSets);
+
+    final suggestion = ref.watch(
+      progressionSuggestionProvider((
+        blockClientId: currentExercise.blockClientId,
+        logCount: completedSetsCount,
+        fallbackLoad: currentExercise.targetLoad,
+        fallbackReps: int.tryParse(currentExercise.reps) ?? 5,
+      )),
+    ).value;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 12),
+          const SizedBox(height: 4),
+          // 1. ACTIVE SESSION TOP BAR
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('ACTIVE SESSION', style: AppTypography.labelLarge),
-                    Text(
-                      session.sectionTitle,
-                      style: AppTypography.titleLarge.copyWith(fontSize: 20),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+              Text(
+                'ACTIVE SESSION',
+                style: AppTypography.labelSmall.copyWith(
+                  color: AppColors.primary,
+                  letterSpacing: 1.1,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
                 ),
               ),
+              const SizedBox(width: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: const Color(0x2298BB6C),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  'LIVE',
+                  style: AppTypography.labelSmall.copyWith(
+                    color: AppColors.success,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  session.sectionTitle,
+                  style: AppTypography.titleMedium.copyWith(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 6),
               OutlinedButton.icon(
                 onPressed: () {
-                  final logs = logsAsync.value ?? [];
                   showDialog(
                     context: context,
                     builder: (ctx) => WorkoutSummaryDialog(
@@ -245,28 +288,39 @@ class _ActiveSessionContent extends ConsumerWidget {
                     ),
                   );
                 },
-                icon: const Icon(Icons.done_all, size: 16),
+                icon: const Icon(Icons.done_all, size: 14),
                 label: const Text('Finish'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.onBackground,
                   side: const BorderSide(color: AppColors.outlineVariant),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
               ),
             ],
           ),
 
+          // 2. EXERCISE SWITCHER CHIPS (if multiple exercises exist)
           if (exercises.length > 1) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 4),
             SizedBox(
-              height: 38,
+              height: 30,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: exercises.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                separatorBuilder: (_, _) => const SizedBox(width: 6),
                 itemBuilder: (context, index) {
                   final ex = exercises[index];
                   final isSelected = index == activeExerciseIndex;
+                  final exSetsDone = logs.where((l) => l.blockClientId == ex.blockClientId).length;
+                  final isAllDone = exSetsDone >= ex.sets && ex.sets > 0;
+
                   return ChoiceChip(
+                    avatar: isAllDone
+                        ? const Icon(Icons.check_circle_rounded, size: 12, color: AppColors.success)
+                        : null,
                     label: Text(ex.name),
                     selected: isSelected,
                     onSelected: (_) {
@@ -274,10 +328,11 @@ class _ActiveSessionContent extends ConsumerWidget {
                     },
                     selectedColor: AppColors.primaryContainer,
                     backgroundColor: AppColors.surfaceContainer,
+                    visualDensity: VisualDensity.compact,
                     labelStyle: TextStyle(
                       color: isSelected ? AppColors.onBackground : AppColors.onSurfaceVariant,
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                      fontSize: 12,
+                      fontSize: 11,
                     ),
                   );
                 },
@@ -285,41 +340,236 @@ class _ActiveSessionContent extends ConsumerWidget {
             ),
           ],
 
-          const SizedBox(height: 14),
-          const Text('COMPLETED SETS', style: AppTypography.labelSmall),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
+
+          // 3. MODERN HERO ACTIVE EXERCISE HUD CARD
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainer,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.6)),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 4,
+                  offset: Offset(0, 1),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Exercise Name & Rest Timer Pill
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        currentExercise.name,
+                        style: AppTypography.titleMedium.copyWith(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.onBackground,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${currentExercise.restSeconds}s rest',
+                      style: AppTypography.labelSmall.copyWith(
+                        color: AppColors.tertiary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+
+                // Compact 3-Column Display Metrics
+                Row(
+                  children: [
+                    Text(
+                      'SET ',
+                      style: AppTypography.labelSmall.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      '$currentSetNumber',
+                      style: AppTypography.titleMedium.copyWith(
+                        fontSize: 14,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      '/$totalSets',
+                      style: AppTypography.labelSmall.copyWith(
+                        fontSize: 10,
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      'TARGET ',
+                      style: AppTypography.labelSmall.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      '${currentExercise.reps} reps',
+                      style: AppTypography.titleMedium.copyWith(
+                        fontSize: 13,
+                        color: AppColors.onBackground,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      'LOAD ',
+                      style: AppTypography.labelSmall.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      '${currentExercise.targetLoad.toStringAsFixed(currentExercise.targetLoad % 1 == 0 ? 0 : 1)} kg',
+                      style: AppTypography.titleMedium.copyWith(
+                        fontSize: 13,
+                        color: AppColors.onBackground,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+
+                // Set Completion Progress Pills
+                Row(
+                  children: List.generate(totalSets, (index) {
+                    final isDone = index < completedSetsCount;
+                    final isCurrent = index == completedSetsCount;
+                    return Expanded(
+                      child: Container(
+                        height: 3,
+                        margin: EdgeInsets.only(right: index < totalSets - 1 ? 3 : 0),
+                        decoration: BoxDecoration(
+                          color: isDone
+                              ? AppColors.primary
+                              : (isCurrent
+                                  ? AppColors.primary.withValues(alpha: 0.45)
+                                  : AppColors.surfaceContainerHighest),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+
+                // Autoregulation / Progression tracker note (if present)
+                if (suggestion != null && suggestion.reasoning != null && suggestion.reasoning!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.trending_up, size: 11, color: AppColors.primary),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          suggestion.reasoning!,
+                          style: AppTypography.labelSmall.copyWith(
+                            color: AppColors.primary,
+                            fontSize: 9,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          // 4. COMPLETED SETS SECTION
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'COMPLETED SETS',
+                style: AppTypography.labelSmall.copyWith(
+                  letterSpacing: 1.1,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              if (logs.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${logs.length}',
+                    style: AppTypography.labelSmall.copyWith(
+                      color: AppColors.primary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+
           Expanded(
             child: logsAsync.when(
-              data: (logs) {
-                if (logs.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.fitness_center,
-                          size: 48,
-                          color: AppColors.onSurfaceVariant.withValues(alpha: 0.5),
+              data: (logsList) {
+                if (logsList.isEmpty) {
+                  return const SingleChildScrollView(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.fitness_center_rounded,
+                              size: 28,
+                              color: Color(0x66DBC0C4),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'No completed sets yet.',
+                              style: AppTypography.bodyMedium,
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Adjust weight below and tap Log Set!',
+                              style: AppTypography.labelSmall,
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'No completed sets yet.',
-                          style: AppTypography.bodyMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Adjust weight below and tap Log Set!',
-                          style: AppTypography.labelSmall,
-                        ),
-                      ],
+                      ),
                     ),
                   );
                 }
 
                 return ListView.builder(
-                  itemCount: logs.length,
+                  itemCount: logsList.length,
                   itemBuilder: (context, index) {
-                    final log = logs[index];
+                    final log = logsList[index];
                     return SetLogCard(log: log);
                   },
                 );

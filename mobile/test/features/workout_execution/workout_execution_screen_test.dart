@@ -66,7 +66,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Diagnostics & Network'), findsOneWidget);
-    expect(find.text('Conta RepEngine Web'), findsOneWidget);
+    expect(find.text('RepEngine Web Account'), findsOneWidget);
     await tester.drag(find.byType(ListView).last, const Offset(0, -250));
     await tester.pumpAndSettle();
     expect(find.text('Simulate Gym / Offline Mode'), findsOneWidget);

@@ -1,21 +1,21 @@
 import 'package:flutter/foundation.dart';
 
-/// Status de autenticação do atleta no aplicativo mobile.
+/// Athlete authentication status in the mobile application.
 enum AuthStatus {
-  /// Modo convidado / offline local (utiliza fallback e treinos cacheados).
+  /// Guest mode / local offline (uses fallback and cached routines).
   guest,
 
-  /// Requisição de login em andamento.
+  /// Login request in progress.
   authenticating,
 
-  /// Conectado à conta do RepEngine Web com JWT válido.
+  /// Connected to RepEngine Web account with valid JWT token.
   authenticated,
 
-  /// Falha na autenticação (credenciais inválidas ou erro de rede).
+  /// Authentication failure (invalid credentials or network error).
   error,
 }
 
-/// Estado imutável da sessão do atleta.
+/// Immutable state of the athlete's session.
 @immutable
 class AuthState {
   final AuthStatus status;
@@ -32,7 +32,7 @@ class AuthState {
     this.errorMessage,
   });
 
-  /// Indica se o atleta está autenticado com token JWT válido.
+  /// Indicates whether the athlete is authenticated with a valid JWT token.
   bool get isAuthenticated =>
       status == AuthStatus.authenticated && token != null && token!.isNotEmpty;
 

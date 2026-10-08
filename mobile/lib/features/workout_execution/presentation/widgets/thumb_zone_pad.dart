@@ -322,19 +322,20 @@ class _QuickButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
+      borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
           color: AppColors.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: AppColors.outlineVariant),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.6)),
         ),
         child: Text(
           label,
           style: AppTypography.labelSmall.copyWith(
             color: AppColors.onBackground,
             fontWeight: FontWeight.w700,
+            fontSize: 11,
           ),
         ),
       ),
@@ -357,16 +358,16 @@ class _RpeChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
+      borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.primaryContainer
               : AppColors.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.outlineVariant,
+            color: isSelected ? AppColors.primary : AppColors.outlineVariant.withValues(alpha: 0.5),
           ),
         ),
         child: Text(

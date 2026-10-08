@@ -9,8 +9,8 @@ import '../../workout_execution/controller/workout_execution_controller.dart';
 import '../../workout_execution/data/workout_repository.dart';
 import '../domain/auth_state.dart';
 
-/// Gerenciador de estado de autenticação do atleta, conectando com a conta Web
-/// através do BFF e persistindo a sessão no armazenamento local.
+/// Athlete authentication state manager, connecting to the Web account
+/// through the BFF and persisting the session in local storage.
 class AuthNotifier extends StateNotifier<AuthState> {
   static const _tokenKey = 'repengine_auth_token';
   static const _userIdKey = 'repengine_auth_user_id';
@@ -45,7 +45,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Autentica o atleta utilizando e-mail e senha cadastrados no RepEngine Web.
+  /// Authenticates the athlete using credentials registered on RepEngine Web.
   Future<bool> login({
     required String email,
     required String password,
@@ -54,7 +54,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (cleanEmail.isEmpty || password.isEmpty) {
       state = state.copyWith(
         status: AuthStatus.error,
-        errorMessage: 'Preencha seu e-mail e senha.',
+        errorMessage: 'Please enter your email and password.',
       );
       return false;
     }
@@ -92,7 +92,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         await prefs?.setInt(_userIdKey, userId);
         await prefs?.setString(_emailKey, cleanEmail);
 
-        // Limpa cache de sincronização anterior e reseta seleção de rotina
+        // Clear previous sync cache and reset routine selection
         await ref.read(syncEngineProvider.notifier).clearSyncCache();
         ref.read(selectedRoutineIdProvider.notifier).state = null;
         ref.read(selectedSectionIdProvider.notifier).state = null;
@@ -104,14 +104,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
           email: cleanEmail,
         );
 
-        // Dispara sincronização completa imediata para baixar treinos e blocos reais do Web
+        // Trigger immediate full sync to download routines and blocks from Web
         await ref.read(syncEngineProvider.notifier).syncNow(forceFullSync: true);
 
         return true;
       } else {
         final msg = data['error'] ??
             data['message'] ??
-            'Credenciais inválidas. Verifique seu login.';
+            'Invalid credentials. Please verify your login.';
         state = state.copyWith(
           status: AuthStatus.error,
           errorMessage: msg.toString(),
@@ -121,13 +121,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (e) {
       state = state.copyWith(
         status: AuthStatus.error,
-        errorMessage: 'Não foi possível conectar ao servidor ($e).',
+        errorMessage: 'Could not connect to server ($e).',
       );
       return false;
     }
   }
 
-  /// Encerra a sessão conectada e retorna ao modo convidado/offline local.
+  /// Ends connected session and returns to guest / local offline mode.
   Future<void> logout() async {
     prefs ??= await SharedPreferences.getInstance();
     await prefs?.remove(_tokenKey);
@@ -143,7 +143,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 }
 
-/// Provider global de autenticação do atleta
+/// Global provider for athlete authentication
 final authStateProvider =
     StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   return AuthNotifier(ref);

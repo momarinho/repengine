@@ -107,7 +107,7 @@ class RoutineSelectorView extends ConsumerWidget {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Modo Offline: exibindo rotinas locais. Conecte sua conta Web no menu lateral para carregar seus treinos reais.',
+                          'Offline Mode: showing local routines. Connect your Web account in the side menu to sync your workouts.',
                           style: AppTypography.labelSmall.copyWith(
                             color: AppColors.onSurfaceVariant,
                             fontSize: 11,
@@ -132,7 +132,7 @@ class RoutineSelectorView extends ConsumerWidget {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Conectado à conta Web (${authState.email}) • Rotinas sincronizadas.',
+                          'Connected to Web account (${authState.email}) • Routines synced.',
                           style: AppTypography.labelSmall.copyWith(
                             color: AppColors.success,
                             fontSize: 11,
