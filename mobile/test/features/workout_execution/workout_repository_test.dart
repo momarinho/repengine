@@ -16,36 +16,36 @@ void main() {
     await db.close();
   });
 
-  test('startSession grava sessao e enfileira mutacao atomicamente na outbox', () async {
+  test('startSession saves session and enqueues mutation atomically in outbox', () async {
     final session = await repository.startSession(
       clientId: 'sess-100',
       workflowId: 2,
       sectionId: 'sec_a',
-      sectionTitle: 'Treino A',
+      sectionTitle: 'Workout A',
       startedAt: DateTime.utc(2026, 10, 3, 14),
     );
 
     expect(session.clientId, equals('sess-100'));
     expect(session.status, equals('active'));
 
-    // Verifica se a outbox recebeu o item
+    // Verify outbox received the item
     final queue = await db.select(db.syncQueueTable).get();
     expect(queue, hasLength(1));
     expect(queue.first.entityClientId, equals('sess-100'));
     expect(queue.first.action, equals('CREATE'));
   });
 
-  test('watchActiveSession e watchSessionLogs emitem atualizacoes em tempo real', () async {
-    // 1. Inicia treino
+  test('watchActiveSession and watchSessionLogs emit real-time updates', () async {
+    // 1. Start workout
     await repository.startSession(
       clientId: 'sess-200',
       workflowId: 1,
       sectionId: 'sec_b',
-      sectionTitle: 'Treino B',
+      sectionTitle: 'Workout B',
       startedAt: DateTime.utc(2026, 10, 3, 15),
     );
 
-    // 2. Registra série
+    // 2. Log set
     await repository.logSet(
       clientId: 'log-1',
       sessionClientId: 'sess-200',
@@ -61,7 +61,7 @@ void main() {
       createdAt: DateTime.utc(2026, 10, 3, 15, 5),
     );
 
-    // 3. Testa streams
+    // 3. Test streams
     final active = await repository.watchActiveSession().first;
     expect(active?.clientId, equals('sess-200'));
 
@@ -70,15 +70,15 @@ void main() {
     expect(logs.first.actualLoad, equals('102.5'));
 
     final pending = await repository.watchPendingSyncCount().first;
-    expect(pending, equals(2)); // 1 sessão + 1 série
+    expect(pending, equals(2)); // 1 session + 1 set
   });
 
-  test('completeSession atualiza status e adiciona mutacao UPDATE na outbox', () async {
+  test('completeSession updates status and enqueues UPDATE mutation in outbox', () async {
     await repository.startSession(
       clientId: 'sess-300',
       workflowId: 1,
       sectionId: 'sec_c',
-      sectionTitle: 'Treino C',
+      sectionTitle: 'Workout C',
       startedAt: DateTime.utc(2026, 10, 3, 16),
     );
 
@@ -92,13 +92,13 @@ void main() {
     expect(queue.last.action, equals('UPDATE'));
   });
 
-  test('getSuggestedProgressionForBlock calcula sobrecarga progressiva (+2.5 kg) apos sessao anterior concluida', () async {
-    // 1. Sessão 1 finalizada com 105 kg x 5 reps @ RPE 8.0
+  test('getSuggestedProgressionForBlock calculates progressive overload (+2.5 kg) after previous completed session', () async {
+    // 1. Session 1 finished with 105 kg x 5 reps @ RPE 8.0
     await repository.startSession(
       clientId: 'sess-prev',
       workflowId: 1,
       sectionId: 'sec_1',
-      sectionTitle: 'Treino A',
+      sectionTitle: 'Workout A',
       startedAt: DateTime.utc(2026, 10, 1, 10),
     );
 
@@ -119,27 +119,27 @@ void main() {
 
     await repository.completeSession('sess-prev');
 
-    // 2. Consulta sugestão para o próximo treino (nenhuma sessão ativa)
+    // 2. Query suggestion for next workout (no active session)
     final suggestion = await repository.getSuggestedProgressionForBlock('blk_squat');
 
-    // Meta alcançada com RPE submáximo (8.0): 105.0 + 2.5 = 107.5 kg!
+    // Target reached with submaximal RPE (8.0): 105.0 + 2.5 = 107.5 kg!
     expect(suggestion.load, equals(107.5));
     expect(suggestion.reps, equals(5));
     expect(suggestion.isProgressed, isTrue);
     expect(suggestion.reasoning, contains('107.5 kg'));
   });
 
-  test('getSuggestedProgressionForBlock mantem a carga da serie anterior dentro da mesma sessao ativa', () async {
-    // 1. Sessão ativa atual
+  test('getSuggestedProgressionForBlock maintains load from previous set within same active session', () async {
+    // 1. Current active session
     await repository.startSession(
       clientId: 'sess-now',
       workflowId: 1,
       sectionId: 'sec_1',
-      sectionTitle: 'Treino A',
+      sectionTitle: 'Workout A',
       startedAt: DateTime.utc(2026, 10, 7, 10),
     );
 
-    // 2. Registra série 1 com 110 kg
+    // 2. Log set 1 with 110 kg
     await repository.logSet(
       clientId: 'log-now-1',
       sessionClientId: 'sess-now',
@@ -155,13 +155,13 @@ void main() {
       createdAt: DateTime.utc(2026, 10, 7, 10, 5),
     );
 
-    // 3. Consulta sugestão para a série 2
+    // 3. Query suggestion for set 2
     final suggestion = await repository.getSuggestedProgressionForBlock('blk_squat');
 
-    // Deve herdar 110.0 kg da série 1 (não voltar para 100 kg!)
+    // Should inherit 110.0 kg from set 1
     expect(suggestion.load, equals(110.0));
     expect(suggestion.reps, equals(5));
     expect(suggestion.isProgressed, isFalse);
-    expect(suggestion.reasoning, contains('Mantendo carga da série anterior'));
+    expect(suggestion.reasoning, contains('Maintaining load from previous set'));
   });
 }

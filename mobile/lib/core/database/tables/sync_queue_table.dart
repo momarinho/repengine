@@ -9,7 +9,7 @@ class SyncQueueTable extends Table {
   TextColumn get entityClientId => text()();
   TextColumn get entityType => text()(); // 'session' | 'set_log'
   TextColumn get action => text()();     // 'CREATE' | 'UPDATE'
-  TextColumn get payload => text()();    // JSON serializado
+  TextColumn get payload => text()();    // Serialized JSON
   TextColumn get status => text().withDefault(const Constant('pending'))(); // 'pending' | 'syncing' | 'failed'
   IntColumn get attempts => integer().withDefault(const Constant(0))();
   DateTimeColumn get createdAt => dateTime()();

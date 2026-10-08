@@ -5,7 +5,7 @@ class RoutinesTable extends Table {
   @override
   String get tableName => 'routines';
 
-  // ID vindo do Go Core (PostgreSQL)
+  // ID from Go Core (PostgreSQL)
   IntColumn get id => integer()();
   TextColumn get name => text().withLength(min: 1, max: 255)();
   TextColumn get description => text().withDefault(const Constant(''))();

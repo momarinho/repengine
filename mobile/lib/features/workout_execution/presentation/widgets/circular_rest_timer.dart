@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 
-/// Cronômetro circular de descanso desenhado em Canvas nativo a 120 FPS.
+/// Circular rest timer drawn on native Canvas at 120 FPS.
 class CircularRestTimerWidget extends StatefulWidget {
   final int totalSeconds;
   final VoidCallback onFinished;
@@ -48,7 +48,7 @@ class _CircularRestTimerWidgetState extends State<CircularRestTimerWidget>
         setState(() {
           _remainingSeconds--;
         });
-        // Feedback tátil nos últimos 3 segundos (3, 2, 1)
+        // Haptic feedback during the final 3 seconds (3, 2, 1)
         if (_remainingSeconds <= 3) {
           HapticFeedback.lightImpact();
         }
@@ -103,16 +103,16 @@ class _CircularRestTimerWidgetState extends State<CircularRestTimerWidget>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('TEMPO DE DESCANSO', style: AppTypography.labelLarge),
+              const Text('REST TIMER', style: AppTypography.labelLarge),
               IconButton(
                 icon: const Icon(Icons.close, color: AppColors.onSurfaceVariant),
                 onPressed: widget.onDismissed,
-                tooltip: 'Pular Descanso',
+                tooltip: 'Skip Rest',
               ),
             ],
           ),
           const SizedBox(height: 16),
-          // Canvas circular nativo
+          // Native circular canvas
           SizedBox(
             width: 140,
             height: 140,
@@ -127,7 +127,7 @@ class _CircularRestTimerWidgetState extends State<CircularRestTimerWidget>
             ),
           ),
           const SizedBox(height: 20),
-          // Ações rápidas (+30s / Pular)
+          // Quick actions (+30s / Skip)
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -147,7 +147,7 @@ class _CircularRestTimerWidgetState extends State<CircularRestTimerWidget>
                   backgroundColor: AppColors.surfaceContainerHighest,
                   foregroundColor: AppColors.onBackground,
                 ),
-                child: const Text('Pular'),
+                child: const Text('Skip'),
               ),
             ],
           ),
@@ -167,14 +167,14 @@ class _RestTimerPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2 - 8;
 
-    // Anel de fundo
+    // Background track
     final bgPaint = Paint()
       ..color = AppColors.surfaceContainerLowest
       ..style = PaintingStyle.stroke
       ..strokeWidth = 8;
     canvas.drawCircle(center, radius, bgPaint);
 
-    // Anel de progresso
+    // Progress ring
     final progressPaint = Paint()
       ..color = progress > 0.25 ? AppColors.primary : AppColors.error
       ..style = PaintingStyle.stroke

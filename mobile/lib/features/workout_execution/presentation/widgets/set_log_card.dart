@@ -11,7 +11,7 @@ class SetLogCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Cálculo do 1RM por Consenso Estatístico (repengine_core)
+    // Statistical Consensus 1RM Calculation (repengine_core)
     final actualLoadNum = double.tryParse(log.actualLoad) ?? 0.0;
     final actualRepsNum = int.tryParse(log.actualReps) ?? 0;
     final actualRpeNum = double.tryParse(log.actualRpe);
@@ -39,7 +39,7 @@ class SetLogCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Número do Set
+          // Set number
           Container(
             width: 36,
             height: 36,
@@ -55,7 +55,7 @@ class SetLogCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 14),
-          // Carga x Reps & 1RM
+          // Load x Reps & 1RM
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -85,7 +85,7 @@ class SetLogCard extends StatelessWidget {
               ],
             ),
           ),
-          // Checkmark de conclusão
+          // Completion checkmark
           Container(
             padding: const EdgeInsets.all(4),
             decoration: const BoxDecoration(

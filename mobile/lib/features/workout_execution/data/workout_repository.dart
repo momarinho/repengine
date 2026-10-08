@@ -30,11 +30,11 @@ class WorkoutRepository {
   WorkoutRepository(this._db);
 
   // ==========================================
-  // STREAMS REATIVAS (A UI escuta em tempo real)
+  // REACTIVE STREAMS (Real-time UI listening)
   // ==========================================
 
-  /// Escuta a sessão de treino ativa no momento.
-  /// Se o usuário fechar o app e reabrir, a UI restaura o estado instantaneamente.
+  /// Listens to the currently active workout session.
+  /// If the user closes and reopens the app, the UI immediately restores active state.
   Stream<WorkoutSessionData?> watchActiveSession() {
     return (_db.select(_db.workoutSessionsTable)
           ..where((t) => t.status.equals('active'))
@@ -42,7 +42,7 @@ class WorkoutRepository {
         .watchSingleOrNull();
   }
 
-  /// Escuta todas as séries executadas em uma sessão específica, em ordem de criação.
+  /// Listens to all sets logged for a session in order of completion.
   Stream<List<WorkoutSetLogData>> watchSessionLogs(String sessionClientId) {
     return (_db.select(_db.workoutSetLogsTable)
           ..where((t) => t.sessionClientId.equals(sessionClientId))
@@ -50,8 +50,8 @@ class WorkoutRepository {
         .watch();
   }
 
-  /// Escuta a quantidade de mutações pendentes na fila de sincronização.
-  /// A UI usa isso para mostrar o ícone de nuvem ("3 pendentes" ou "Sincronizado").
+  /// Listens to the count of pending mutations in the sync queue.
+  /// The UI uses this for the sync badge ("3 pending" or "Synced").
   Stream<int> watchPendingSyncCount() {
     final countExp = _db.syncQueueTable.id.count();
     final query = _db.selectOnly(_db.syncQueueTable)
@@ -61,7 +61,7 @@ class WorkoutRepository {
     return query.map((row) => row.read(countExp) ?? 0).watchSingle();
   }
 
-  /// Retorna stream com todos os itens da fila outbox para inspeção e diagnóstico.
+  /// Returns stream of all outbox queue items for inspection and diagnostics.
   Stream<List<SyncQueueData>> watchSyncQueue() {
     return (_db.select(_db.syncQueueTable)
           ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
@@ -69,10 +69,10 @@ class WorkoutRepository {
   }
 
   // ==========================================
-  // OPERAÇÕES ATÔMICAS (Gravação Local + Outbox)
+  // ATOMIC OPERATIONS (Local Storage + Outbox)
   // ==========================================
 
-  /// Inicia uma nova sessão de treino e enfileira para sincronização.
+  /// Starts a new workout session and enqueues for synchronization.
   Future<WorkoutSessionData> startSession({
     required String clientId,
     required int workflowId,
@@ -81,7 +81,7 @@ class WorkoutRepository {
     required DateTime startedAt,
   }) async {
     return _db.transaction(() async {
-      // 1. Grava a sessão localmente no SQLite
+      // 1. Write session locally to SQLite
       final sessionCompanion = WorkoutSessionsTableCompanion.insert(
         clientId: clientId,
         workflowId: workflowId,
@@ -94,7 +94,7 @@ class WorkoutRepository {
       final sessionId =
           await _db.into(_db.workoutSessionsTable).insert(sessionCompanion);
 
-      // 2. Grava a mutação na fila Outbox (sync_queue)
+      // 2. Write mutation to Outbox queue (sync_queue)
       final payload = jsonEncode({
         'client_id': clientId,
         'workflow_id': workflowId,
@@ -120,7 +120,7 @@ class WorkoutRepository {
     });
   }
 
-  /// Registra uma série concluída e enfileira para sincronização.
+  /// Logs a completed set and enqueues for synchronization.
   Future<WorkoutSetLogData> logSet({
     required String clientId,
     required String sessionClientId,
@@ -136,7 +136,7 @@ class WorkoutRepository {
     required DateTime createdAt,
   }) async {
     return _db.transaction(() async {
-      // 1. Salva a série no SQLite local
+      // 1. Save set to local SQLite
       final setCompanion = WorkoutSetLogsTableCompanion.insert(
         clientId: clientId,
         sessionClientId: sessionClientId,
@@ -155,7 +155,7 @@ class WorkoutRepository {
       final logId =
           await _db.into(_db.workoutSetLogsTable).insert(setCompanion);
 
-      // 2. Enfileira mutação atômica na sync_queue
+      // 2. Enqueue atomic mutation to sync_queue
       final payload = jsonEncode({
         'client_id': clientId,
         'session_client_id': sessionClientId,
@@ -187,7 +187,7 @@ class WorkoutRepository {
     });
   }
 
-  /// Finaliza a sessão ativa.
+  /// Completes active workout session.
   Future<void> completeSession(String sessionClientId) async {
     await _db.transaction(() async {
       final now = DateTime.now().toUtc();
@@ -217,14 +217,14 @@ class WorkoutRepository {
     });
   }
 
-  /// Calcula dinamicamente a carga e repetições sugeridas para o próximo set do bloco,
-  /// integrando o histórico local do SQLite com o AutoregulationEngine da repengine_core.
+  /// Dynamically computes recommended load and repetitions for the next set in the block,
+  /// integrating local SQLite history with repengine_core AutoregulationEngine.
   Future<ProgressionSuggestion> getSuggestedProgressionForBlock(
     String blockClientId, {
     double fallbackLoad = 100.0,
     int fallbackReps = 5,
   }) async {
-    // 1. Verifica se já existem séries concluídas nesta sessão ativa
+    // 1. Check if sets were already completed in the current active session
     final activeSession = await (_db.select(_db.workoutSessionsTable)
           ..where((t) => t.status.equals('active'))
           ..limit(1))
@@ -246,13 +246,13 @@ class WorkoutRepository {
         return ProgressionSuggestion(
           load: load,
           reps: reps,
-          reasoning: 'Mantendo carga da série anterior (#${lastSet.setIndex})',
+          reasoning: 'Maintaining load from previous set (#${lastSet.setIndex})',
           isProgressed: false,
         );
       }
     }
 
-    // 2. Se for o início do treino (sem séries ainda), consulta histórico de sessões finalizadas
+    // 2. If at session start (no sets yet), query historical completed sessions
     final allHistoricalLogs = await (_db.select(_db.workoutSetLogsTable)
           ..where((t) =>
               t.blockClientId.equals(blockClientId) &
@@ -270,12 +270,12 @@ class WorkoutRepository {
       return ProgressionSuggestion(
         load: fallbackLoad,
         reps: fallbackReps,
-        reasoning: 'Carga inicial recomendada',
+        reasoning: 'Initial recommended load',
         isProgressed: false,
       );
     }
 
-    // Agrupa as séries da sessão concluída mais recente
+    // Group sets from the most recent completed session
     final lastSessionClientId = pastLogs.first.sessionClientId;
     final lastSessionLogs = pastLogs
         .where((l) => l.sessionClientId == lastSessionClientId)

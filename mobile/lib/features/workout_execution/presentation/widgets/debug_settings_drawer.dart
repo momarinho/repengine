@@ -73,9 +73,9 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Diagnóstico & Rede', style: AppTypography.titleMedium),
+                        Text('Diagnostics & Network', style: AppTypography.titleMedium),
                         Text(
-                          'Sincronização Local (PC ↔ Celular)',
+                          'Local Sync (PC ↔ Mobile)',
                           style: AppTypography.labelSmall.copyWith(color: AppColors.onSurfaceVariant),
                         ),
                       ],
@@ -90,24 +90,24 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
             ),
             const Divider(color: AppColors.outlineVariant, height: 1),
 
-            // Conteúdo Rolável
+            // Scrollable Content
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  // 1. CARD DE STATUS DA CONEXÃO
+                  // 1. CONNECTION STATUS CARD
                   _buildConnectionStatusCard(health),
                   const SizedBox(height: 16),
 
-                  // 2. CONFIGURAÇÃO DE HOST
+                  // 2. HOST CONFIGURATION
                   _buildHostConfigCard(currentHost),
                   const SizedBox(height: 16),
 
-                  // 3. MODO ACADEMIA (SIMULAÇÃO OFFLINE)
+                  // 3. GYM MODE (OFFLINE SIMULATION)
                   _buildOfflineSimulationCard(hostNotifier),
                   const SizedBox(height: 20),
 
-                  // 4. INSPETOR DA FILA DRIFT (SyncQueueTable)
+                  // 4. DRIFT QUEUE INSPECTOR (SyncQueueTable)
                   _buildSyncQueueInspector(syncQueueAsync),
                 ],
               ),
@@ -124,19 +124,19 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
           const Color(0x2298BB6C),
           AppColors.success,
           Icons.check_circle_rounded,
-          'Docker Ativo no PC',
+          'Docker Active on PC',
         ),
       ConnectionStateEnum.offline => (
           const Color(0x22EB6F92),
           AppColors.primary,
           Icons.wifi_off_rounded,
-          'PC Offline / Desconectado',
+          'PC Offline / Disconnected',
         ),
       ConnectionStateEnum.checking => (
           const Color(0x227AA89F),
           AppColors.secondary,
           Icons.sync_rounded,
-          'Verificando conexão...',
+          'Checking connection...',
         ),
     };
 
@@ -165,7 +165,7 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
                     Text(title, style: AppTypography.titleMedium.copyWith(color: badgeColor)),
                     if (health.latencyMs != null)
                       Text(
-                        'Latência: ${health.latencyMs} ms',
+                        'Latency: ${health.latencyMs} ms',
                         style: AppTypography.labelSmall.copyWith(color: AppColors.onSurfaceVariant),
                       ),
                   ],
@@ -225,7 +225,7 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Endereço do PC (Host BFF)', style: AppTypography.labelMedium),
+          Text('PC Address (BFF Host)', style: AppTypography.labelMedium),
           const SizedBox(height: 8),
           TextField(
             controller: _hostController,
@@ -246,27 +246,27 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
               ),
               suffixIcon: IconButton(
                 icon: const Icon(Icons.save, size: 20, color: AppColors.primary),
-                tooltip: 'Salvar Host',
+                tooltip: 'Save Host',
                 onPressed: () async {
                   await ref.read(serverHostProvider.notifier).setHost(_hostController.text);
                   await ref.read(serverHealthProvider.notifier).checkHealth();
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Host salvo com sucesso!')),
+                    const SnackBar(content: Text('Host saved successfully!')),
                   );
                 },
               ),
             ),
           ),
           const SizedBox(height: 10),
-          Text('Atalhos rápidos:', style: AppTypography.labelSmall.copyWith(color: AppColors.onSurfaceVariant)),
+          Text('Quick presets:', style: AppTypography.labelSmall.copyWith(color: AppColors.onSurfaceVariant)),
           const SizedBox(height: 6),
           Wrap(
             spacing: 8,
             runSpacing: 6,
             children: [
               _presetChip('Desktop (localhost)', 'http://localhost:8081'),
-              _presetChip('Emulador (10.0.2.2)', 'http://10.0.2.2:8081'),
+              _presetChip('Emulator (10.0.2.2)', 'http://10.0.2.2:8081'),
             ],
           ),
         ],
@@ -298,9 +298,9 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
       clipBehavior: Clip.antiAlias,
       child: SwitchListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        title: Text('Modo Academia Forçado', style: AppTypography.labelMedium),
+        title: Text('Simulate Gym / Offline Mode', style: AppTypography.labelMedium),
         subtitle: Text(
-          'Simula perda de Wi-Fi e desliga a comunicação de rede para testar autonomia offline.',
+          'Forces offline mode to test local outbox queue and autonomy.',
           style: AppTypography.labelSmall.copyWith(color: AppColors.onSurfaceVariant),
         ),
         value: notifier.simulateOffline,
@@ -321,7 +321,7 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Fila SQLite (SyncQueueTable)', style: AppTypography.labelMedium),
+            Text('SQLite Queue (SyncQueueTable)', style: AppTypography.labelMedium),
             queueAsync.maybeWhen(
               data: (items) => Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -330,7 +330,7 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  '${items.length} pendentes',
+                  '${items.length} pending',
                   style: AppTypography.labelSmall.copyWith(
                     color: items.isEmpty ? AppColors.onSurfaceVariant : AppColors.primary,
                     fontWeight: FontWeight.bold,
@@ -359,11 +359,11 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
                       const Icon(Icons.cloud_done_outlined, size: 28, color: AppColors.success),
                       const SizedBox(height: 6),
                       Text(
-                        'Fila vazia!',
+                        'Queue empty!',
                         style: AppTypography.titleMedium.copyWith(color: AppColors.success),
                       ),
                       Text(
-                        'Nenhuma série ou sessão aguardando envio.',
+                        'No sets or sessions waiting to be pushed.',
                         style: AppTypography.labelSmall.copyWith(color: AppColors.onSurfaceVariant),
                       ),
                     ],
@@ -456,7 +456,7 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, _) => Text('Erro ao ler fila: $err'),
+          error: (err, _) => Text('Error reading queue: $err'),
         ),
       ],
     );

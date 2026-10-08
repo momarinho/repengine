@@ -61,7 +61,7 @@ abstract final class AutoregulationEngine {
     double loadIncrement = 2.5,
   }) {
     if (sessions.isEmpty) {
-      throw ArgumentError('Lista de sessões não pode ser vazia');
+      throw ArgumentError('Session list cannot be empty');
     }
 
     final sorted = List<HistoricalSession>.from(sessions)
@@ -89,41 +89,41 @@ abstract final class AutoregulationEngine {
       recAction = AutoregulationAction.resetCycle;
       recLoad = _round(currentLoad * 0.85, 1);
       reasoning =
-          'Detectadas 3 falhas consecutivas em $exerciseName. '
-          'Resetando ciclo em 15% (para $recLoad kg) para recuperar o sistema nervoso e reconstruir ímpeto.';
+          'Detected 3 consecutive failures in $exerciseName. '
+          'Resetting cycle by 15% (to $recLoad kg) to recover nervous system and rebuild momentum.';
       confidence = 0.95;
     } else if (consecutiveFailures == 2) {
       recAction = AutoregulationAction.deloadIntensity;
       recLoad = _round(currentLoad * 0.90, 1);
       reasoning =
-          'Detectadas 2 sessões estagnadas. Recomenda-se redução de 10% (para $recLoad kg) antes de avançar.';
+          'Detected 2 stagnant sessions. Recommending a 10% reduction (to $recLoad kg) before advancing.';
       confidence = 0.85;
     } else if (consecutiveFailures == 1) {
       recAction = AutoregulationAction.maintainLoad;
       recLoad = currentLoad;
       reasoning =
-          'Reps prescritas não foram alcançadas na última sessão (${lastSession.completedReps}/${lastSession.targetReps}). '
-          'Mantenha a carga para uma nova tentativa.';
+          'Prescribed reps were not reached in the last session (${lastSession.completedReps}/${lastSession.targetReps}). '
+          'Maintain load for another attempt.';
       confidence = 0.80;
     } else {
       if (lastRpe <= 8.5) {
         recAction = AutoregulationAction.increaseLoad;
         recLoad = _round(currentLoad + loadIncrement, 1);
         reasoning =
-            'Meta alcançada com RPE submáximo ($lastRpe). '
-            'Sobrecarga progressiva recomendada: +$loadIncrement kg (meta: $recLoad kg).';
+            'Target reached with submaximal RPE ($lastRpe). '
+            'Progressive overload recommended: +$loadIncrement kg (target: $recLoad kg).';
         confidence = 0.90;
       } else if (lastRpe >= 9.5) {
         recAction = AutoregulationAction.maintainLoad;
         recLoad = currentLoad;
         reasoning =
-            'Todas as repetições foram concluídas, mas o esforço foi no limite absoluto (RPE $lastRpe). '
-            'Consolide na mesma carga antes de subir.';
+            'All reps were completed, but effort was at absolute limit (RPE $lastRpe). '
+            'Consolidate at the current load before increasing.';
         confidence = 0.85;
       } else {
         recAction = AutoregulationAction.increaseLoad;
         recLoad = _round(currentLoad + loadIncrement, 1);
-        reasoning = 'Meta alcançada. Aumente a carga em +$loadIncrement kg.';
+        reasoning = 'Target reached. Increase load by +$loadIncrement kg.';
         confidence = 0.85;
       }
     }

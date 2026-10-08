@@ -33,61 +33,61 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 1. Estado inicial: vazio
-    expect(find.text('Pronto para Treinar?'), findsOneWidget);
-    expect(find.text('INICIAR TREINO A (GZCLP HYBRID)'), findsOneWidget);
+    // 1. Initial empty state
+    expect(find.text('Ready to Train?'), findsOneWidget);
+    expect(find.text('START WORKOUT A (GZCLP HYBRID)'), findsOneWidget);
 
-    // 2. Inicia o treino
-    await tester.tap(find.text('INICIAR TREINO A (GZCLP HYBRID)'));
+    // 2. Start workout
+    await tester.tap(find.text('START WORKOUT A (GZCLP HYBRID)'));
     await tester.pumpAndSettle();
 
-    // 3. Verifica se a tela do HUD ativo apareceu
-    expect(find.text('SESSÃO ATIVA'), findsOneWidget);
-    expect(find.text('Treino A (GZCLP Hybrid)'), findsOneWidget);
-    expect(find.text('Nenhuma série concluída ainda.'), findsOneWidget);
+    // 3. Verify active HUD appeared
+    expect(find.text('ACTIVE SESSION'), findsOneWidget);
+    expect(find.text('Workout A (GZCLP Hybrid)'), findsOneWidget);
+    expect(find.text('No completed sets yet.'), findsOneWidget);
 
-    // 4. Conclui uma série
-    expect(find.text('CONCLUIR SÉRIE (100.0 kg × 5)'), findsOneWidget);
-    await tester.tap(find.text('CONCLUIR SÉRIE (100.0 kg × 5)'));
+    // 4. Complete a set
+    expect(find.text('LOG SET (100.0 kg × 5)'), findsOneWidget);
+    await tester.tap(find.text('LOG SET (100.0 kg × 5)'));
     await tester.pumpAndSettle();
 
-    // 5. Verifica se o card da série foi adicionado na lista e o cronômetro abriu
+    // 5. Verify set log card was added to list and rest timer opened
     expect(find.text('#1'), findsOneWidget);
     expect(find.text('100.0 kg × 5 reps'), findsOneWidget);
-    expect(find.text('TEMPO DE DESCANSO'), findsOneWidget);
+    expect(find.text('REST TIMER'), findsOneWidget);
 
-    // Pula o cronômetro para cancelar o timer periódico
-    await tester.tap(find.byTooltip('Pular Descanso'));
+    // Skip rest timer to cancel periodic ticker
+    await tester.tap(find.byTooltip('Skip Rest'));
     await tester.pumpAndSettle();
 
-    // 6. Abre o DebugSettingsDrawer pelo ícone de ajustes
-    await tester.tap(find.byTooltip('Diagnóstico & Rede'));
+    // 6. Open DebugSettingsDrawer via action icon
+    await tester.tap(find.byTooltip('Diagnostics & Network'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Diagnóstico & Rede'), findsOneWidget);
-    expect(find.text('Endereço do PC (Host BFF)'), findsOneWidget);
-    expect(find.text('Modo Academia Forçado'), findsOneWidget);
-    expect(find.text('Fila SQLite (SyncQueueTable)'), findsOneWidget);
+    expect(find.text('Diagnostics & Network'), findsOneWidget);
+    expect(find.text('PC Address (BFF Host)'), findsOneWidget);
+    expect(find.text('Simulate Gym / Offline Mode'), findsOneWidget);
+    expect(find.text('SQLite Queue (SyncQueueTable)'), findsOneWidget);
 
-    // Fecha o Drawer
+    // Close Drawer
     await tester.tap(find.byIcon(Icons.close));
     await tester.pumpAndSettle();
 
-    // 7. Clica em Finalizar Treino e verifica se o WorkoutSummaryDialog abre
-    await tester.tap(find.text('Finalizar'));
+    // 7. Click Finish and verify WorkoutSummaryDialog opens
+    await tester.tap(find.text('Finish'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Finalizar Sessão?'), findsOneWidget);
-    expect(find.text('VOLUME TOTAL'), findsOneWidget);
-    expect(find.text('SÉRIES / REPS'), findsOneWidget);
+    expect(find.text('Finish Workout?'), findsOneWidget);
+    expect(find.text('TOTAL VOLUME'), findsOneWidget);
+    expect(find.text('SETS / REPS'), findsOneWidget);
     expect(find.text('500 kg'), findsOneWidget); // 100kg x 5 = 500kg
 
-    // Confirma a finalização
-    await tester.tap(find.text('Concluir'));
+    // Confirm completion
+    await tester.tap(find.text('Complete'));
     await tester.pumpAndSettle();
 
-    // 8. Volta para a tela inicial vazia
-    expect(find.text('Pronto para Treinar?'), findsOneWidget);
+    // 8. Return to initial empty state
+    expect(find.text('Ready to Train?'), findsOneWidget);
 
     await db.close();
   });

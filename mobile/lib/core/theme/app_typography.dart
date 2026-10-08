@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
 abstract final class AppTypography {
-  // Títulos principais e displays (ex: Nome do treino, Carga gigante do cronômetro)
+  // Main titles and displays (e.g. Workout name, giant rest timer numbers)
   static const displayLarge = TextStyle(
     fontSize: 40,
     fontWeight: FontWeight.w700,
@@ -25,7 +25,7 @@ abstract final class AppTypography {
     color: AppColors.onBackground,
   );
 
-  // Corpo de texto e descrições
+  // Body text and descriptions
   static const bodyLarge = TextStyle(
     fontSize: 16,
     fontWeight: FontWeight.w400,
@@ -40,7 +40,7 @@ abstract final class AppTypography {
     height: 1.4,
   );
 
-  // Rótulos técnicos (ex: "SET 1", "RPE 8.5", "100.0 KG")
+  // Technical labels (e.g. "SET 1", "RPE 8.5", "100.0 KG")
   static const labelLarge = TextStyle(
     fontSize: 14,
     fontWeight: FontWeight.w700,

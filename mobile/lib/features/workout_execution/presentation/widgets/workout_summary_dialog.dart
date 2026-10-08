@@ -49,7 +49,7 @@ class WorkoutSummaryDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Ícone de Troféu / Conclusão
+            // Trophy / Completion Icon
             Center(
               child: Container(
                 width: 64,
@@ -69,7 +69,7 @@ class WorkoutSummaryDialog extends StatelessWidget {
             const SizedBox(height: 16),
 
             Text(
-              'Finalizar Sessão?',
+              'Finish Workout?',
               style: AppTypography.titleMedium.copyWith(color: AppColors.onSurface),
               textAlign: TextAlign.center,
             ),
@@ -81,7 +81,7 @@ class WorkoutSummaryDialog extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            // Grid de Métricas
+            // Metrics Grid
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -93,7 +93,7 @@ class WorkoutSummaryDialog extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _MetricItem(
-                      label: 'VOLUME TOTAL',
+                      label: 'TOTAL VOLUME',
                       value: '${totalVolume.toStringAsFixed(totalVolume % 1 == 0 ? 0 : 1)} kg',
                       icon: Icons.fitness_center_rounded,
                     ),
@@ -105,7 +105,7 @@ class WorkoutSummaryDialog extends StatelessWidget {
                   ),
                   Expanded(
                     child: _MetricItem(
-                      label: 'SÉRIES / REPS',
+                      label: 'SETS / REPS',
                       value: '$completedSets / $totalReps',
                       icon: Icons.repeat_rounded,
                     ),
@@ -117,7 +117,7 @@ class WorkoutSummaryDialog extends StatelessWidget {
                   ),
                   Expanded(
                     child: _MetricItem(
-                      label: 'DURAÇÃO',
+                      label: 'DURATION',
                       value: durationStr,
                       icon: Icons.timer_rounded,
                     ),
@@ -127,7 +127,7 @@ class WorkoutSummaryDialog extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // Nota sobre persistência offline
+            // Offline persistence notice
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -140,7 +140,7 @@ class WorkoutSummaryDialog extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Tudo gravado localmente no SQLite. Será sincronizado com o PC ao reconectar.',
+                      'Saved locally in SQLite. Will sync with your PC upon reconnection.',
                       style: AppTypography.labelSmall.copyWith(
                         color: AppColors.onSurfaceVariant,
                         height: 1.2,
@@ -152,7 +152,7 @@ class WorkoutSummaryDialog extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            // Botões de Ação
+            // Action Buttons
             Row(
               children: [
                 Expanded(
@@ -166,7 +166,7 @@ class WorkoutSummaryDialog extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text('Continuar Treino'),
+                    child: const Text('Resume Workout'),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -184,7 +184,7 @@ class WorkoutSummaryDialog extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text('Concluir'),
+                    child: const Text('Complete'),
                   ),
                 ),
               ],

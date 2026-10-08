@@ -54,9 +54,9 @@ Este checklist complementa os Sprints do roadmap, rastreando individualmente cad
   - [x] Persistência do host/porta no `shared_preferences` ([`server_config.dart`](file:///home/mateus/Projects/repengine/mobile/lib/core/network/server_config.dart)).
   - [x] Endpoint de health check no BFF sem auth ([`server_mobile/routes/api/v1/health.dart`](file:///home/mateus/Projects/repengine/server_mobile/routes/api/v1/health.dart)) testado e rodando no Docker.
   - [x] Heartbeat automático a cada 15s.
-- [ ] **Cliente HTTP de Sincronização (`SyncHttpClient`)**:
-  - [ ] Despacho em lote para `POST /api/v1/mobile/sync/push`.
-  - [ ] Busca de atualizações em `GET /api/v1/mobile/sync/pull`.
+- [x] **Cliente HTTP de Sincronização (`SyncHttpClient`)**:
+  - [x] Despacho em lote para `POST /api/v1/mobile/sync/push`.
+  - [x] Busca de atualizações em `GET /api/v1/mobile/sync/pull`.
 - [ ] **Worker em Segundo Plano (`SyncEngine`)**:
   - [ ] Monitoramento de conexão via `connectivity_plus`.
   - [ ] Heartbeat periódico no PC.

@@ -2,32 +2,32 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/database/app_database.dart';
 import '../data/workout_repository.dart';
 
-/// Stream da sessão ativa no momento
+/// Stream of currently active workout session
 final activeSessionStreamProvider = StreamProvider<WorkoutSessionData?>((ref) {
   final repo = ref.watch(workoutRepositoryProvider);
   return repo.watchActiveSession();
 });
 
-/// Stream das séries da sessão ativa
+/// Stream of logged sets for active session
 final activeSessionLogsStreamProvider =
     StreamProvider.family<List<WorkoutSetLogData>, String>((ref, sessionId) {
   final repo = ref.watch(workoutRepositoryProvider);
   return repo.watchSessionLogs(sessionId);
 });
 
-/// Stream da quantidade de itens pendentes na outbox
+/// Stream of pending item count in sync outbox
 final pendingSyncCountStreamProvider = StreamProvider<int>((ref) {
   final repo = ref.watch(workoutRepositoryProvider);
   return repo.watchPendingSyncCount();
 });
 
-/// Stream de todos os itens da fila de sincronização (para o Debug Drawer)
+/// Stream of all sync queue items (for Debug Drawer)
 final syncQueueStreamProvider = StreamProvider<List<SyncQueueData>>((ref) {
   final repo = ref.watch(workoutRepositoryProvider);
   return repo.watchSyncQueue();
 });
 
-/// Estado do cronômetro de descanso
+/// Rest timer state
 class RestTimerState {
   final bool isActive;
   final int durationSeconds;
@@ -62,7 +62,7 @@ final restTimerProvider =
   return RestTimerNotifier();
 });
 
-/// Provider reativo que calcula a sugestão de progressão para um bloco de exercício
+/// Reactive provider calculating progression suggestion for an exercise block
 final progressionSuggestionProvider =
     FutureProvider.family<ProgressionSuggestion, ({String blockClientId, int logCount})>(
   (ref, params) async {

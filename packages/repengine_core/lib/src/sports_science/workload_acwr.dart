@@ -114,20 +114,20 @@ abstract final class ACWRCalculator {
 
     if (acwr < 0.8) {
       zone = ACWRZone.undertraining;
-      risk = 'Destreinamento ou carga em declínio.';
-      rec = 'Aumente o volume semanal gradualmente para voltar à zona ideal.';
+      risk = 'Undertraining or declining workload.';
+      rec = 'Gradually increase weekly volume to return to the optimal zone.';
     } else if (acwr <= 1.3) {
       zone = ACWRZone.optimal;
-      risk = 'Sweet Spot: Carga perfeitamente equilibrada com o preparo crônico.';
-      rec = 'Mantenha a sobrecarga linear progressiva.';
+      risk = 'Sweet Spot: Workload is well balanced with chronic fitness.';
+      rec = 'Maintain progressive linear overload.';
     } else if (acwr <= 1.5) {
       zone = ACWRZone.elevatedRisk;
-      risk = 'Risco Elevado: Fadiga acumulando mais rápido que o preparo.';
-      rec = 'Limite incrementos de volume. Priorize sono e nutrição.';
+      risk = 'Elevated Risk: Fatigue accumulating faster than fitness.';
+      rec = 'Limit volume increases. Prioritize sleep and recovery.';
     } else {
       zone = ACWRZone.dangerZone;
-      risk = 'Danger Zone (ACWR > 1.5): Pico excessivo de carga. Risco iminente de lesão.';
-      rec = 'Aplique deload imediato: reduza a intensidade em 10% ou o volume em 40%.';
+      risk = 'Danger Zone (ACWR > 1.5): Excessive workload spike. High injury risk.';
+      rec = 'Apply immediate deload: reduce intensity by 10% or volume by 40%.';
     }
 
     return ACWRResult(

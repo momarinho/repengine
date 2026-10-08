@@ -30,7 +30,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('RepEngine HUD'), findsOneWidget);
-    expect(find.text('Pronto para Treinar?'), findsOneWidget);
+    expect(find.text('Ready to Train?'), findsOneWidget);
 
     // Verify repengine_core can be imported and instantiated inside mobile
     const payload = SyncPushPayload();

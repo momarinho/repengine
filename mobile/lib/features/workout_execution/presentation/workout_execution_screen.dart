@@ -44,7 +44,7 @@ class WorkoutExecutionScreen extends ConsumerWidget {
           Builder(
             builder: (context) => IconButton(
               icon: const Icon(Icons.tune_rounded, size: 20),
-              tooltip: 'Diagnóstico & Rede',
+              tooltip: 'Diagnostics & Network',
               onPressed: () => Scaffold.of(context).openEndDrawer(),
             ),
           ),
@@ -62,7 +62,7 @@ class WorkoutExecutionScreen extends ConsumerWidget {
                   clientId: uniqueId,
                   workflowId: 2,
                   sectionId: 'sec_day1',
-                  sectionTitle: 'Treino A - Agachamento & Supino',
+                  sectionTitle: 'Workout A - Squat & Bench',
                   startedAt: DateTime.now().toUtc(),
                 );
               },
@@ -71,10 +71,10 @@ class WorkoutExecutionScreen extends ConsumerWidget {
 
           return Stack(
             children: [
-              // Visualizador de séries da sessão ativa
+              // Active session sets viewer
               _ActiveSessionContent(sessionClientId: session.clientId),
 
-              // Overlay de cronômetro circular se ativo
+              // Circular rest timer overlay if active
               if (restTimer.isActive)
                 Positioned(
                   top: 20,
@@ -94,7 +94,7 @@ class WorkoutExecutionScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Erro: $err')),
+        error: (err, _) => Center(child: Text('Error: $err')),
       ),
       bottomNavigationBar: activeSessionAsync.maybeWhen(
         data: (session) {
@@ -112,7 +112,7 @@ class WorkoutExecutionScreen extends ConsumerWidget {
             initialLoad: suggestion.load,
             initialReps: suggestion.reps,
             progressionNote: suggestion.reasoning,
-            exerciseName: 'Agachamento Livre',
+            exerciseName: 'Barbell Back Squat',
             onLogSet: (load, reps, rpe) async {
               final repo = ref.read(workoutRepositoryProvider);
               final currentLogs = ref.read(activeSessionLogsStreamProvider(session.clientId)).value ?? [];
@@ -134,7 +134,7 @@ class WorkoutExecutionScreen extends ConsumerWidget {
                 createdAt: DateTime.now().toUtc(),
               );
 
-              // Inicia cronômetro de descanso de 90 segundos automaticamente
+              // Automatically start 90s rest timer
               ref.read(restTimerProvider.notifier).start(seconds: 90);
             },
           );
@@ -166,9 +166,9 @@ class _ActiveSessionContent extends ConsumerWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('SESSÃO ATIVA', style: AppTypography.labelLarge),
+                  const Text('ACTIVE SESSION', style: AppTypography.labelLarge),
                   Text(
-                    'Treino A (GZCLP Hybrid)',
+                    'Workout A (GZCLP Hybrid)',
                     style: AppTypography.titleLarge.copyWith(fontSize: 20),
                   ),
                 ],
@@ -194,7 +194,7 @@ class _ActiveSessionContent extends ConsumerWidget {
                   );
                 },
                 icon: const Icon(Icons.done_all, size: 16),
-                label: const Text('Finalizar'),
+                label: const Text('Finish'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.onBackground,
                   side: const BorderSide(color: AppColors.outlineVariant),
@@ -203,7 +203,7 @@ class _ActiveSessionContent extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 16),
-          const Text('SÉRIES CONCLUÍDAS', style: AppTypography.labelSmall),
+          const Text('COMPLETED SETS', style: AppTypography.labelSmall),
           const SizedBox(height: 8),
           Expanded(
             child: logsAsync.when(
@@ -220,12 +220,12 @@ class _ActiveSessionContent extends ConsumerWidget {
                         ),
                         const SizedBox(height: 12),
                         const Text(
-                          'Nenhuma série concluída ainda.',
+                          'No completed sets yet.',
                           style: AppTypography.bodyMedium,
                         ),
                         const SizedBox(height: 4),
                         const Text(
-                          'Ajuste o peso no painel abaixo e toque em Concluir Série!',
+                          'Adjust weight below and tap Log Set!',
                           style: AppTypography.labelSmall,
                         ),
                       ],
@@ -242,7 +242,7 @@ class _ActiveSessionContent extends ConsumerWidget {
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) => Center(child: Text('Erro: $err')),
+              error: (err, _) => Center(child: Text('Error: $err')),
             ),
           ),
         ],
@@ -279,12 +279,12 @@ class _EmptyWorkoutView extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             const Text(
-              'Pronto para Treinar?',
+              'Ready to Train?',
               style: AppTypography.titleLarge,
             ),
             const SizedBox(height: 8),
             const Text(
-              'O RepEngine HUD grava cada repetição 100% offline no celular, garantindo latência zero na academia.',
+              'RepEngine HUD logs every set 100% offline on your device, ensuring zero latency at the gym.',
               textAlign: TextAlign.center,
               style: AppTypography.bodyMedium,
             ),
@@ -292,7 +292,7 @@ class _EmptyWorkoutView extends StatelessWidget {
             ElevatedButton.icon(
               onPressed: onStart,
               icon: const Icon(Icons.play_arrow),
-              label: const Text('INICIAR TREINO A (GZCLP HYBRID)'),
+              label: const Text('START WORKOUT A (GZCLP HYBRID)'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryContainer,
                 foregroundColor: AppColors.onBackground,
@@ -327,7 +327,7 @@ class _CloudSyncBadge extends StatelessWidget {
           AppColors.secondary,
           AppColors.secondary,
           Icons.sync_rounded,
-          'Testando...',
+          'Connecting...',
         );
       }
       if (health.state == ConnectionStateEnum.offline) {
@@ -337,7 +337,7 @@ class _CloudSyncBadge extends StatelessWidget {
             const Color(0xFFE6C384),
             const Color(0xFFE6C384),
             Icons.offline_bolt_rounded,
-            'Modo Academia ($pendingCount)',
+            'Gym Mode ($pendingCount)',
           );
         }
         return (
@@ -355,7 +355,7 @@ class _CloudSyncBadge extends StatelessWidget {
           AppColors.success,
           AppColors.success,
           Icons.cloud_done_rounded,
-          'Sincronizado',
+          'Synced',
         );
       }
       return (
@@ -363,7 +363,7 @@ class _CloudSyncBadge extends StatelessWidget {
         const Color(0xFFE6C384),
         const Color(0xFFE6C384),
         Icons.cloud_upload_rounded,
-        'Pendente ($pendingCount)',
+        'Pending ($pendingCount)',
       );
     }();
 

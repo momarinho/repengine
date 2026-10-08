@@ -8,7 +8,7 @@ import 'package:repengine_mobile/features/workout_execution/presentation/widgets
 
 void main() {
   group('Sports Science HUD Integration (Sprint 4.1)', () {
-    testWidgets('ThumbZonePad calcula e exibe 1RM Consenso em tempo real com ajuste de RPE', (
+    testWidgets('ThumbZonePad calculates and displays Consensus 1RM in real time with RPE adjustment', (
       WidgetTester tester,
     ) async {
       double? loggedLoad;
@@ -20,7 +20,7 @@ void main() {
           theme: AppTheme.darkTheme,
           home: Scaffold(
             body: ThumbZonePad(
-              exerciseName: 'Supino Reto',
+              exerciseName: 'Bench Press',
               initialLoad: 100.0,
               initialReps: 5,
               initialRpe: 8.0,
@@ -35,15 +35,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 100kg x 5 reps @ RPE 8 -> effective reps = 7 -> 1RM Consenso = 122.5 kg
+      // 100kg x 5 reps @ RPE 8 -> effective reps = 7 -> Consensus 1RM = 122.5 kg
       final expectedInitial = OneRepMaxCalculator.calculate(
-        exerciseName: 'Supino Reto',
+        exerciseName: 'Bench Press',
         load: 100.0,
         reps: 5,
         rpe: 8.0,
       );
       expect(
-        find.text('1RM Consenso: ${expectedInitial.consensus1RM.toStringAsFixed(1)} kg'),
+        find.text('Consensus 1RM: ${expectedInitial.consensus1RM.toStringAsFixed(1)} kg'),
         findsOneWidget,
       );
       expect(
@@ -51,38 +51,39 @@ void main() {
         findsOneWidget,
       );
 
-      // Ajusta carga (+5kg)
+      // Adjust load (+5kg)
       await tester.tap(find.text('+5'));
       await tester.pumpAndSettle();
 
       final expectedAfterLoad = OneRepMaxCalculator.calculate(
-        exerciseName: 'Supino Reto',
+        exerciseName: 'Bench Press',
         load: 105.0,
         reps: 5,
         rpe: 8.0,
       );
       expect(
-        find.text('1RM Consenso: ${expectedAfterLoad.consensus1RM.toStringAsFixed(1)} kg'),
+        find.text('Consensus 1RM: ${expectedAfterLoad.consensus1RM.toStringAsFixed(1)} kg'),
         findsOneWidget,
       );
 
-      // Altera RPE para 10.0
+      // Change RPE to 10.0
       await tester.tap(find.text('10'));
       await tester.pumpAndSettle();
 
       final expectedAfterRpe = OneRepMaxCalculator.calculate(
-        exerciseName: 'Supino Reto',
+        exerciseName: 'Bench Press',
         load: 105.0,
         reps: 5,
         rpe: 10.0,
       );
       expect(
-        find.text('1RM Consenso: ${expectedAfterRpe.consensus1RM.toStringAsFixed(1)} kg'),
+        find.text('Consensus 1RM: ${expectedAfterRpe.consensus1RM.toStringAsFixed(1)} kg'),
         findsOneWidget,
       );
 
-      // Conclui a série e verifica os parâmetros passados
-      await tester.tap(find.text('CONCLUIR SÉRIE (105.0 kg × 5)'));
+      // Log set and verify passed parameters
+      expect(find.text('LOG SET (105.0 kg × 5)'), findsOneWidget);
+      await tester.tap(find.text('LOG SET (105.0 kg × 5)'));
       await tester.pumpAndSettle();
 
       expect(loggedLoad, 105.0);
@@ -90,7 +91,7 @@ void main() {
       expect(loggedRpe, 10.0);
     });
 
-    testWidgets('SetLogCard exibe 1RM por Consenso Científico da repengine_core', (
+    testWidgets('SetLogCard displays 1RM using Scientific Consensus from repengine_core', (
       WidgetTester tester,
     ) async {
       final log = WorkoutSetLogData(

@@ -23,7 +23,7 @@ part 'app_database.g.dart';
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
-  // Construtor usado exclusivamente em testes de unidade (banco SQLite 100% em RAM)
+  // Constructor used exclusively in unit tests (100% in-memory SQLite database)
   AppDatabase.forTesting(super.e);
 
   @override

@@ -43,7 +43,7 @@ class ServerConfigNotifier extends StateNotifier<String> {
     if (kIsWeb) return 'http://localhost:8081';
     try {
       if (Platform.isAndroid) {
-        // No emulador Android, 10.0.2.2 mapeia para o localhost do host PC
+        // On Android emulator, 10.0.2.2 maps to host PC localhost
         return 'http://10.0.2.2:8081';
       }
     } catch (_) {}
@@ -92,7 +92,7 @@ class ServerHealthNotifier extends StateNotifier<ServerConnectionState> {
         ) {
     if (autoStartTimer) {
       checkHealth();
-      // Heartbeat automático a cada 15 segundos
+      // Automatic heartbeat every 15 seconds
       _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) {
         checkHealth();
       });
@@ -110,7 +110,7 @@ class ServerHealthNotifier extends StateNotifier<ServerConnectionState> {
     if (notifier.simulateOffline) {
       state = ServerConnectionState(
         state: ConnectionStateEnum.offline,
-        errorMessage: 'Modo Academia forçado (simulação offline ativa)',
+        errorMessage: 'Forced Gym Mode (offline simulation active)',
         lastCheckedAt: DateTime.now(),
       );
       return state;
@@ -137,7 +137,7 @@ class ServerHealthNotifier extends StateNotifier<ServerConnectionState> {
         return state;
       }
 
-      // Fallback para rota raiz
+      // Fallback to root route
       final rootRes = await http.get(Uri.parse(host)).timeout(const Duration(milliseconds: 2000));
       if (rootRes.statusCode == 200) {
         state = ServerConnectionState(
@@ -150,7 +150,7 @@ class ServerHealthNotifier extends StateNotifier<ServerConnectionState> {
 
       state = ServerConnectionState(
         state: ConnectionStateEnum.offline,
-        errorMessage: 'Código HTTP ${res.statusCode}',
+        errorMessage: 'HTTP status ${res.statusCode}',
         lastCheckedAt: DateTime.now(),
       );
       return state;

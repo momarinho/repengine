@@ -16,7 +16,7 @@ class ThumbZonePad extends StatefulWidget {
     super.key,
     this.initialLoad = 100.0,
     this.initialReps = 5,
-    this.exerciseName = 'Exercício',
+    this.exerciseName = 'Exercise',
     this.initialRpe = 8.0,
     this.progressionNote,
     required this.onLogSet,
@@ -95,7 +95,7 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Tag de Sobrecarga / Recomendação de Progressão
+            // Overload Tag / Progression Recommendation
             if (widget.progressionNote != null) ...[
               Container(
                 margin: const EdgeInsets.only(bottom: 8),
@@ -126,7 +126,7 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
               ),
             ],
 
-            // Pill de estimativa em tempo real com Consenso Científico de 1RM
+            // Real-time estimate pill with Scientific Consensus 1RM
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
@@ -140,7 +140,7 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
                   const Icon(Icons.bolt, size: 16, color: AppColors.primary),
                   const SizedBox(width: 4),
                   Text(
-                    '1RM Consenso: ${result.consensus1RM.toStringAsFixed(1)} kg',
+                    'Consensus 1RM: ${result.consensus1RM.toStringAsFixed(1)} kg',
                     style: AppTypography.labelSmall.copyWith(
                       color: AppColors.primary,
                       fontWeight: FontWeight.w700,
@@ -159,7 +159,7 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
             ),
             const SizedBox(height: 8),
 
-            // Seletor rápido de RPE ergonômico
+            // Ergonomic quick RPE selector
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -187,10 +187,10 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
             ),
             const SizedBox(height: 10),
 
-            // Controles de Carga & Reps lado a lado
+            // Load & Reps side-by-side controls
             Row(
               children: [
-                // Seletor de Carga
+                // Load Selector
                 Expanded(
                   child: Container(
                     padding: const EdgeInsets.all(8),
@@ -200,7 +200,7 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
                     ),
                     child: Column(
                       children: [
-                        const Text('CARGA (KG)', style: AppTypography.labelSmall),
+                        const Text('LOAD (KG)', style: AppTypography.labelSmall),
                         const SizedBox(height: 4),
                         Text(
                           _load.toStringAsFixed(1),
@@ -225,7 +225,7 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
                 ),
                 const SizedBox(width: 12),
 
-                // Seletor de Repetições
+                // Reps Selector
                 Expanded(
                   child: Container(
                     padding: const EdgeInsets.all(8),
@@ -235,7 +235,7 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
                     ),
                     child: Column(
                       children: [
-                        const Text('REPETIÇÕES', style: AppTypography.labelSmall),
+                        const Text('REPS', style: AppTypography.labelSmall),
                         const SizedBox(height: 4),
                         Text(
                           '$_reps',
@@ -258,7 +258,7 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
             ),
             const SizedBox(height: 12),
 
-            // Botão massivo "CONCLUIR SÉRIE"
+            // Main "LOG SET" button
             ElevatedButton(
               onPressed: () {
                 HapticFeedback.mediumImpact();
@@ -278,7 +278,7 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
                   const Icon(Icons.check_circle_outline, size: 22),
                   const SizedBox(width: 8),
                   Text(
-                    'CONCLUIR SÉRIE ($_load kg × $_reps)',
+                    'LOG SET ($_load kg × $_reps)',
                     style: AppTypography.labelLarge.copyWith(
                       color: AppColors.onBackground,
                       fontSize: 16,
