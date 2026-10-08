@@ -147,7 +147,8 @@ class GoCoreClient {
     }
   }
 
-  /// Busca a lista de workflows do usuário no Go Core para sync delta (Pull).
+  /// Busca a lista de workflows do usuário no Go Core para sync delta (Pull),
+  /// hidratando os blocos de cada rotina (exercícios, seções, progressões).
   Future<List<Workflow>> fetchWorkflows(String authHeader) async {
     final url = Uri.parse('$baseUrl/workflows?limit=100');
 
@@ -168,8 +169,77 @@ class GoCoreClient {
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     final list = data['data'] as List<dynamic>? ?? const [];
 
-    return list
+    final basicWorkflows = list
         .map((w) => Workflow.fromJson(w as Map<String, dynamic>))
         .toList();
+
+    // Hidrata os blocos detalhados para cada workflow ativo
+    final hydratedWorkflows = await Future.wait(
+      basicWorkflows.map((w) async {
+        if (w.isDeleted) return w;
+        try {
+          final detailUrl = Uri.parse('$baseUrl/workflows/${w.id}');
+          final detailRes = await _httpClient.get(
+            detailUrl,
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': authHeader,
+            },
+          );
+          if (detailRes.statusCode == 200) {
+            final detailData =
+                jsonDecode(detailRes.body) as Map<String, dynamic>;
+            return Workflow.fromJson(detailData);
+          }
+        } catch (_) {
+          // Mantém o workflow básico caso a chamada individual falhe
+        }
+        return w;
+      }),
+    );
+
+    return hydratedWorkflows;
   }
+
+  /// Autentica o atleta ou treinador no Go Core via e-mail e senha.
+  Future<Map<String, dynamic>> login(String email, String password) async {
+    final url = Uri.parse('$baseUrl/auth/login');
+
+    final response = await _httpClient.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({
+        'email': email,
+        'password': password,
+      }),
+    );
+
+    try {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200) {
+        return data;
+      }
+      final msg = data['error'] ?? data['message'] ?? 'Falha na autenticação';
+      throw GoCoreAuthException(response.statusCode, msg.toString());
+    } on FormatException {
+      throw GoCoreAuthException(
+        response.statusCode,
+        'Resposta inválida do servidor (${response.statusCode})',
+      );
+    }
+  }
+}
+
+/// Exceção para erros de autenticação originados no Go Core.
+class GoCoreAuthException implements Exception {
+  final int statusCode;
+  final String message;
+
+  GoCoreAuthException(this.statusCode, this.message);
+
+  @override
+  String toString() => 'GoCoreAuthException($statusCode): $message';
 }

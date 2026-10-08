@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/server_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../auth/data/auth_repository.dart';
+import '../../../auth/domain/auth_state.dart';
 import '../../../sync/application/sync_engine.dart';
 import '../../controller/workout_execution_controller.dart';
 
@@ -18,18 +20,25 @@ class DebugSettingsDrawer extends ConsumerStatefulWidget {
 
 class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
   late final TextEditingController _hostController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _passwordController;
   bool _isTesting = false;
 
   @override
   void initState() {
     super.initState();
     final currentHost = ref.read(serverHostProvider);
+    final authState = ref.read(authStateProvider);
     _hostController = TextEditingController(text: currentHost);
+    _emailController = TextEditingController(text: authState.email ?? '');
+    _passwordController = TextEditingController();
   }
 
   @override
   void dispose() {
     _hostController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -50,6 +59,7 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
     final hostNotifier = ref.watch(serverHostProvider.notifier);
     final syncQueueAsync = ref.watch(syncQueueStreamProvider);
     final syncState = ref.watch(syncEngineProvider);
+    final authState = ref.watch(authStateProvider);
 
     return Drawer(
       backgroundColor: AppColors.surface,
@@ -101,19 +111,23 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
                   _buildConnectionStatusCard(health),
                   const SizedBox(height: 16),
 
-                  // 2. HOST CONFIGURATION
+                  // 2. ATHLETE ACCOUNT (WEB LOGIN)
+                  _buildAthleteAccountCard(authState, health),
+                  const SizedBox(height: 16),
+
+                  // 3. HOST CONFIGURATION
                   _buildHostConfigCard(currentHost),
                   const SizedBox(height: 16),
 
-                  // 3. GYM MODE (OFFLINE SIMULATION)
+                  // 4. GYM MODE (OFFLINE SIMULATION)
                   _buildOfflineSimulationCard(hostNotifier),
                   const SizedBox(height: 16),
 
-                  // 4. TWO-PHASE SYNC (PUSH & PULL)
+                  // 5. TWO-PHASE SYNC (PUSH & PULL)
                   _buildSyncActionCard(syncState, health),
                   const SizedBox(height: 20),
 
-                  // 5. DRIFT QUEUE INSPECTOR (SyncQueueTable)
+                  // 6. DRIFT QUEUE INSPECTOR (SyncQueueTable)
                   _buildSyncQueueInspector(syncQueueAsync),
                 ],
               ),
@@ -316,6 +330,235 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
               child: Text(
                 health.errorMessage!,
                 style: AppTypography.labelSmall.copyWith(color: AppColors.primaryContainer),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAthleteAccountCard(AuthState authState, ServerConnectionState health) {
+    final isAuthenticated = authState.isAuthenticated;
+    final isAuthenticating = authState.status == AuthStatus.authenticating;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainer,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isAuthenticated
+              ? AppColors.success.withValues(alpha: 0.4)
+              : AppColors.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isAuthenticated ? Icons.account_circle : Icons.account_circle_outlined,
+                color: isAuthenticated ? AppColors.success : AppColors.secondary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              const Text('Conta RepEngine Web', style: AppTypography.labelMedium),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isAuthenticated
+                      ? const Color(0x2298BB6C)
+                      : AppColors.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isAuthenticated ? AppColors.success : AppColors.outlineVariant,
+                    width: 0.8,
+                  ),
+                ),
+                child: Text(
+                  isAuthenticated ? 'Conectado' : 'Convidado / Offline',
+                  style: AppTypography.labelSmall.copyWith(
+                    color: isAuthenticated ? AppColors.success : AppColors.onSurfaceVariant,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (isAuthenticated) ...[
+            Text(
+              'Sessão ativa com acesso às rotinas da plataforma desktop.',
+              style: AppTypography.labelSmall.copyWith(color: AppColors.onSurfaceVariant),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.outlineVariant),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.badge_outlined, size: 16, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      authState.email ?? 'Atleta',
+                      style: AppTypography.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.onSurface,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (authState.userId != null)
+                    Text(
+                      'ID #${authState.userId}',
+                      style: AppTypography.labelSmall.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                        fontSize: 10,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  HapticFeedback.lightImpact();
+                  await ref.read(authStateProvider.notifier).logout();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Desconectado. Aplicativo operando em modo offline.'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.logout, size: 16),
+                label: const Text('Desconectar / Trocar de Conta'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.onSurfaceVariant,
+                  side: const BorderSide(color: AppColors.outlineVariant),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+          ] else ...[
+            Text(
+              'Conecte com seu e-mail e senha cadastrados no Desktop para baixar seus treinos reais.',
+              style: AppTypography.labelSmall.copyWith(color: AppColors.onSurfaceVariant),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              style: AppTypography.bodyMedium,
+              decoration: InputDecoration(
+                isDense: true,
+                filled: true,
+                fillColor: AppColors.surfaceContainerLowest,
+                prefixIcon: const Icon(Icons.email_outlined, size: 18, color: AppColors.onSurfaceVariant),
+                hintText: 'atleta@repengine.com',
+                hintStyle: AppTypography.bodyMedium.copyWith(color: AppColors.outline),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.outlineVariant),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.outlineVariant),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _passwordController,
+              obscureText: true,
+              style: AppTypography.bodyMedium,
+              decoration: InputDecoration(
+                isDense: true,
+                filled: true,
+                fillColor: AppColors.surfaceContainerLowest,
+                prefixIcon: const Icon(Icons.lock_outline, size: 18, color: AppColors.onSurfaceVariant),
+                hintText: 'Sua senha',
+                hintStyle: AppTypography.bodyMedium.copyWith(color: AppColors.outline),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.outlineVariant),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.outlineVariant),
+                ),
+              ),
+            ),
+            if (authState.errorMessage != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerLowest,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  authState.errorMessage!,
+                  style: AppTypography.labelSmall.copyWith(color: AppColors.primary, fontSize: 11),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: isAuthenticating
+                    ? null
+                    : () async {
+                        HapticFeedback.lightImpact();
+                        final success = await ref.read(authStateProvider.notifier).login(
+                              email: _emailController.text,
+                              password: _passwordController.text,
+                            );
+                        if (mounted) {
+                          if (success) {
+                            _passwordController.clear();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Conta conectada! Seus treinos foram sincronizados.'),
+                                backgroundColor: AppColors.success,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                icon: isAuthenticating
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onPrimary),
+                      )
+                    : const Icon(Icons.login, size: 18),
+                label: Text(isAuthenticating ? 'Conectando...' : 'Conectar Conta Web'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.onPrimary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
               ),
             ),
           ],

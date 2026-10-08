@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:repengine_core/repengine_core.dart';
 
 import '../../../../core/network/server_config.dart';
+import '../../auth/data/auth_repository.dart';
 
 /// HTTP client for synchronization between Flutter Mobile and Dart Frog BFF.
 ///
@@ -91,8 +92,13 @@ class SyncHttpClient {
   }
 }
 
-/// Global provider for SyncHttpClient watching dynamic server host
+/// Global provider for SyncHttpClient watching dynamic server host and athlete JWT token
 final syncHttpClientProvider = Provider<SyncHttpClient>((ref) {
   final host = ref.watch(serverHostProvider);
-  return SyncHttpClient(baseUrl: host);
+  final authState = ref.watch(authStateProvider);
+  final token = authState.token ?? 'dev-token';
+  return SyncHttpClient(
+    baseUrl: host,
+    authToken: token,
+  );
 });

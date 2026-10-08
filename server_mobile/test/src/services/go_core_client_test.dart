@@ -107,5 +107,131 @@ void main() {
         expect(result.message, contains('Missing or invalid session_id'));
       },
     );
+
+    test('fetchWorkflows hydrates detailed blocks from /workflows/:id', () async {
+      final now = DateTime.utc(2026, 10, 1, 12);
+      // List response (basic metadata without blocks)
+      when(
+        () => mockHttp.get(
+          Uri.parse('http://api:8080/workflows?limit=100'),
+          headers: any(named: 'headers'),
+        ),
+      ).thenAnswer(
+        (_) async => http.Response(
+          jsonEncode({
+            'data': [
+              {
+                'id': 101,
+                'user_id': 1,
+                'name': 'Upper Body Hypertrophy',
+                'description': 'Chest and back focus',
+                'is_public': false,
+                'created_at': now.toIso8601String(),
+                'updated_at': now.toIso8601String(),
+                'block_count': 2,
+              }
+            ]
+          }),
+          200,
+        ),
+      );
+
+      // Detail response (hydrated with blocks)
+      when(
+        () => mockHttp.get(
+          Uri.parse('http://api:8080/workflows/101'),
+          headers: any(named: 'headers'),
+        ),
+      ).thenAnswer(
+        (_) async => http.Response(
+          jsonEncode({
+            'id': 101,
+            'user_id': 1,
+            'name': 'Upper Body Hypertrophy',
+            'description': 'Chest and back focus',
+            'is_public': false,
+            'created_at': now.toIso8601String(),
+            'updated_at': now.toIso8601String(),
+            'block_count': 2,
+            'blocks': [
+              {
+                'id': 501,
+                'workflow_id': 101,
+                'node_type_slug': 'section',
+                'position': 0,
+                'data': {'title': 'Upper A', 'subtitle': 'Heavy bench and rows'}
+              },
+              {
+                'id': 502,
+                'workflow_id': 101,
+                'node_type_slug': 'exercise',
+                'position': 1,
+                'data': {
+                  'exercise_name': 'Incline Dumbbell Press',
+                  'sets': 4,
+                  'reps': '8-10',
+                  'load': 36.0,
+                  'rest_seconds': 120
+                }
+              }
+            ]
+          }),
+          200,
+        ),
+      );
+
+      final workflows = await client.fetchWorkflows('Bearer token');
+
+      expect(workflows.length, equals(1));
+      expect(workflows.first.id, equals(101));
+      expect(workflows.first.blocks.length, equals(2));
+      expect(workflows.first.blocks.first.nodeTypeSlug, equals('section'));
+      expect(workflows.first.blocks.first.data['title'], equals('Upper A'));
+      expect(workflows.first.blocks.last.data['exercise_name'], equals('Incline Dumbbell Press'));
+    });
+
+    test('login forwards credentials to Go Core /auth/login and returns response', () async {
+      when(
+        () => mockHttp.post(
+          Uri.parse('http://api:8080/auth/login'),
+          headers: any(named: 'headers'),
+          body: any(named: 'body'),
+        ),
+      ).thenAnswer(
+        (_) async => http.Response(
+          jsonEncode({
+            'message': 'logged in',
+            'user_id': 42,
+            'token': 'signed-jwt-token-42',
+          }),
+          200,
+        ),
+      );
+
+      final result = await client.login('athlete@repengine.com', 'secret123');
+
+      expect(result['user_id'], equals(42));
+      expect(result['token'], equals('signed-jwt-token-42'));
+    });
+
+    test('login throws GoCoreAuthException on 401 unauthorized', () async {
+      when(
+        () => mockHttp.post(
+          Uri.parse('http://api:8080/auth/login'),
+          headers: any(named: 'headers'),
+          body: any(named: 'body'),
+        ),
+      ).thenAnswer(
+        (_) async => http.Response(
+          jsonEncode({'error': 'invalid credentials'}),
+          401,
+        ),
+      );
+
+      expect(
+        () => client.login('athlete@repengine.com', 'wrongpassword'),
+        throwsA(isA<GoCoreAuthException>().having((e) => e.statusCode, 'statusCode', 401)),
+      );
+    });
   });
 }

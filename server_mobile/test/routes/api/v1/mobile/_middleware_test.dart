@@ -19,6 +19,22 @@ void main() {
       context = _MockRequestContext();
       request = _MockRequest();
       when(() => context.request).thenReturn(request);
+      when(() => request.uri).thenReturn(Uri.parse('http://localhost/api/v1/mobile/sync/pull'));
+    });
+
+    test('bypasses authentication for /auth/login endpoint', () async {
+      when(() => request.uri).thenReturn(Uri.parse('http://localhost/api/v1/mobile/auth/login'));
+      when(() => request.headers).thenReturn({});
+
+      var handlerInvoked = false;
+      final handler = middleware((ctx) async {
+        handlerInvoked = true;
+        return Response();
+      });
+
+      final response = await handler(context);
+      expect(response.statusCode, equals(HttpStatus.ok));
+      expect(handlerInvoked, isTrue);
     });
 
     test('returns 401 when Authorization header is missing', () async {

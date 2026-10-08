@@ -6,6 +6,11 @@ final _jwtSecret = Platform.environment['JWT_SECRET'] ?? 'dev-secret-key';
 
 Handler middleware(Handler handler) {
   return (context) async {
+    final path = context.request.uri.path;
+    if (path.contains('/auth/login') || path.contains('/auth/register')) {
+      return handler(context);
+    }
+
     final authHeader = context.request.headers['authorization'];
     if (authHeader == null || !authHeader.startsWith('Bearer ')) {
       return Response.json(

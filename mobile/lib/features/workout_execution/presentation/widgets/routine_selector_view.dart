@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../auth/data/auth_repository.dart';
 import '../../controller/workout_execution_controller.dart';
 import '../../domain/routine_model.dart';
 
@@ -21,6 +22,7 @@ class RoutineSelectorView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final routinesAsync = ref.watch(parsedRoutinesStreamProvider);
+    final authState = ref.watch(authStateProvider);
 
     return routinesAsync.when(
       data: (routines) {
@@ -88,7 +90,60 @@ class RoutineSelectorView extends ConsumerWidget {
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+
+              // Web Account Connection Status Banner
+              if (!authState.isAuthenticated) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.outlineVariant),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.cloud_off_rounded, size: 18, color: AppColors.secondary),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Modo Offline: exibindo rotinas locais. Conecte sua conta Web no menu lateral para carregar seus treinos reais.',
+                          style: AppTypography.labelSmall.copyWith(
+                            color: AppColors.onSurfaceVariant,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ] else ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0x1898BB6C),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.cloud_done_rounded, size: 18, color: AppColors.success),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Conectado à conta Web (${authState.email}) • Rotinas sincronizadas.',
+                          style: AppTypography.labelSmall.copyWith(
+                            color: AppColors.success,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
 
               // Routine Selector (if multiple routines exist)
               if (routines.length > 1) ...[

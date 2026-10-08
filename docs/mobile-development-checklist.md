@@ -113,3 +113,23 @@ Este checklist complementa os Sprints do roadmap, rastreando individualmente cad
 - [x] **Esteira de CI/CD em GitHub Actions**:
   - [x] `.github/workflows/ci.yml` estendido com `core-test`, `bff-test`, `mobile-test` e `mobile-build-apk` com compilação e upload de release do APK.
 
+---
+
+## 🔐 6. Sprint 7: Conexão Real com Conta Web & Hidratação de Treinos
+- [x] **Hidratação de Blocos de Rotina (`blocksJson`) no Dart Frog BFF**:
+  - [x] `GoCoreClient.fetchWorkflows()` enriquecendo workflows com chamadas concorrentes a `GET /workflows/:id`.
+  - [x] Entrega de seções e exercícios completos com repetições, carga e descansos no `SyncPullResponse`.
+- [x] **Proxy de Autenticação no Dart Frog BFF**:
+  - [x] `POST /api/v1/mobile/auth/login` conectando com Go Core `POST /auth/login`.
+  - [x] Exceção estruturada `GoCoreAuthException` e bypass de rota pública no `_middleware.dart`.
+- [x] **Gerenciamento de Autenticação & Token no Mobile**:
+  - [x] `AuthState` e `AuthNotifier` ([`auth_repository.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/auth/data/auth_repository.dart)).
+  - [x] Persistência em `SharedPreferences` de token, user ID e email.
+  - [x] Injeção de JWT dinâmico no `SyncHttpClient` e gatilho de sync imediato pós-login.
+- [x] **Interface do Usuário (UI)**:
+  - [x] Card "Conta RepEngine Web" na gaveta de diagnóstico ([`debug_settings_drawer.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/debug_settings_drawer.dart)).
+  - [x] Banner informativo de status offline/conectado no seletor de rotina ([`routine_selector_view.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/routine_selector_view.dart)).
+- [x] **Testes Automatizados**:
+  - [x] Testes no BFF (`go_core_client_test.dart`, `login_test.dart`, `_middleware_test.dart`).
+  - [x] Testes no Mobile (`auth_notifier_test.dart`, `workout_execution_screen_test.dart`).
+

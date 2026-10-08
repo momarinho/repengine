@@ -212,4 +212,29 @@ flowchart TD
 - [x] **Esteira de Integração Contínua (CI/CD) no GitHub Actions**:
   - Pipeline `.github/workflows/ci.yml` estendido com 4 novos jobs: `core-test`, `bff-test`, `mobile-test` e `mobile-build-apk` compilando e publicando o artefato de release do APK.
 
+---
+
+### 🔐 SPRINT 7: Autenticação Real do Atleta & Conexão com Conta Web Desktop
+> **Objetivo**: Conectar o aplicativo mobile à conta real do usuário criada no Desktop Web, substituindo os dados de demonstração offline por treinos, seções e exercícios reais criados na plataforma Web do RepEngine.
+
+- [x] **Hidratação de Blocos de Rotina no Dart Frog BFF (`server_mobile`)**:
+  - `GoCoreClient.fetchWorkflows`: Enriquecimento da listagem básica com chamadas concorrentes a `GET /workflows/:id` para obter todos os blocos estruturados (`blocksJson`).
+  - Blocos de seções (`section`), exercícios (`exercise`), progressões lineares (`linear_progression`) e descansos entregues completos no `SyncPullResponse`.
+- [x] **Proxy de Autenticação no BFF (`server_mobile/routes/api/v1/mobile/auth/login.dart`)**:
+  - Rota `POST /api/v1/mobile/auth/login` repassando credenciais do atleta ao Go Core (`POST /auth/login`).
+  - Middleware atualizado com bypass seguro para endpoints de autenticação pública.
+  - Exceção estruturada `GoCoreAuthException` preservando status codes HTTP 400/401/500 do Go Core.
+- [x] **Gerenciamento de Sessão & Token no Flutter (`features/auth`)**:
+  - `AuthState` e `AuthNotifier` gerenciando status (`guest`, `authenticating`, `authenticated`, `error`).
+  - Persistência segura de `token`, `user_id` e `email` no `SharedPreferences`.
+  - Injeção dinâmica do JWT do atleta autenticado no `SyncHttpClient` (`Authorization: Bearer <token>`).
+  - Disparo de sincronização imediata (`syncNow()`) no momento do login.
+- [x] **Interface do Atleta na Gaveta de Configurações & Seletor de Rotinas**:
+  - Card "Conta RepEngine Web" no `DebugSettingsDrawer` com campos de login, feedback de erro e botão de desconexão.
+  - Banner informativo dinâmico em `RoutineSelectorView` indicando se o app está em modo offline de demonstração ou conectado à conta Web real.
+- [x] **Testes Automatizados**:
+  - 100% de aprovação nos testes do BFF (`go_core_client_test.dart`, `login_test.dart`, `_middleware_test.dart`).
+  - Testes unitários do `AuthNotifier` no Flutter (`auth_notifier_test.dart`).
+  - Zero erros e advertências no `flutter analyze`.
+
 

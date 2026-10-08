@@ -38,6 +38,7 @@ void main() {
     expect(find.text('START WORKOUT A (GZCLP HYBRID)'), findsOneWidget);
 
     // 2. Start workout
+    await tester.ensureVisible(find.text('START WORKOUT A (GZCLP HYBRID)'));
     await tester.tap(find.text('START WORKOUT A (GZCLP HYBRID)'));
     await tester.pumpAndSettle();
 
@@ -65,7 +66,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Diagnostics & Network'), findsOneWidget);
-    expect(find.text('PC Address (BFF Host)'), findsOneWidget);
+    expect(find.text('Conta RepEngine Web'), findsOneWidget);
+    await tester.drag(find.byType(ListView).last, const Offset(0, -250));
+    await tester.pumpAndSettle();
     expect(find.text('Simulate Gym / Offline Mode'), findsOneWidget);
     expect(find.text('Cloud Synchronization'), findsOneWidget);
     await tester.drag(find.byType(ListView).last, const Offset(0, -300));
