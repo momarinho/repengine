@@ -4,6 +4,7 @@ import 'package:meta/meta.dart';
 class WorkoutSetLog {
   final int? id;
   final int? sessionId;
+  final String? sessionClientId;
   final int? workflowBlockId;
   final String blockClientId;
   final String nodeTypeSlug;
@@ -24,6 +25,7 @@ class WorkoutSetLog {
   const WorkoutSetLog({
     this.id,
     this.sessionId,
+    this.sessionClientId,
     this.workflowBlockId,
     required this.blockClientId,
     required this.nodeTypeSlug,
@@ -45,6 +47,7 @@ class WorkoutSetLog {
   Map<String, dynamic> toJson() => {
     if (id != null) 'id': id,
     if (sessionId != null) 'session_id': sessionId,
+    if (sessionClientId != null) 'session_client_id': sessionClientId,
     if (workflowBlockId != null) 'workflow_block_id': workflowBlockId,
     'block_client_id': blockClientId,
     'node_type_slug': nodeTypeSlug,
@@ -67,6 +70,7 @@ class WorkoutSetLog {
     return WorkoutSetLog(
       id: json['id'] as int?,
       sessionId: json['session_id'] as int?,
+      sessionClientId: json['session_client_id'] as String?,
       workflowBlockId: json['workflow_block_id'] as int?,
       blockClientId: json['block_client_id']?.toString() ?? '',
       nodeTypeSlug: json['node_type_slug']?.toString() ?? '',

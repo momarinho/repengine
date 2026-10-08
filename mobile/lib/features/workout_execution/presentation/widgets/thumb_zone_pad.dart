@@ -77,7 +77,7 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
     final result = _oneRmResult;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerHigh,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -95,10 +95,19 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Text(
+              widget.exerciseName.toUpperCase(),
+              style: AppTypography.labelSmall.copyWith(
+                color: AppColors.onSurfaceVariant,
+                letterSpacing: 1.2,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
             // Overload Tag / Progression Recommendation
             if (widget.progressionNote != null) ...[
               Container(
-                margin: const EdgeInsets.only(bottom: 8),
+                margin: const EdgeInsets.only(bottom: 6),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.primaryContainer.withValues(alpha: 0.15),
@@ -134,27 +143,30 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.bolt, size: 16, color: AppColors.primary),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Consensus 1RM: ${result.consensus1RM.toStringAsFixed(1)} kg',
-                    style: AppTypography.labelSmall.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.bolt, size: 16, color: AppColors.primary),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Consensus 1RM: ${result.consensus1RM.toStringAsFixed(1)} kg',
+                      style: AppTypography.labelSmall.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    '(±${result.stdDev.toStringAsFixed(1)} kg)',
-                    style: AppTypography.labelSmall.copyWith(
-                      color: AppColors.onSurfaceVariant,
-                      fontSize: 10,
+                    const SizedBox(width: 6),
+                    Text(
+                      '(±${result.stdDev.toStringAsFixed(1)} kg)',
+                      style: AppTypography.labelSmall.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                        fontSize: 10,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 8),
@@ -185,7 +197,7 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
                   ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
 
             // Load & Reps side-by-side controls
             Row(
@@ -207,17 +219,20 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
                           style: AppTypography.displayLarge.copyWith(fontSize: 28),
                         ),
                         const SizedBox(height: 6),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _QuickButton(label: '-5', onTap: () => _adjustLoad(-5.0)),
-                            const SizedBox(width: 4),
-                            _QuickButton(label: '-2.5', onTap: () => _adjustLoad(-2.5)),
-                            const SizedBox(width: 4),
-                            _QuickButton(label: '+2.5', onTap: () => _adjustLoad(2.5)),
-                            const SizedBox(width: 4),
-                            _QuickButton(label: '+5', onTap: () => _adjustLoad(5.0)),
-                          ],
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _QuickButton(label: '-5', onTap: () => _adjustLoad(-5.0)),
+                              const SizedBox(width: 4),
+                              _QuickButton(label: '-2.5', onTap: () => _adjustLoad(-2.5)),
+                              const SizedBox(width: 4),
+                              _QuickButton(label: '+2.5', onTap: () => _adjustLoad(2.5)),
+                              const SizedBox(width: 4),
+                              _QuickButton(label: '+5', onTap: () => _adjustLoad(5.0)),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -256,7 +271,7 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
 
             // Main "LOG SET" button
             ElevatedButton(
@@ -267,24 +282,27 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryContainer,
                 foregroundColor: AppColors.onBackground,
-                minimumSize: const Size.fromHeight(54),
+                minimumSize: const Size.fromHeight(50),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.check_circle_outline, size: 22),
-                  const SizedBox(width: 8),
-                  Text(
-                    'LOG SET ($_load kg × $_reps)',
-                    style: AppTypography.labelLarge.copyWith(
-                      color: AppColors.onBackground,
-                      fontSize: 16,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.check_circle_outline, size: 22),
+                    const SizedBox(width: 8),
+                    Text(
+                      'LOG SET ($_load kg × $_reps)',
+                      style: AppTypography.labelLarge.copyWith(
+                        color: AppColors.onBackground,
+                        fontSize: 16,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ],

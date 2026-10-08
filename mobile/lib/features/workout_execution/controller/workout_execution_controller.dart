@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/database/app_database.dart';
 import '../data/workout_repository.dart';
+import '../domain/routine_model.dart';
 
 /// Stream of currently active workout session
 final activeSessionStreamProvider = StreamProvider<WorkoutSessionData?>((ref) {
@@ -63,11 +64,37 @@ final restTimerProvider =
 });
 
 /// Reactive provider calculating progression suggestion for an exercise block
-final progressionSuggestionProvider =
-    FutureProvider.family<ProgressionSuggestion, ({String blockClientId, int logCount})>(
+final progressionSuggestionProvider = FutureProvider.family<
+    ProgressionSuggestion,
+    ({String blockClientId, int logCount, double? fallbackLoad, int? fallbackReps})>(
   (ref, params) async {
     final repo = ref.watch(workoutRepositoryProvider);
-    return repo.getSuggestedProgressionForBlock(params.blockClientId);
+    return repo.getSuggestedProgressionForBlock(
+      params.blockClientId,
+      fallbackLoad: params.fallbackLoad ?? 100.0,
+      fallbackReps: params.fallbackReps ?? 5,
+    );
   },
 );
+
+/// Stream of all synced routines parsed with their sections and exercises
+final parsedRoutinesStreamProvider = StreamProvider<List<ParsedRoutine>>((ref) {
+  final repo = ref.watch(workoutRepositoryProvider);
+  return repo.watchRoutines().map((routines) {
+    if (routines.isEmpty) {
+      return [ParsedRoutine.defaultGzclp()];
+    }
+    return routines.map(ParsedRoutine.fromRoutine).toList();
+  });
+});
+
+/// Currently selected routine ID on the dashboard (defaults to first available)
+final selectedRoutineIdProvider = StateProvider<int?>((ref) => null);
+
+/// Currently selected section/day ID on the dashboard
+final selectedSectionIdProvider = StateProvider<String?>((ref) => null);
+
+/// Currently selected exercise index in active workout session
+final activeExerciseIndexProvider = StateProvider<int>((ref) => 0);
+
 

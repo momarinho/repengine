@@ -82,5 +82,70 @@ void main() {
       expect(result.items.first.status, equals(SyncItemStatus.accepted));
       expect(result.items.first.serverId, equals(10));
     });
+
+    test('resolves session_id on set logs from offline session_client_id', () async {
+      when(() => request.method).thenReturn(HttpMethod.post);
+      when(() => request.json()).thenAnswer((_) async => {
+            'sessions': [
+              {
+                'workflow_id': 1,
+                'user_id': 1,
+                'section_id': 'sec_1',
+                'section_title': 'Treino A',
+                'status': 'active',
+                'started_at': '2026-09-29T10:00:00.000Z',
+                'client_id': 'offline-sess-99',
+              }
+            ],
+            'set_logs': [
+              {
+                'session_client_id': 'offline-sess-99',
+                'block_client_id': 'blk_1',
+                'node_type_slug': 'exercise_squat',
+                'set_index': 1,
+                'prescribed_reps': '5',
+                'prescribed_load': '100.0',
+                'actual_reps': '5',
+                'actual_load': '100.0',
+                'actual_rpe': '8.0',
+                'completed': true,
+                'client_id': 'offline-log-99',
+                'created_at': '2026-09-29T10:05:00.000Z',
+              }
+            ],
+          });
+
+      when(() => client.forwardSession(any(), any())).thenAnswer(
+        (_) async => const SyncPushItemStatus(
+          clientId: 'offline-sess-99',
+          status: SyncItemStatus.accepted,
+          serverId: 55,
+        ),
+      );
+
+      WorkoutSetLog? capturedLog;
+      when(() => client.forwardSetLog(any(), any())).thenAnswer((inv) async {
+        capturedLog = inv.positionalArguments[0] as WorkoutSetLog;
+        return const SyncPushItemStatus(
+          clientId: 'offline-log-99',
+          status: SyncItemStatus.accepted,
+          serverId: 101,
+        );
+      });
+
+      final response = await route.onRequest(context);
+
+      expect(response.statusCode, equals(HttpStatus.ok));
+      expect(capturedLog, isNotNull);
+      expect(capturedLog!.sessionId, equals(55));
+      expect(capturedLog!.sessionClientId, equals('offline-sess-99'));
+
+      final body = await response.json() as Map<String, dynamic>;
+      final result = SyncPushResult.fromJson(body);
+      expect(result.items, hasLength(2));
+      expect(result.items.last.clientId, equals('offline-log-99'));
+      expect(result.items.last.status, equals(SyncItemStatus.accepted));
+    });
   });
 }
+

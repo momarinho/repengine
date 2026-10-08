@@ -89,3 +89,27 @@ Este checklist complementa os Sprints do roadmap, rastreando individualmente cad
 - [x] **Descomissionamento do Python**:
   - [x] Remover o contêiner `analytics` do `docker-compose.dev.yml` (economia de ~200MB de RAM).
   - [x] Aposentar pasta `analytics/`.
+
+---
+
+## 🏆 5. Sprint 6: Dashboard de Rotinas/Dias, Resolução de Conflitos, Visual & CI/CD
+- [x] **Seletor Offline de Rotinas e Dias de Treino (`RoutineSelectorView`)**:
+  - [x] Modelo de domínio `ParsedRoutine`, `RoutineSection`, `RoutineExercise` com parser de blocos ([`routine_model.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/domain/routine_model.dart)).
+  - [x] Coluna `blocksJson` no Drift (`RoutinesTable`) para armazenar blocos em JSON offline.
+  - [x] Seletor de rotina e de dias/seções com chips horizontais interativos.
+  - [x] Prévia detalhada de exercícios de cada dia de treino (séries, repetições, carga prescrita e descanso).
+  - [x] Botão dinâmico para iniciar o dia de treino selecionado.
+- [x] **Execução Multiexercício no HUD Ativo**:
+  - [x] Exibição do título dinâmico da seção/dia no cabeçalho do HUD.
+  - [x] Abas/chips horizontais para alternar entre exercícios do treino ativo sem perda de estado.
+  - [x] `ThumbZonePad` responsivo com `FittedBox` exibindo nome do exercício selecionado e sugestão individual de sobrecarga.
+- [x] **Resolução Determinística de Conflitos (Coach vs. Athlete)**:
+  - [x] Teste de integração ponta a ponta ([`deterministic_conflict_resolution_test.dart`](file:///home/mateus/Projects/repengine/mobile/test/features/sync/deterministic_conflict_resolution_test.dart)).
+  - [x] Validação de preservação 100% íntegra dos treinos offline do atleta com `client_id` enquanto o treinador atualiza a rotina no desktop.
+  - [x] Atualização atômica da rotina local no SQLite sem impacto nos registros já concluídos.
+- [x] **Testes de Regressão Visual e Responsividade de Design System**:
+  - [x] Teste de regressão visual ([`hud_visual_test.dart`](file:///home/mateus/Projects/repengine/mobile/test/features/workout_execution/hud_visual_test.dart)) validando tokens Kanagawa, hierarquia visual e touch targets mínimos de 48-54dp.
+  - [x] Responsividade validada para viewports de smartphones compactos a flagships (sem RenderFlex overflow).
+- [x] **Esteira de CI/CD em GitHub Actions**:
+  - [x] `.github/workflows/ci.yml` estendido com `core-test`, `bff-test`, `mobile-test` e `mobile-build-apk` com compilação e upload de release do APK.
+

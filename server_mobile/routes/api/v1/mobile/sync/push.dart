@@ -26,16 +26,47 @@ Future<Response> onRequest(RequestContext context) async {
 
   final payload = SyncPushPayload.fromJson(body);
   final itemsResult = <SyncPushItemStatus>[];
+  final sessionClientToServerId = <String, int>{};
 
   // 4. Processar cada sessão do lote
   for (final session in payload.sessions) {
     final status = await client.forwardSession(session, authHeader);
     itemsResult.add(status);
+    if (status.serverId != null && session.clientId != null) {
+      sessionClientToServerId[session.clientId!] = status.serverId!;
+    }
   }
 
-  // 5. Processar cada série individual do lote
+  // 5. Processar cada série individual do lote (resolvendo session_id offline)
   for (final log in payload.setLogs) {
-    final status = await client.forwardSetLog(log, authHeader);
+    var logToForward = log;
+    if ((log.sessionId == null || log.sessionId! <= 0) &&
+        log.sessionClientId != null &&
+        sessionClientToServerId.containsKey(log.sessionClientId)) {
+      final serverSessionId = sessionClientToServerId[log.sessionClientId]!;
+      logToForward = WorkoutSetLog(
+        id: log.id,
+        sessionId: serverSessionId,
+        sessionClientId: log.sessionClientId,
+        workflowBlockId: log.workflowBlockId,
+        blockClientId: log.blockClientId,
+        nodeTypeSlug: log.nodeTypeSlug,
+        setIndex: log.setIndex,
+        prescribedReps: log.prescribedReps,
+        prescribedLoad: log.prescribedLoad,
+        prescribedIntensity: log.prescribedIntensity,
+        prescribedRpe: log.prescribedRpe,
+        actualReps: log.actualReps,
+        actualLoad: log.actualLoad,
+        actualRpe: log.actualRpe,
+        actualRir: log.actualRir,
+        completed: log.completed,
+        notes: log.notes,
+        clientId: log.clientId,
+        createdAt: log.createdAt,
+      );
+    }
+    final status = await client.forwardSetLog(logToForward, authHeader);
     itemsResult.add(status);
   }
 

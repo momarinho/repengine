@@ -201,6 +201,10 @@ class WorkoutRepository {
         ),
       );
 
+      final existing = await (_db.select(_db.workoutSessionsTable)
+            ..where((t) => t.clientId.equals(sessionClientId)))
+          .getSingleOrNull();
+
       await _db.into(_db.syncQueueTable).insert(
             SyncQueueTableCompanion.insert(
               entityClientId: sessionClientId,
@@ -208,7 +212,11 @@ class WorkoutRepository {
               action: 'UPDATE',
               payload: jsonEncode({
                 'client_id': sessionClientId,
+                'workflow_id': existing?.workflowId ?? 0,
+                'section_id': existing?.sectionId ?? '',
+                'section_title': existing?.sectionTitle ?? '',
                 'status': 'completed',
+                'started_at': existing?.startedAt.toUtc().toIso8601String() ?? now.toIso8601String(),
                 'completed_at': now.toIso8601String(),
               }),
               createdAt: now,
@@ -352,6 +360,7 @@ class WorkoutRepository {
 
     await _db.batch((batch) {
       for (final workflow in workflows) {
+        final blocksJson = jsonEncode(workflow.blocks.map((b) => b.toJson()).toList());
         batch.insert(
           _db.routinesTable,
           RoutinesTableCompanion.insert(
@@ -361,11 +370,20 @@ class WorkoutRepository {
             blockCount: Value(workflow.blockCount),
             isPublic: Value(workflow.isPublic),
             updatedAt: workflow.updatedAt,
+            blocksJson: Value(blocksJson),
           ),
           mode: InsertMode.insertOrReplace,
         );
       }
     });
+  }
+
+  /// Retrieves a routine by ID from local SQLite.
+  Future<Routine?> getRoutineById(int id) {
+    return (_db.select(_db.routinesTable)
+          ..where((t) => t.id.equals(id))
+          ..limit(1))
+        .getSingleOrNull();
   }
 
   /// Removes routines from SQLite that were deleted on the server.

@@ -58,7 +58,9 @@ class WorkoutSession {
       sectionId: json['section_id'] as String? ?? '',
       sectionTitle: json['section_title'] as String? ?? '',
       status: json['status'] as String? ?? 'active',
-      startedAt: DateTime.parse(json['started_at'] as String),
+      startedAt: json['started_at'] != null
+          ? DateTime.parse(json['started_at'] as String)
+          : DateTime.now().toUtc(),
       completedAt: json['completed_at'] != null
           ? DateTime.parse(json['completed_at'] as String)
           : null,

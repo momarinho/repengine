@@ -148,3 +148,112 @@ jobs:
         env:
           CGO_ENABLED: 0
         run: ./scripts/ci/migration-smoke.sh
+
+  core-test:
+    name: RepEngine Core Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/repengine_core
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install dependencies
+        run: dart pub get
+
+      - name: Run Core tests
+        run: dart test
+
+  bff-test:
+    name: Mobile BFF Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server_mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install dependencies
+        run: dart pub get
+
+      - name: Run BFF tests
+        run: dart test
+
+  mobile-test:
+    name: Flutter Mobile Test & Analyze
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze Flutter codebase
+        run: flutter analyze
+
+      - name: Run Flutter tests
+        run: flutter test
+
+  mobile-build-apk:
+    name: Flutter Mobile Build Release APK
+    needs: [mobile-test]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Release APK
+        run: flutter build apk --release
+
+      - name: Upload Release APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: repengine-mobile-release-apk
+          path: mobile/build/app/outputs/flutter-apk/app-release.apk
+

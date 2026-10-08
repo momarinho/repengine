@@ -196,15 +196,20 @@ flowchart TD
 ---
 
 ### 🏆 SPRINT 6 (Fatia Vertical 3): Conflito Real Aluno x Treinador, Golden Tests & CI/CD
-> **Objetivo**: Finalizar o produto com reconciliação determinística de conflitos, cobertura de regressão visual e esteira automatizada de release do APK.
+> **Objetivo**: Finalizar o produto com reconciliação determinística de conflitos, cobertura de regressão visual, seletor offline de rotinas e dias, e esteira automatizada de release do APK.
 
-- [ ] **Resolução Determinística de Conflitos no Dart Frog**:
-  - Cenário concorrente real: Treinador edita no SvelteKit ↔ Aluno conclui série offline.
-  - Regra de negócio: esforço físico do atleta nunca é descartado; rotina é atualizada para a nova versão com aviso amigável.
-- [ ] **Testes Visuais (Golden Tests) & CI/CD**:
-  - Testes visuais automatizados com `alchemist` garantindo layout perfeito em temas escuro/claro e telas pequenas.
-  - Pipeline no GitHub Actions gerando `app-release.apk`.
-- [ ] **README do Portfólio**:
-  - QR Code para download direto do APK.
-  - Demonstração em vídeo lado a lado: Desktop Web x Celular em Modo Avião.
+- [x] **Dashboard de Seleção de Rotinas e Dias/Seções Offline**:
+  - `RoutineSelectorView` renderizando cartões de rotinas sincronizadas e chips horizontais de dias/seções (`RoutineSection`).
+  - Prévia rica de exercícios prescritos (séries, repetições, carga recomendada e tempo de descanso).
+  - Alternância rápida entre exercícios dentro do HUD ativo com atualização reativa do `ThumbZonePad` e cálculo individual de sobrecarga.
+  - Coluna `blocksJson` no Drift (`RoutinesTable`) serializando blocos da rotina em JSON estruturado para execução 100% offline.
+- [x] **Resolução Determinística de Conflitos no Dart Frog & Flutter**:
+  - Cenário concorrente real: Treinador edita no SvelteKit ↔ Aluno conclui série offline na academia.
+  - Regra de negócio comprovada em teste automatizado (`deterministic_conflict_resolution_test.dart`): esforço físico do atleta nunca é descartado; séries locais usam `client_id` e são aceitas; rotina local atualiza atomicamente via delta pull.
+- [x] **Testes de Regressão Visual & Design System Ergômico**:
+  - Testes automatizados em `hud_visual_test.dart` cobrindo tokens da paleta Kanagawa Dark, hierarquia tipográfica e touch targets mínimos de 48-54dp.
+  - Responsividade sem qualquer overflow em resoluções de smartphones compactos a flagships via `FittedBox`.
+- [x] **Esteira de Integração Contínua (CI/CD) no GitHub Actions**:
+  - Pipeline `.github/workflows/ci.yml` estendido com 4 novos jobs: `core-test`, `bff-test`, `mobile-test` e `mobile-build-apk` compilando e publicando o artefato de release do APK.
+
 

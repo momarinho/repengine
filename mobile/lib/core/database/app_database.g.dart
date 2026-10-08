@@ -81,6 +81,18 @@ class $RoutinesTableTable extends RoutinesTable
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _blocksJsonMeta = const VerificationMeta(
+    'blocksJson',
+  );
+  @override
+  late final GeneratedColumn<String> blocksJson = GeneratedColumn<String>(
+    'blocks_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -89,6 +101,7 @@ class $RoutinesTableTable extends RoutinesTable
     blockCount,
     isPublic,
     updatedAt,
+    blocksJson,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -142,6 +155,12 @@ class $RoutinesTableTable extends RoutinesTable
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
     }
+    if (data.containsKey('blocks_json')) {
+      context.handle(
+        _blocksJsonMeta,
+        blocksJson.isAcceptableOrUnknown(data['blocks_json']!, _blocksJsonMeta),
+      );
+    }
     return context;
   }
 
@@ -175,6 +194,10 @@ class $RoutinesTableTable extends RoutinesTable
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
       )!,
+      blocksJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}blocks_json'],
+      )!,
     );
   }
 
@@ -191,6 +214,7 @@ class Routine extends DataClass implements Insertable<Routine> {
   final int blockCount;
   final bool isPublic;
   final DateTime updatedAt;
+  final String blocksJson;
   const Routine({
     required this.id,
     required this.name,
@@ -198,6 +222,7 @@ class Routine extends DataClass implements Insertable<Routine> {
     required this.blockCount,
     required this.isPublic,
     required this.updatedAt,
+    required this.blocksJson,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -208,6 +233,7 @@ class Routine extends DataClass implements Insertable<Routine> {
     map['block_count'] = Variable<int>(blockCount);
     map['is_public'] = Variable<bool>(isPublic);
     map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['blocks_json'] = Variable<String>(blocksJson);
     return map;
   }
 
@@ -219,6 +245,7 @@ class Routine extends DataClass implements Insertable<Routine> {
       blockCount: Value(blockCount),
       isPublic: Value(isPublic),
       updatedAt: Value(updatedAt),
+      blocksJson: Value(blocksJson),
     );
   }
 
@@ -234,6 +261,7 @@ class Routine extends DataClass implements Insertable<Routine> {
       blockCount: serializer.fromJson<int>(json['blockCount']),
       isPublic: serializer.fromJson<bool>(json['isPublic']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      blocksJson: serializer.fromJson<String>(json['blocksJson']),
     );
   }
   @override
@@ -246,6 +274,7 @@ class Routine extends DataClass implements Insertable<Routine> {
       'blockCount': serializer.toJson<int>(blockCount),
       'isPublic': serializer.toJson<bool>(isPublic),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'blocksJson': serializer.toJson<String>(blocksJson),
     };
   }
 
@@ -256,6 +285,7 @@ class Routine extends DataClass implements Insertable<Routine> {
     int? blockCount,
     bool? isPublic,
     DateTime? updatedAt,
+    String? blocksJson,
   }) => Routine(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -263,6 +293,7 @@ class Routine extends DataClass implements Insertable<Routine> {
     blockCount: blockCount ?? this.blockCount,
     isPublic: isPublic ?? this.isPublic,
     updatedAt: updatedAt ?? this.updatedAt,
+    blocksJson: blocksJson ?? this.blocksJson,
   );
   Routine copyWithCompanion(RoutinesTableCompanion data) {
     return Routine(
@@ -276,6 +307,9 @@ class Routine extends DataClass implements Insertable<Routine> {
           : this.blockCount,
       isPublic: data.isPublic.present ? data.isPublic.value : this.isPublic,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      blocksJson: data.blocksJson.present
+          ? data.blocksJson.value
+          : this.blocksJson,
     );
   }
 
@@ -287,14 +321,22 @@ class Routine extends DataClass implements Insertable<Routine> {
           ..write('description: $description, ')
           ..write('blockCount: $blockCount, ')
           ..write('isPublic: $isPublic, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('blocksJson: $blocksJson')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, description, blockCount, isPublic, updatedAt);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    description,
+    blockCount,
+    isPublic,
+    updatedAt,
+    blocksJson,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -304,7 +346,8 @@ class Routine extends DataClass implements Insertable<Routine> {
           other.description == this.description &&
           other.blockCount == this.blockCount &&
           other.isPublic == this.isPublic &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.blocksJson == this.blocksJson);
 }
 
 class RoutinesTableCompanion extends UpdateCompanion<Routine> {
@@ -314,6 +357,7 @@ class RoutinesTableCompanion extends UpdateCompanion<Routine> {
   final Value<int> blockCount;
   final Value<bool> isPublic;
   final Value<DateTime> updatedAt;
+  final Value<String> blocksJson;
   const RoutinesTableCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
@@ -321,6 +365,7 @@ class RoutinesTableCompanion extends UpdateCompanion<Routine> {
     this.blockCount = const Value.absent(),
     this.isPublic = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.blocksJson = const Value.absent(),
   });
   RoutinesTableCompanion.insert({
     this.id = const Value.absent(),
@@ -329,6 +374,7 @@ class RoutinesTableCompanion extends UpdateCompanion<Routine> {
     this.blockCount = const Value.absent(),
     this.isPublic = const Value.absent(),
     required DateTime updatedAt,
+    this.blocksJson = const Value.absent(),
   }) : name = Value(name),
        updatedAt = Value(updatedAt);
   static Insertable<Routine> custom({
@@ -338,6 +384,7 @@ class RoutinesTableCompanion extends UpdateCompanion<Routine> {
     Expression<int>? blockCount,
     Expression<bool>? isPublic,
     Expression<DateTime>? updatedAt,
+    Expression<String>? blocksJson,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -346,6 +393,7 @@ class RoutinesTableCompanion extends UpdateCompanion<Routine> {
       if (blockCount != null) 'block_count': blockCount,
       if (isPublic != null) 'is_public': isPublic,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (blocksJson != null) 'blocks_json': blocksJson,
     });
   }
 
@@ -356,6 +404,7 @@ class RoutinesTableCompanion extends UpdateCompanion<Routine> {
     Value<int>? blockCount,
     Value<bool>? isPublic,
     Value<DateTime>? updatedAt,
+    Value<String>? blocksJson,
   }) {
     return RoutinesTableCompanion(
       id: id ?? this.id,
@@ -364,6 +413,7 @@ class RoutinesTableCompanion extends UpdateCompanion<Routine> {
       blockCount: blockCount ?? this.blockCount,
       isPublic: isPublic ?? this.isPublic,
       updatedAt: updatedAt ?? this.updatedAt,
+      blocksJson: blocksJson ?? this.blocksJson,
     );
   }
 
@@ -388,6 +438,9 @@ class RoutinesTableCompanion extends UpdateCompanion<Routine> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (blocksJson.present) {
+      map['blocks_json'] = Variable<String>(blocksJson.value);
+    }
     return map;
   }
 
@@ -399,7 +452,8 @@ class RoutinesTableCompanion extends UpdateCompanion<Routine> {
           ..write('description: $description, ')
           ..write('blockCount: $blockCount, ')
           ..write('isPublic: $isPublic, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('blocksJson: $blocksJson')
           ..write(')'))
         .toString();
   }
@@ -3152,6 +3206,7 @@ typedef $$RoutinesTableTableCreateCompanionBuilder =
       Value<int> blockCount,
       Value<bool> isPublic,
       required DateTime updatedAt,
+      Value<String> blocksJson,
     });
 typedef $$RoutinesTableTableUpdateCompanionBuilder =
     RoutinesTableCompanion Function({
@@ -3161,6 +3216,7 @@ typedef $$RoutinesTableTableUpdateCompanionBuilder =
       Value<int> blockCount,
       Value<bool> isPublic,
       Value<DateTime> updatedAt,
+      Value<String> blocksJson,
     });
 
 class $$RoutinesTableTableFilterComposer
@@ -3199,6 +3255,11 @@ class $$RoutinesTableTableFilterComposer
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get blocksJson => $composableBuilder(
+    column: $table.blocksJson,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -3241,6 +3302,11 @@ class $$RoutinesTableTableOrderingComposer
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get blocksJson => $composableBuilder(
+    column: $table.blocksJson,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$RoutinesTableTableAnnotationComposer
@@ -3273,6 +3339,11 @@ class $$RoutinesTableTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get blocksJson => $composableBuilder(
+    column: $table.blocksJson,
+    builder: (column) => column,
+  );
 }
 
 class $$RoutinesTableTableTableManager
@@ -3312,6 +3383,7 @@ class $$RoutinesTableTableTableManager
                 Value<int> blockCount = const Value.absent(),
                 Value<bool> isPublic = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> blocksJson = const Value.absent(),
               }) => RoutinesTableCompanion(
                 id: id,
                 name: name,
@@ -3319,6 +3391,7 @@ class $$RoutinesTableTableTableManager
                 blockCount: blockCount,
                 isPublic: isPublic,
                 updatedAt: updatedAt,
+                blocksJson: blocksJson,
               ),
           createCompanionCallback:
               ({
@@ -3328,6 +3401,7 @@ class $$RoutinesTableTableTableManager
                 Value<int> blockCount = const Value.absent(),
                 Value<bool> isPublic = const Value.absent(),
                 required DateTime updatedAt,
+                Value<String> blocksJson = const Value.absent(),
               }) => RoutinesTableCompanion.insert(
                 id: id,
                 name: name,
@@ -3335,6 +3409,7 @@ class $$RoutinesTableTableTableManager
                 blockCount: blockCount,
                 isPublic: isPublic,
                 updatedAt: updatedAt,
+                blocksJson: blocksJson,
               ),
           withReferenceMapper: (p0) => p0
               .map(

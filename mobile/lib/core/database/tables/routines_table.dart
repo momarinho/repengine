@@ -12,6 +12,7 @@ class RoutinesTable extends Table {
   IntColumn get blockCount => integer().withDefault(const Constant(0))();
   BoolColumn get isPublic => boolean().withDefault(const Constant(false))();
   DateTimeColumn get updatedAt => dateTime()();
+  TextColumn get blocksJson => text().withDefault(const Constant('[]'))();
 
   @override
   Set<Column> get primaryKey => {id};

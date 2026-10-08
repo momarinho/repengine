@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/database/app_database.dart';
 import '../../../../core/network/server_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../sync/application/sync_engine.dart';
 import '../controller/workout_execution_controller.dart';
 import '../data/workout_repository.dart';
+import '../domain/routine_model.dart';
 import 'widgets/circular_rest_timer.dart';
 import 'widgets/debug_settings_drawer.dart';
+import 'widgets/routine_selector_view.dart';
 import 'widgets/set_log_card.dart';
 import 'widgets/thumb_zone_pad.dart';
 import 'widgets/workout_summary_dialog.dart';
@@ -57,25 +60,48 @@ class WorkoutExecutionScreen extends ConsumerWidget {
       body: activeSessionAsync.when(
         data: (session) {
           if (session == null) {
-            return _EmptyWorkoutView(
-              onStart: () async {
+            return RoutineSelectorView(
+              onStartWorkout: ({
+                required workflowId,
+                required sectionId,
+                required sectionTitle,
+              }) async {
                 final repo = ref.read(workoutRepositoryProvider);
                 final uniqueId = 'sess-${DateTime.now().millisecondsSinceEpoch}';
+                ref.read(activeExerciseIndexProvider.notifier).state = 0;
                 await repo.startSession(
                   clientId: uniqueId,
-                  workflowId: 2,
-                  sectionId: 'sec_day1',
-                  sectionTitle: 'Workout A - Squat & Bench',
+                  workflowId: workflowId,
+                  sectionId: sectionId,
+                  sectionTitle: sectionTitle,
                   startedAt: DateTime.now().toUtc(),
                 );
               },
             );
           }
 
+          final routines = ref.watch(parsedRoutinesStreamProvider).value ?? [ParsedRoutine.defaultGzclp()];
+          final routine = routines.firstWhere(
+            (r) => r.id == session.workflowId,
+            orElse: () => routines.first,
+          );
+          final section = routine.sections.firstWhere(
+            (s) => s.id == session.sectionId,
+            orElse: () => routine.sections.isNotEmpty ? routine.sections.first : ParsedRoutine.defaultGzclp().sections.first,
+          );
+          final exercises = section.exercises.isNotEmpty
+              ? section.exercises
+              : ParsedRoutine.defaultGzclp().sections.first.exercises;
+          final activeExIndex = ref.watch(activeExerciseIndexProvider).clamp(0, exercises.length - 1);
+
           return Stack(
             children: [
               // Active session sets viewer
-              _ActiveSessionContent(sessionClientId: session.clientId),
+              _ActiveSessionContent(
+                session: session,
+                exercises: exercises,
+                activeExerciseIndex: activeExIndex,
+              ),
 
               // Circular rest timer overlay if active
               if (restTimer.isActive)
@@ -102,20 +128,37 @@ class WorkoutExecutionScreen extends ConsumerWidget {
       bottomNavigationBar: activeSessionAsync.maybeWhen(
         data: (session) {
           if (session == null) return null;
+          final routines = ref.watch(parsedRoutinesStreamProvider).value ?? [ParsedRoutine.defaultGzclp()];
+          final routine = routines.firstWhere(
+            (r) => r.id == session.workflowId,
+            orElse: () => routines.first,
+          );
+          final section = routine.sections.firstWhere(
+            (s) => s.id == session.sectionId,
+            orElse: () => routine.sections.isNotEmpty ? routine.sections.first : ParsedRoutine.defaultGzclp().sections.first,
+          );
+          final exercises = section.exercises.isNotEmpty
+              ? section.exercises
+              : ParsedRoutine.defaultGzclp().sections.first.exercises;
+          final activeExIndex = ref.watch(activeExerciseIndexProvider).clamp(0, exercises.length - 1);
+          final currentExercise = exercises[activeExIndex];
+
           final logs = ref.watch(activeSessionLogsStreamProvider(session.clientId)).value ?? [];
           final suggestion = ref.watch(
             progressionSuggestionProvider((
-              blockClientId: 'blk_squat',
+              blockClientId: currentExercise.blockClientId,
               logCount: logs.length,
+              fallbackLoad: currentExercise.targetLoad,
+              fallbackReps: int.tryParse(currentExercise.reps) ?? 5,
             )),
-          ).value ?? const ProgressionSuggestion(load: 100.0, reps: 5);
+          ).value ?? ProgressionSuggestion(load: currentExercise.targetLoad, reps: int.tryParse(currentExercise.reps) ?? 5);
 
           return ThumbZonePad(
-            key: ValueKey('pad_${session.clientId}_${logs.length}_${suggestion.load}'),
+            key: ValueKey('pad_${session.clientId}_${currentExercise.blockClientId}_${logs.length}_${suggestion.load}'),
             initialLoad: suggestion.load,
             initialReps: suggestion.reps,
             progressionNote: suggestion.reasoning,
-            exerciseName: 'Barbell Back Squat',
+            exerciseName: currentExercise.name,
             onLogSet: (load, reps, rpe) async {
               final repo = ref.read(workoutRepositoryProvider);
               final currentLogs = ref.read(activeSessionLogsStreamProvider(session.clientId)).value ?? [];
@@ -125,8 +168,8 @@ class WorkoutExecutionScreen extends ConsumerWidget {
               await repo.logSet(
                 clientId: logUniqueId,
                 sessionClientId: session.clientId,
-                blockClientId: 'blk_squat',
-                nodeTypeSlug: 'exercise_squat',
+                blockClientId: currentExercise.blockClientId,
+                nodeTypeSlug: currentExercise.nodeTypeSlug,
                 setIndex: nextIndex,
                 prescribedReps: reps.toString(),
                 prescribedLoad: load.toString(),
@@ -137,8 +180,8 @@ class WorkoutExecutionScreen extends ConsumerWidget {
                 createdAt: DateTime.now().toUtc(),
               );
 
-              // Automatically start 90s rest timer
-              ref.read(restTimerProvider.notifier).start(seconds: 90);
+              // Automatically start rest timer for this exercise
+              ref.read(restTimerProvider.notifier).start(seconds: currentExercise.restSeconds);
             },
           );
         },
@@ -149,13 +192,19 @@ class WorkoutExecutionScreen extends ConsumerWidget {
 }
 
 class _ActiveSessionContent extends ConsumerWidget {
-  final String sessionClientId;
+  final WorkoutSessionData session;
+  final List<RoutineExercise> exercises;
+  final int activeExerciseIndex;
 
-  const _ActiveSessionContent({required this.sessionClientId});
+  const _ActiveSessionContent({
+    required this.session,
+    required this.exercises,
+    required this.activeExerciseIndex,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final logsAsync = ref.watch(activeSessionLogsStreamProvider(sessionClientId));
+    final logsAsync = ref.watch(activeSessionLogsStreamProvider(session.clientId));
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -166,22 +215,22 @@ class _ActiveSessionContent extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('ACTIVE SESSION', style: AppTypography.labelLarge),
-                  Text(
-                    'Workout A (GZCLP Hybrid)',
-                    style: AppTypography.titleLarge.copyWith(fontSize: 20),
-                  ),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('ACTIVE SESSION', style: AppTypography.labelLarge),
+                    Text(
+                      session.sectionTitle,
+                      style: AppTypography.titleLarge.copyWith(fontSize: 20),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
               OutlinedButton.icon(
                 onPressed: () {
                   final logs = logsAsync.value ?? [];
-                  final session = ref.read(activeSessionStreamProvider).value;
-                  if (session == null) return;
-
                   showDialog(
                     context: context,
                     builder: (ctx) => WorkoutSummaryDialog(
@@ -190,7 +239,7 @@ class _ActiveSessionContent extends ConsumerWidget {
                       onConfirm: () async {
                         await ref
                             .read(workoutRepositoryProvider)
-                            .completeSession(sessionClientId);
+                            .completeSession(session.clientId);
                         ref.read(restTimerProvider.notifier).stop();
                       },
                     ),
@@ -205,7 +254,38 @@ class _ActiveSessionContent extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+
+          if (exercises.length > 1) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 38,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: exercises.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final ex = exercises[index];
+                  final isSelected = index == activeExerciseIndex;
+                  return ChoiceChip(
+                    label: Text(ex.name),
+                    selected: isSelected,
+                    onSelected: (_) {
+                      ref.read(activeExerciseIndexProvider.notifier).state = index;
+                    },
+                    selectedColor: AppColors.primaryContainer,
+                    backgroundColor: AppColors.surfaceContainer,
+                    labelStyle: TextStyle(
+                      color: isSelected ? AppColors.onBackground : AppColors.onSurfaceVariant,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      fontSize: 12,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 14),
           const Text('COMPLETED SETS', style: AppTypography.labelSmall),
           const SizedBox(height: 8),
           Expanded(
@@ -249,64 +329,6 @@ class _ActiveSessionContent extends ConsumerWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _EmptyWorkoutView extends StatelessWidget {
-  final VoidCallback onStart;
-
-  const _EmptyWorkoutView({required this.onStart});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerHigh,
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.outlineVariant),
-              ),
-              child: const Icon(
-                Icons.bolt,
-                size: 54,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Ready to Train?',
-              style: AppTypography.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'RepEngine HUD logs every set 100% offline on your device, ensuring zero latency at the gym.',
-              textAlign: TextAlign.center,
-              style: AppTypography.bodyMedium,
-            ),
-            const SizedBox(height: 28),
-            ElevatedButton.icon(
-              onPressed: onStart,
-              icon: const Icon(Icons.play_arrow),
-              label: const Text('START WORKOUT A (GZCLP HYBRID)'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryContainer,
-                foregroundColor: AppColors.onBackground,
-                minimumSize: const Size.fromHeight(54),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
