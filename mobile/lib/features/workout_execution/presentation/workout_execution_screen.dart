@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/server_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../sync/application/sync_engine.dart';
 import '../controller/workout_execution_controller.dart';
 import '../data/workout_repository.dart';
 import 'widgets/circular_rest_timer.dart';
@@ -21,6 +22,7 @@ class WorkoutExecutionScreen extends ConsumerWidget {
     final pendingSyncCount = ref.watch(pendingSyncCountStreamProvider).value ?? 0;
     final restTimer = ref.watch(restTimerProvider);
     final health = ref.watch(serverHealthProvider);
+    final syncState = ref.watch(syncEngineProvider);
 
     return Scaffold(
       endDrawer: const DebugSettingsDrawer(),
@@ -38,6 +40,7 @@ class WorkoutExecutionScreen extends ConsumerWidget {
               child: _CloudSyncBadge(
                 health: health,
                 pendingCount: pendingSyncCount,
+                isSyncing: syncState.status == SyncStatus.syncing,
               ),
             ),
           ),
@@ -312,15 +315,26 @@ class _EmptyWorkoutView extends StatelessWidget {
 class _CloudSyncBadge extends StatelessWidget {
   final ServerConnectionState health;
   final int pendingCount;
+  final bool isSyncing;
 
   const _CloudSyncBadge({
     required this.health,
     required this.pendingCount,
+    this.isSyncing = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final (Color bg, Color border, Color text, IconData icon, String label) = () {
+      if (isSyncing) {
+        return (
+          const Color(0x227AA89F),
+          AppColors.secondary,
+          AppColors.secondary,
+          Icons.sync_rounded,
+          'Syncing with PC...',
+        );
+      }
       if (health.state == ConnectionStateEnum.checking) {
         return (
           const Color(0x227AA89F),

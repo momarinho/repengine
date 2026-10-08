@@ -1,5 +1,6 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:repengine_core/repengine_core.dart';
 import 'package:repengine_mobile/core/database/app_database.dart';
 import 'package:repengine_mobile/features/workout_execution/data/workout_repository.dart';
 
@@ -164,4 +165,67 @@ void main() {
     expect(suggestion.isProgressed, isFalse);
     expect(suggestion.reasoning, contains('Maintaining load from previous set'));
   });
+
+  test('upsertWorkflows, deleteWorkflows, watchRoutines, and deleteQueueItemsByClientIds work correctly', () async {
+    final now = DateTime.utc(2026, 10, 8, 10);
+    final workflowA = Workflow(
+      id: 10,
+      userId: 1,
+      name: 'Upper Body A',
+      description: 'Push & Pull',
+      blockCount: 4,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    // 1. Test Upsert (Insert)
+    await repository.upsertWorkflows([workflowA]);
+    var routines = await db.select(db.routinesTable).get();
+    expect(routines, hasLength(1));
+    expect(routines.first.name, equals('Upper Body A'));
+
+    // 2. Test watchRoutines stream
+    final routinesStreamFuture = repository.watchRoutines().first;
+    final streamedRoutines = await routinesStreamFuture;
+    expect(streamedRoutines, hasLength(1));
+    expect(streamedRoutines.first.name, equals('Upper Body A'));
+
+    // 3. Test Upsert (Update existing)
+    final workflowAUpdated = Workflow(
+      id: 10,
+      userId: 1,
+      name: 'Upper Body A (Updated)',
+      description: 'Updated desc',
+      blockCount: 5,
+      createdAt: now,
+      updatedAt: now.add(const Duration(hours: 1)),
+    );
+    await repository.upsertWorkflows([workflowAUpdated]);
+    routines = await db.select(db.routinesTable).get();
+    expect(routines, hasLength(1));
+    expect(routines.first.name, equals('Upper Body A (Updated)'));
+    expect(routines.first.blockCount, equals(5));
+
+    // 4. Test Delete
+    await repository.deleteWorkflows([10]);
+    routines = await db.select(db.routinesTable).get();
+    expect(routines, isEmpty);
+
+    // 5. Test deleteQueueItemsByClientIds
+    await repository.startSession(
+      clientId: 'sess-to-purge',
+      workflowId: 1,
+      sectionId: 'sec_1',
+      sectionTitle: 'Workout A',
+      startedAt: now,
+    );
+    var queue = await db.select(db.syncQueueTable).get();
+    expect(queue, hasLength(1));
+    expect(queue.first.entityClientId, equals('sess-to-purge'));
+
+    await repository.deleteQueueItemsByClientIds(['sess-to-purge']);
+    queue = await db.select(db.syncQueueTable).get();
+    expect(queue, isEmpty);
+  });
 }
+

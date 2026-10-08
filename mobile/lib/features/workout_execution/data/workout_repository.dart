@@ -323,4 +323,56 @@ class WorkoutRepository {
       isProgressed: autoregResult.recommendedLoad > maxLoad,
     );
   }
+
+  // ==========================================
+  // WORKFLOW & SYNC QUEUE OPERATIONS
+  // ==========================================
+
+  /// Listens to all routines saved locally in SQLite in real time.
+  Stream<List<Routine>> watchRoutines() {
+    return (_db.select(_db.routinesTable)
+          ..orderBy([(t) => OrderingTerm.asc(t.name)]))
+        .watch();
+  }
+
+  /// Inserts or updates workflows received from server (Batch Upsert).
+  Future<void> upsertWorkflows(List<Workflow> workflows) async {
+    if (workflows.isEmpty) return;
+
+    await _db.batch((batch) {
+      for (final workflow in workflows) {
+        batch.insert(
+          _db.routinesTable,
+          RoutinesTableCompanion.insert(
+            id: Value(workflow.id),
+            name: workflow.name,
+            description: Value(workflow.description),
+            blockCount: Value(workflow.blockCount),
+            isPublic: Value(workflow.isPublic),
+            updatedAt: workflow.updatedAt,
+          ),
+          mode: InsertMode.insertOrReplace,
+        );
+      }
+    });
+  }
+
+  /// Removes routines from SQLite that were deleted on the server.
+  Future<void> deleteWorkflows(List<int> ids) async {
+    if (ids.isEmpty) return;
+
+    await (_db.delete(_db.routinesTable)
+          ..where((t) => t.id.isIn(ids)))
+        .go();
+  }
+
+  /// Atomically purges confirmed mutations from the sync queue.
+  Future<void> deleteQueueItemsByClientIds(List<String> clientIds) async {
+    if (clientIds.isEmpty) return;
+
+    await (_db.delete(_db.syncQueueTable)
+          ..where((t) => t.entityClientId.isIn(clientIds)))
+        .go();
+  }
 }
+

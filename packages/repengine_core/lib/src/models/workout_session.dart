@@ -53,8 +53,8 @@ class WorkoutSession {
   factory WorkoutSession.fromJson(Map<String, dynamic> json) {
     return WorkoutSession(
       id: json['id'] as int?,
-      workflowId: json['workflow_id'] as int,
-      userId: json['user_id'] as int,
+      workflowId: (json['workflow_id'] as num?)?.toInt() ?? 0,
+      userId: (json['user_id'] as num?)?.toInt() ?? 1,
       sectionId: json['section_id'] as String? ?? '',
       sectionTitle: json['section_title'] as String? ?? '',
       status: json['status'] as String? ?? 'active',

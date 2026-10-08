@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/server_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../sync/application/sync_engine.dart';
 import '../../controller/workout_execution_controller.dart';
 
 class DebugSettingsDrawer extends ConsumerStatefulWidget {
@@ -48,6 +49,7 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
     final currentHost = ref.watch(serverHostProvider);
     final hostNotifier = ref.watch(serverHostProvider.notifier);
     final syncQueueAsync = ref.watch(syncQueueStreamProvider);
+    final syncState = ref.watch(syncEngineProvider);
 
     return Drawer(
       backgroundColor: AppColors.surface,
@@ -105,9 +107,13 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
 
                   // 3. GYM MODE (OFFLINE SIMULATION)
                   _buildOfflineSimulationCard(hostNotifier),
+                  const SizedBox(height: 16),
+
+                  // 4. TWO-PHASE SYNC (PUSH & PULL)
+                  _buildSyncActionCard(syncState, health),
                   const SizedBox(height: 20),
 
-                  // 4. DRIFT QUEUE INSPECTOR (SyncQueueTable)
+                  // 5. DRIFT QUEUE INSPECTOR (SyncQueueTable)
                   _buildSyncQueueInspector(syncQueueAsync),
                 ],
               ),
@@ -116,6 +122,110 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
         ),
       ),
     );
+  }
+
+  Widget _buildSyncActionCard(SyncState syncState, ServerConnectionState health) {
+    final isSyncing = syncState.status == SyncStatus.syncing;
+    final isOnline = health.isOnline;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainer,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.sync_rounded, color: AppColors.primary, size: 20),
+              const SizedBox(width: 8),
+              Text('Cloud Synchronization', style: AppTypography.labelMedium),
+              const Spacer(),
+              if (syncState.lastSyncedAt != null)
+                Text(
+                  'Last: ${_formatTime(syncState.lastSyncedAt!)}',
+                  style: AppTypography.labelSmall.copyWith(color: AppColors.onSurfaceVariant, fontSize: 10),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Pushes offline sets to PC and pulls routines via delta sync.',
+            style: AppTypography.labelSmall.copyWith(color: AppColors.onSurfaceVariant),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: (!isOnline || isSyncing)
+                  ? null
+                  : () async {
+                      HapticFeedback.lightImpact();
+                      final success = await ref.read(syncEngineProvider.notifier).syncNow();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              success ? 'Sync completed successfully!' : 'Sync failed. Check connection.',
+                            ),
+                            backgroundColor: success ? AppColors.success : AppColors.primary,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
+              icon: isSyncing
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onPrimary),
+                    )
+                  : const Icon(Icons.cloud_sync_rounded, size: 18),
+              label: Text(
+                isSyncing
+                    ? 'Syncing with PC...'
+                    : (!isOnline ? 'Offline (Cannot Sync)' : 'Sync Now (Push & Pull)'),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.onPrimary,
+                disabledBackgroundColor: AppColors.surfaceContainerHigh,
+                disabledForegroundColor: AppColors.outline,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+          if (syncState.errorMessage != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+              ),
+              child: Text(
+                syncState.errorMessage!,
+                style: AppTypography.labelSmall.copyWith(color: AppColors.primary, fontSize: 10),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _formatTime(DateTime dt) {
+    final local = dt.toLocal();
+    final h = local.hour.toString().padLeft(2, '0');
+    final m = local.minute.toString().padLeft(2, '0');
+    final s = local.second.toString().padLeft(2, '0');
+    return '$h:$m:$s';
   }
 
   Widget _buildConnectionStatusCard(ServerConnectionState health) {

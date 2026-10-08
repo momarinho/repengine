@@ -67,6 +67,9 @@ void main() {
     expect(find.text('Diagnostics & Network'), findsOneWidget);
     expect(find.text('PC Address (BFF Host)'), findsOneWidget);
     expect(find.text('Simulate Gym / Offline Mode'), findsOneWidget);
+    expect(find.text('Cloud Synchronization'), findsOneWidget);
+    await tester.drag(find.byType(ListView).last, const Offset(0, -300));
+    await tester.pumpAndSettle();
     expect(find.text('SQLite Queue (SyncQueueTable)'), findsOneWidget);
 
     // Close Drawer

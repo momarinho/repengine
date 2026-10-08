@@ -29,7 +29,7 @@ Este checklist complementa os Sprints do roadmap, rastreando individualmente cad
   - [x] Botão "Testar Conexão" com medição de ping/latência em tempo real.
   - [x] Switch "Simular Modo Academia (Offline)" para testes manuais.
   - [x] Inspetor da Fila de Sincronização (`SyncQueueTable`) com visualização de mutações pendentes.
-  - [ ] Botão "Sincronizar Agora" (Pull & Push manual).
+  - [x] Botão "Sincronizar Agora" (Pull & Push manual).
 
 ---
 
@@ -46,6 +46,7 @@ Este checklist complementa os Sprints do roadmap, rastreando individualmente cad
   - [x] `completeSession()` finalizando o treino e enfileirando sync.
   - [x] Streams reativos (`watchActiveSession`, `watchSessionLogs`, `watchPendingSyncCount`).
   - [x] Stream de inspeção da fila (`watchSyncQueue`).
+  - [x] Operações de rotinas e outbox (`watchRoutines`, `upsertWorkflows`, `deleteWorkflows`, `deleteQueueItemsByClientIds`).
 
 ---
 
@@ -57,11 +58,11 @@ Este checklist complementa os Sprints do roadmap, rastreando individualmente cad
 - [x] **Cliente HTTP de Sincronização (`SyncHttpClient`)**:
   - [x] Despacho em lote para `POST /api/v1/mobile/sync/push`.
   - [x] Busca de atualizações em `GET /api/v1/mobile/sync/pull`.
-- [ ] **Worker em Segundo Plano (`SyncEngine`)**:
-  - [ ] Monitoramento de conexão via `connectivity_plus`.
-  - [ ] Heartbeat periódico no PC.
-  - [ ] Auto-sync ao reconectar no Wi-Fi / ligar o Docker.
-  - [ ] Expulso atômico dos itens confirmados da `SyncQueueTable`.
+- [x] **Worker em Segundo Plano (`SyncEngine`)**:
+  - [x] Orquestrador de duas fases: Push de mutações locais -> Pull delta de rotinas.
+  - [x] Expulso atômico dos itens confirmados da `SyncQueueTable` via `deleteQueueItemsByClientIds`.
+  - [x] Integração reativa com badge na AppBar (`_CloudSyncBadge`) e drawer (`DebugSettingsDrawer`).
+  - [ ] Monitoramento automático de conectividade via `connectivity_plus`.
 
 ---
 
