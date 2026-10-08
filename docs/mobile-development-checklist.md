@@ -30,6 +30,8 @@ Este checklist complementa os Sprints do roadmap, rastreando individualmente cad
   - [x] 🔵 `Sincronizando com o PC...` (envio em andamento).
   - [x] ⚪ `PC Offline` (Docker inativo ou celular fora do Wi-Fi).
 - [x] **Gaveta de Ajustes & Diagnóstico (Debug Drawer)**:
+  - [x] Detecção Automática do Host BFF (`HostDiscoveryService` com probe paralelo na sub-rede local e validação da assinatura `repengine_mobile_bff`).
+  - [x] Botão "Auto-Detect PC (Wi-Fi)" com feedback dinâmico e reconexão silenciosa no startup/queda.
   - [x] Campo editável para IP do PC com botões de atalho (`localhost`, `10.0.2.2`).
   - [x] Botão "Testar Conexão" com medição de ping/latência em tempo real.
   - [x] Switch "Simular Modo Academia (Offline)" para testes manuais.

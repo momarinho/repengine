@@ -23,6 +23,7 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
   late final TextEditingController _emailController;
   late final TextEditingController _passwordController;
   bool _isTesting = false;
+  bool _isScanning = false;
 
   @override
   void initState() {
@@ -50,6 +51,35 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
     if (mounted) {
       setState(() => _isTesting = false);
     }
+  }
+
+  Future<void> _autoDetectHost() async {
+    setState(() => _isScanning = true);
+    HapticFeedback.lightImpact();
+    ref.read(serverHealthProvider.notifier).resetAutoDiscoveryAttempt();
+    final found = await ref.read(serverHostProvider.notifier).autoDiscover();
+    if (!mounted) return;
+
+    if (found != null) {
+      _hostController.text = found;
+      await ref.read(serverHealthProvider.notifier).checkHealth();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('RepEngine PC detected at $found!'),
+          backgroundColor: AppColors.success,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No RepEngine PC found on Wi-Fi. Ensure Docker is running on port 8081.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+    setState(() => _isScanning = false);
   }
 
   @override
@@ -342,6 +372,30 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
               ),
             ),
           ],
+          if (health.state == ConnectionStateEnum.offline) ...[
+            const SizedBox(height: 8),
+            InkWell(
+              borderRadius: BorderRadius.circular(6),
+              onTap: _isScanning ? null : _autoDetectHost,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.radar_rounded, size: 14, color: AppColors.primary),
+                    const SizedBox(width: 4),
+                    Text(
+                      _isScanning ? 'Scanning local network...' : 'Auto-detect PC on Wi-Fi',
+                      style: AppTypography.labelSmall.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -621,6 +675,27 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
             ),
           ),
           const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton.icon(
+              onPressed: _isScanning ? null : _autoDetectHost,
+              icon: _isScanning
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onPrimary),
+                    )
+                  : const Icon(Icons.radar_rounded, size: 18),
+              label: Text(_isScanning ? 'Scanning local Wi-Fi...' : 'Auto-Detect PC (Wi-Fi)'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryContainer,
+                foregroundColor: AppColors.onBackground,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
           Text('Quick presets:', style: AppTypography.labelSmall.copyWith(color: AppColors.onSurfaceVariant)),
           const SizedBox(height: 6),
           Wrap(

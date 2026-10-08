@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'host_discovery_service.dart';
 
 enum ConnectionStateEnum {
   online,
@@ -31,11 +32,12 @@ class ServerConnectionState {
 class ServerConfigNotifier extends StateNotifier<String> {
   static const _hostKey = 'repengine_server_host';
   static const _simulateOfflineKey = 'repengine_simulate_offline';
+  final Ref? _ref;
 
   bool _simulateOffline = false;
   bool get simulateOffline => _simulateOffline;
 
-  ServerConfigNotifier() : super(_defaultHost()) {
+  ServerConfigNotifier([this._ref]) : super(_defaultHost()) {
     _loadFromPrefs();
   }
 
@@ -68,6 +70,16 @@ class ServerConfigNotifier extends StateNotifier<String> {
     await prefs.setString(_hostKey, cleaned);
   }
 
+  /// Automatically scans local LAN / Wi-Fi to locate the RepEngine Mobile BFF host.
+  Future<String?> autoDiscover({bool save = true}) async {
+    final discoveryService = _ref?.read(hostDiscoveryServiceProvider) ?? HostDiscoveryService();
+    final discovered = await discoveryService.discoverBffHost();
+    if (discovered != null && save) {
+      await setHost(discovered);
+    }
+    return discovered;
+  }
+
   Future<void> setSimulateOffline(bool offline) async {
     _simulateOffline = offline;
     final prefs = await SharedPreferences.getInstance();
@@ -76,12 +88,13 @@ class ServerConfigNotifier extends StateNotifier<String> {
 }
 
 final serverHostProvider = StateNotifierProvider<ServerConfigNotifier, String>((ref) {
-  return ServerConfigNotifier();
+  return ServerConfigNotifier(ref);
 });
 
 class ServerHealthNotifier extends StateNotifier<ServerConnectionState> {
   final Ref _ref;
   Timer? _heartbeatTimer;
+  bool _hasAttemptedAutoDiscovery = false;
 
   ServerHealthNotifier(this._ref, {bool autoStartTimer = true})
       : super(
@@ -91,7 +104,7 @@ class ServerHealthNotifier extends StateNotifier<ServerConnectionState> {
           ),
         ) {
     if (autoStartTimer) {
-      checkHealth();
+      checkHealth(allowAutoDiscover: true);
       // Automatic heartbeat every 15 seconds
       _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) {
         checkHealth();
@@ -105,7 +118,11 @@ class ServerHealthNotifier extends StateNotifier<ServerConnectionState> {
     super.dispose();
   }
 
-  Future<ServerConnectionState> checkHealth() async {
+  void resetAutoDiscoveryAttempt() {
+    _hasAttemptedAutoDiscovery = false;
+  }
+
+  Future<ServerConnectionState> checkHealth({bool allowAutoDiscover = false}) async {
     final notifier = _ref.read(serverHostProvider.notifier);
     if (notifier.simulateOffline) {
       state = ServerConnectionState(
@@ -148,6 +165,15 @@ class ServerHealthNotifier extends StateNotifier<ServerConnectionState> {
         return state;
       }
 
+      // If initial check failed, trigger auto-discovery on startup / on-demand if not attempted yet
+      if (allowAutoDiscover && !_hasAttemptedAutoDiscovery) {
+        _hasAttemptedAutoDiscovery = true;
+        final discovered = await notifier.autoDiscover();
+        if (discovered != null && discovered != host) {
+          return await checkHealth(allowAutoDiscover: false);
+        }
+      }
+
       state = ServerConnectionState(
         state: ConnectionStateEnum.offline,
         errorMessage: 'HTTP status ${res.statusCode}',
@@ -156,6 +182,16 @@ class ServerHealthNotifier extends StateNotifier<ServerConnectionState> {
       return state;
     } catch (e) {
       stopwatch.stop();
+
+      // If network failed, trigger auto-discovery on startup / on-demand if not attempted yet
+      if (allowAutoDiscover && !_hasAttemptedAutoDiscovery) {
+        _hasAttemptedAutoDiscovery = true;
+        final discovered = await notifier.autoDiscover();
+        if (discovered != null && discovered != host) {
+          return await checkHealth(allowAutoDiscover: false);
+        }
+      }
+
       state = ServerConnectionState(
         state: ConnectionStateEnum.offline,
         errorMessage: e.toString().replaceFirst(RegExp(r'^[^:]+:\s*'), ''),
