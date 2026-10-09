@@ -640,5 +640,179 @@ class WorkoutRepository {
           );
     });
   }
+
+  /// Creates a new custom routine locally and enqueues it for sync.
+  Future<Routine> createRoutine({
+    required String name,
+    String description = '',
+    required List<RoutineSection> sections,
+  }) async {
+    return _db.transaction(() async {
+      final now = DateTime.now().toUtc();
+
+      // Determine unique local ID
+      final existingRoutines = await _db.select(_db.routinesTable).get();
+      int newId = 101;
+      if (existingRoutines.isNotEmpty) {
+        final maxId = existingRoutines.map((r) => r.id).reduce((a, b) => a > b ? a : b);
+        newId = maxId + 1;
+      }
+
+      final blockList = <Map<String, dynamic>>[];
+      int blockIndex = 1;
+      for (final sec in sections) {
+        final secId = sec.id.isNotEmpty ? sec.id : 'sec_${newId}_$blockIndex';
+        blockList.add({
+          'id': secId,
+          'node_type_slug': 'section',
+          'data': {
+            'title': sec.title,
+            'subtitle': sec.subtitle,
+          },
+        });
+        blockIndex++;
+        for (final ex in sec.exercises) {
+          final exId = ex.blockClientId.isNotEmpty ? ex.blockClientId : 'blk_${newId}_$blockIndex';
+          blockList.add({
+            'id': exId,
+            'node_type_slug': ex.nodeTypeSlug.isNotEmpty ? ex.nodeTypeSlug : 'exercise_custom',
+            'data': {
+              'exercise_name': ex.name,
+              'sets': ex.sets,
+              'reps': ex.reps,
+              'load': ex.targetLoad,
+              'rest_seconds': ex.restSeconds,
+            },
+          });
+          blockIndex++;
+        }
+      }
+
+      final blocksJson = jsonEncode(blockList);
+
+      await _db.into(_db.routinesTable).insert(
+            RoutinesTableCompanion.insert(
+              id: Value(newId),
+              name: name,
+              description: Value(description),
+              blockCount: Value(blockList.length),
+              isPublic: const Value(false),
+              updatedAt: now,
+              blocksJson: Value(blocksJson),
+            ),
+          );
+
+      await _db.into(_db.syncQueueTable).insert(
+            SyncQueueTableCompanion.insert(
+              entityClientId: 'routine-$newId',
+              entityType: 'workflow',
+              action: 'CREATE',
+              payload: jsonEncode({
+                'id': newId,
+                'name': name,
+                'description': description,
+                'blocks_json': blocksJson,
+                'created_at': now.toIso8601String(),
+                'updated_at': now.toIso8601String(),
+              }),
+              createdAt: now,
+            ),
+          );
+
+      return (_db.select(_db.routinesTable)..where((t) => t.id.equals(newId))).getSingle();
+    });
+  }
+
+  /// Updates an existing routine locally and enqueues it for sync.
+  Future<void> updateRoutine({
+    required int id,
+    required String name,
+    String description = '',
+    required List<RoutineSection> sections,
+  }) async {
+    await _db.transaction(() async {
+      final now = DateTime.now().toUtc();
+
+      final blockList = <Map<String, dynamic>>[];
+      int blockIndex = 1;
+      for (final sec in sections) {
+        final secId = sec.id.isNotEmpty ? sec.id : 'sec_${id}_$blockIndex';
+        blockList.add({
+          'id': secId,
+          'node_type_slug': 'section',
+          'data': {
+            'title': sec.title,
+            'subtitle': sec.subtitle,
+          },
+        });
+        blockIndex++;
+        for (final ex in sec.exercises) {
+          final exId = ex.blockClientId.isNotEmpty ? ex.blockClientId : 'blk_${id}_$blockIndex';
+          blockList.add({
+            'id': exId,
+            'node_type_slug': ex.nodeTypeSlug.isNotEmpty ? ex.nodeTypeSlug : 'exercise_custom',
+            'data': {
+              'exercise_name': ex.name,
+              'sets': ex.sets,
+              'reps': ex.reps,
+              'load': ex.targetLoad,
+              'rest_seconds': ex.restSeconds,
+            },
+          });
+          blockIndex++;
+        }
+      }
+
+      final blocksJson = jsonEncode(blockList);
+
+      await (_db.update(_db.routinesTable)..where((t) => t.id.equals(id))).write(
+        RoutinesTableCompanion(
+          name: Value(name),
+          description: Value(description),
+          blockCount: Value(blockList.length),
+          blocksJson: Value(blocksJson),
+          updatedAt: Value(now),
+        ),
+      );
+
+      await _db.into(_db.syncQueueTable).insert(
+            SyncQueueTableCompanion.insert(
+              entityClientId: 'routine-$id',
+              entityType: 'workflow',
+              action: 'UPDATE',
+              payload: jsonEncode({
+                'id': id,
+                'name': name,
+                'description': description,
+                'blocks_json': blocksJson,
+                'updated_at': now.toIso8601String(),
+              }),
+              createdAt: now,
+            ),
+          );
+    });
+  }
+
+  /// Deletes a routine locally and enqueues deletion for sync.
+  Future<void> deleteRoutine(int id) async {
+    await _db.transaction(() async {
+      final now = DateTime.now().toUtc();
+
+      await (_db.delete(_db.routinesTable)..where((t) => t.id.equals(id))).go();
+
+      await _db.into(_db.syncQueueTable).insert(
+            SyncQueueTableCompanion.insert(
+              entityClientId: 'routine-$id',
+              entityType: 'workflow',
+              action: 'DELETE',
+              payload: jsonEncode({
+                'id': id,
+                'deleted_at': now.toIso8601String(),
+              }),
+              createdAt: now,
+            ),
+          );
+    });
+  }
 }
 

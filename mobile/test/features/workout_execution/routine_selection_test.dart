@@ -24,6 +24,13 @@ void main() {
   testWidgets('Athlete can select synced routine, switch days, and launch HUD for selected day', (
     WidgetTester tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     final repo = WorkoutRepository(db);
 
@@ -224,6 +231,13 @@ void main() {
   testWidgets('Athlete completing all sets of an exercise triggers rest timer and auto-advances to next exercise, and completing all exercises shows finished state', (
     WidgetTester tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     final repo = WorkoutRepository(db);
 

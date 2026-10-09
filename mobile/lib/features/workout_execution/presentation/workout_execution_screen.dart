@@ -6,6 +6,8 @@ import '../../../../core/network/server_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../sync/application/sync_engine.dart';
+import '../../auth/data/auth_repository.dart';
+import '../../auth/presentation/athlete_auth_screen.dart';
 import '../controller/workout_execution_controller.dart';
 import '../data/workout_repository.dart';
 import '../domain/routine_model.dart';
@@ -29,6 +31,7 @@ class WorkoutExecutionScreen extends ConsumerWidget {
     final restTimer = ref.watch(restTimerProvider);
     final health = ref.watch(serverHealthProvider);
     final syncState = ref.watch(syncEngineProvider);
+    final authState = ref.watch(authStateProvider);
 
     return Scaffold(
       endDrawer: const DebugSettingsDrawer(),
@@ -49,6 +52,19 @@ class WorkoutExecutionScreen extends ConsumerWidget {
                 isSyncing: syncState.status == SyncStatus.syncing,
               ),
             ),
+          ),
+          IconButton(
+            icon: Icon(
+              authState.isAuthenticated ? Icons.account_circle : Icons.account_circle_outlined,
+              size: 22,
+              color: authState.isAuthenticated ? AppColors.primary : AppColors.onSurfaceVariant,
+            ),
+            tooltip: authState.isAuthenticated ? 'Athlete Profile (${authState.email})' : 'Log In / Account',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AthleteAuthScreen()),
+              );
+            },
           ),
           Builder(
             builder: (context) => IconButton(

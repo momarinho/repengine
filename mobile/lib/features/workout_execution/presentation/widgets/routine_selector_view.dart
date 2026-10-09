@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../auth/data/auth_repository.dart';
+import '../../../auth/presentation/athlete_auth_screen.dart';
 import '../../controller/workout_execution_controller.dart';
 import '../../domain/routine_model.dart';
+import '../routine_editor_screen.dart';
 
 class RoutineSelectorView extends ConsumerWidget {
   final Future<void> Function({
@@ -92,93 +94,144 @@ class RoutineSelectorView extends ConsumerWidget {
 
               const SizedBox(height: 16),
 
-              // Web Account Connection Status Banner
-              if (!authState.isAuthenticated) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.outlineVariant),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.cloud_off_rounded, size: 18, color: AppColors.secondary),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Offline Mode: showing local routines. Connect your Web account in the side menu to sync your workouts.',
-                          style: AppTypography.labelSmall.copyWith(
-                            color: AppColors.onSurfaceVariant,
-                            fontSize: 11,
-                          ),
+              // Web Account Connection Status Banner (Tappable to open AthleteAuthScreen)
+              GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const AthleteAuthScreen()),
+                  );
+                },
+                child: !authState.isAuthenticated
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceContainerHigh,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.outlineVariant),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.cloud_off_rounded, size: 18, color: AppColors.secondary),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Offline Mode: showing local routines. Tap to sign in and sync your workouts with the cloud.',
+                                style: AppTypography.labelSmall.copyWith(
+                                  color: AppColors.onSurfaceVariant,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right, size: 18, color: AppColors.onSurfaceVariant),
+                          ],
+                        ),
+                      )
+                    : Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0x1898BB6C),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.cloud_done_rounded, size: 18, color: AppColors.success),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Connected (${authState.email}) • Routines synced. Tap to view profile.',
+                                style: AppTypography.labelSmall.copyWith(
+                                  color: AppColors.success,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right, size: 18, color: AppColors.success),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ] else ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0x1898BB6C),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.cloud_done_rounded, size: 18, color: AppColors.success),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Connected to Web account (${authState.email}) • Routines synced.',
-                          style: AppTypography.labelSmall.copyWith(
-                            color: AppColors.success,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
+              ),
 
-              // Routine Selector (if multiple routines exist)
-              if (routines.length > 1) ...[
-                const Text('ROUTINE', style: AppTypography.labelSmall),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 40,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: routines.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      final r = routines[index];
-                      final isSelected = r.id == selectedRoutine.id;
-                      return ChoiceChip(
-                        label: Text(r.name),
-                        selected: isSelected,
-                        onSelected: (_) {
-                          ref.read(selectedRoutineIdProvider.notifier).state = r.id;
-                          if (r.sections.isNotEmpty) {
-                            ref.read(selectedSectionIdProvider.notifier).state = r.sections.first.id;
-                          }
-                        },
-                        selectedColor: AppColors.primaryContainer,
-                        backgroundColor: AppColors.surfaceContainer,
-                        labelStyle: TextStyle(
-                          color: isSelected ? AppColors.onBackground : AppColors.onSurfaceVariant,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        ),
-                      );
-                    },
+              const SizedBox(height: 16),
+
+              // Routine Selector Header & Actions (New Routine & Edit Routine)
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: SizedBox(
+                  width: 360,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('ROUTINES', style: AppTypography.labelSmall),
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit_note_rounded, size: 22, color: AppColors.primary),
+                            tooltip: 'Edit "${selectedRoutine.name}"',
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => RoutineEditorScreen(routineToEdit: selectedRoutine),
+                                ),
+                              );
+                            },
+                          ),
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.add, size: 14),
+                            label: const Text('New Routine', style: TextStyle(fontSize: 12)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.primary,
+                              side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const RoutineEditorScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 16),
-              ],
+              ),
+              const SizedBox(height: 8),
+
+              SizedBox(
+                height: 40,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: routines.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final r = routines[index];
+                    final isSelected = r.id == selectedRoutine.id;
+                    return ChoiceChip(
+                      label: Text(r.name),
+                      selected: isSelected,
+                      onSelected: (_) {
+                        ref.read(selectedRoutineIdProvider.notifier).state = r.id;
+                        if (r.sections.isNotEmpty) {
+                          ref.read(selectedSectionIdProvider.notifier).state = r.sections.first.id;
+                        }
+                      },
+                      selectedColor: AppColors.primaryContainer,
+                      backgroundColor: AppColors.surfaceContainer,
+                      labelStyle: TextStyle(
+                        color: isSelected ? AppColors.onBackground : AppColors.onSurfaceVariant,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
 
               // Day / Section Selector
               const Text('WORKOUT DAY / SECTION', style: AppTypography.labelSmall),
