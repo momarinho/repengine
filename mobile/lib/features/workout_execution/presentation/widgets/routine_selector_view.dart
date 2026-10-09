@@ -8,6 +8,8 @@ import '../../../auth/presentation/athlete_auth_screen.dart';
 import '../../controller/workout_execution_controller.dart';
 import '../../domain/routine_model.dart';
 import '../routine_editor_screen.dart';
+import '../workout_history_screen.dart';
+import 'plate_calculator_sheet.dart';
 
 class RoutineSelectorView extends ConsumerWidget {
   final Future<void> Function({
@@ -150,6 +152,77 @@ class RoutineSelectorView extends ConsumerWidget {
                           ],
                         ),
                       ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Quick Tools (History & Plate Calculator)
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      key: const Key('quick_history_btn'),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const WorkoutHistoryScreen()),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceContainer,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.outlineVariant),
+                        ),
+                        child: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.history_rounded, size: 18, color: AppColors.primary),
+                              SizedBox(width: 8),
+                              Text(
+                                'History',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: InkWell(
+                      key: const Key('quick_plate_calc_btn'),
+                      onTap: () => PlateCalculatorSheet.show(context, 100.0),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceContainer,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.outlineVariant),
+                        ),
+                        child: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.calculate_rounded, size: 18, color: AppColors.primary),
+                              SizedBox(width: 8),
+                              Text(
+                                'Plate Calc',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
 
               const SizedBox(height: 16),

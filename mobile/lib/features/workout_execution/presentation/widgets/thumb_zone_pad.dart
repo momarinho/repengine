@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:repengine_core/repengine_core.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import 'plate_calculator_sheet.dart';
 
 class ThumbZonePad extends StatefulWidget {
   final double initialLoad;
@@ -215,11 +216,39 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
                     ),
                     child: Column(
                       children: [
-                        const Text('LOAD (KG)', style: AppTypography.labelSmall),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text('LOAD (KG)', style: AppTypography.labelSmall),
+                              const SizedBox(width: 4),
+                              Tooltip(
+                                message: 'Plate Calculator',
+                                child: InkWell(
+                                  key: const Key('plate_calculator_btn'),
+                                  onTap: () => PlateCalculatorSheet.show(context, _load),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: const Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                    child: Icon(
+                                      Icons.calculate_rounded,
+                                      size: 15,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                         const SizedBox(height: 4),
-                        Text(
-                          _load.toStringAsFixed(1),
-                          style: AppTypography.displayLarge.copyWith(fontSize: 32),
+                        GestureDetector(
+                          onTap: () => PlateCalculatorSheet.show(context, _load),
+                          child: Text(
+                            _load.toStringAsFixed(1),
+                            style: AppTypography.displayLarge.copyWith(fontSize: 32),
+                          ),
                         ),
                         const SizedBox(height: 6),
                         FittedBox(

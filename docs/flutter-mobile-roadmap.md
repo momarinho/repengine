@@ -247,25 +247,26 @@ flowchart TD
   - Modal de confirmação ergonômico [`AbandonWorkoutDialog`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/abandon_workout_dialog.dart) prevenindo toques acidentais.
   - Purga transacional atômica no SQLite via `WorkoutRepository.abandonSession`: deleção da sessão ativa, séries temporárias e remoção das mutações pendentes na outbox (`SyncQueueTable`), impedindo que treinos cancelados subam para o servidor.
   - 100% de cobertura de testes automatizados unitários e de widget (`workout_repository_test.dart` e `workout_execution_screen_test.dart`).
-- [ ] **Fluxo Ergonômico de Criação de Rotina (`RoutineCreatorScreen` / Modal)**:
+- [x] **Fluxo Ergonômico de Criação de Rotina (`RoutineCreatorScreen` / Modal)**:
   - Metadados da rotina: Nome e descrição.
   - Construtor dinâmico de seções (dias de treino): adicionar/remover seções (ex: "Day 1 - Push", "Day 2 - Pull").
   - Adição de exercícios por seção com catálogo rápido pré-configurado (*Squat, Bench Press, Deadlift, OHP, Barbell Row, etc.*) ou nome livre.
   - Prescrição por exercício: séries (sets), repetições alvo, carga recomendada inicial (kg) e tempo de descanso (segundos).
-- [ ] **Persistência Estruturada no SQLite (`WorkoutRepository.createRoutine`)**:
+- [x] **Persistência Estruturada no SQLite (`WorkoutRepository.createRoutine`)**:
   - Serialização determinística dos blocos no formato nativo de `blocksJson` compatível com o parser `routine_model.dart`.
   - Inserção atômica no Drift local (`RoutinesTable`) e reflexo imediato no `watchRoutines()`.
   - Enfileiramento na `SyncQueueTable` para replicação no Go Core.
-- [ ] **Ponto de Entrada e Integração na UI**:
+- [x] **Ponto de Entrada e Integração na UI**:
   - Botão de ação destacado `+ Create Routine` integrado ao [`RoutineSelectorView`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/routine_selector_view.dart).
   - Seleção e execução imediata do treino recém-criado com HUD ativo, cronômetro de descanso pré-configurado e cálculo de 1RM.
-- [ ] **Calculadora de Anilhas (*Plate Calculator*) Integrada ao HUD**:
-  - Widget ergonômico no `ThumbZonePad` decompondo qualquer carga alvo nas anilhas necessárias para barra olímpica de 20kg (25kg, 20kg, 15kg, 10kg, 5kg, 2.5kg, 1.25kg).
-- [ ] **Histórico Local de Treinos Concluídos (`WorkoutHistoryView`)**:
-  - Tela para consultar treinos passados, logs de séries, duração e volume total computados do SQLite local.
-- [ ] **Testes Automatizados**:
-  - Testes unitários de repositório para criação e leitura de rotinas customizadas locais.
-  - Testes de widget para validação do formulário e feedback de criação.
+- [x] **Calculadora de Anilhas (*Plate Calculator*) Integrada ao HUD**:
+  - Widget ergonômico no `ThumbZonePad`, AppBar e Dashboard decompondo qualquer carga alvo nas anilhas necessárias para barra olímpica (25kg, 20kg, 15kg, 10kg, 5kg, 2.5kg, 1.25kg) com seletor de barra e badges visuais por cores oficiais.
+  - Testes de widget automatizados em `plate_calculator_test.dart`.
+- [x] **Histórico Local de Treinos Concluídos (`WorkoutHistoryView`)**:
+  - Tela completa para consultar treinos passados, logs de séries, duração e volume total computados do SQLite local, com detalhamento expansível de exercícios e opção de exclusão.
+  - Testes de widget automatizados em `workout_history_test.dart`.
+- [x] **Testes Automatizados**:
+  - Testes unitários de repositório e testes de widget para criação e edição de rotinas no celular (`routine_editor_test.dart`), calculadora de anilhas (`plate_calculator_test.dart`) e histórico (`workout_history_test.dart`).
 
 ---
 

@@ -16,10 +16,12 @@ import 'widgets/circular_rest_timer.dart';
 import 'widgets/debug_settings_drawer.dart';
 import 'widgets/exercise_completed_pad.dart';
 import 'widgets/in_workout_edit_sheet.dart';
+import 'widgets/plate_calculator_sheet.dart';
 import 'widgets/routine_selector_view.dart';
 import 'widgets/set_log_card.dart';
 import 'widgets/thumb_zone_pad.dart';
 import 'widgets/workout_summary_dialog.dart';
+import 'workout_history_screen.dart';
 
 class WorkoutExecutionScreen extends ConsumerWidget {
   const WorkoutExecutionScreen({super.key});
@@ -52,6 +54,20 @@ class WorkoutExecutionScreen extends ConsumerWidget {
                 isSyncing: syncState.status == SyncStatus.syncing,
               ),
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.calculate_rounded, size: 21),
+            tooltip: 'Plate Calculator',
+            onPressed: () => PlateCalculatorSheet.show(context, 100.0),
+          ),
+          IconButton(
+            icon: const Icon(Icons.history_rounded, size: 22),
+            tooltip: 'Workout History',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const WorkoutHistoryScreen()),
+              );
+            },
           ),
           IconButton(
             icon: Icon(

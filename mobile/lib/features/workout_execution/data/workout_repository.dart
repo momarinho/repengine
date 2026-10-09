@@ -69,6 +69,27 @@ class WorkoutRepository {
         .watch();
   }
 
+  /// Listens to all completed workout sessions ordered by startedAt DESC.
+  Stream<List<WorkoutSessionData>> watchCompletedSessions() {
+    return (_db.select(_db.workoutSessionsTable)
+          ..where((t) => t.status.equals('completed'))
+          ..orderBy([(t) => OrderingTerm.desc(t.startedAt)]))
+        .watch();
+  }
+
+  /// Retrieves all set logs for a given session.
+  Future<List<WorkoutSetLogData>> getSessionLogs(String sessionClientId) {
+    return (_db.select(_db.workoutSetLogsTable)
+          ..where((t) => t.sessionClientId.equals(sessionClientId))
+          ..orderBy([(t) => OrderingTerm.asc(t.setIndex)]))
+        .get();
+  }
+
+  /// Deletes a completed session and its associated logs from local storage.
+  Future<void> deleteCompletedSession(String sessionClientId) {
+    return abandonSession(sessionClientId, deleteSession: true);
+  }
+
   // ==========================================
   // ATOMIC OPERATIONS (Local Storage + Outbox)
   // ==========================================
@@ -189,9 +210,9 @@ class WorkoutRepository {
   }
 
   /// Completes active workout session.
-  Future<void> completeSession(String sessionClientId) async {
+  Future<void> completeSession(String sessionClientId, {DateTime? completedAt}) async {
     await _db.transaction(() async {
-      final now = DateTime.now().toUtc();
+      final now = completedAt?.toUtc() ?? DateTime.now().toUtc();
 
       await (_db.update(_db.workoutSessionsTable)
             ..where((t) => t.clientId.equals(sessionClientId)))

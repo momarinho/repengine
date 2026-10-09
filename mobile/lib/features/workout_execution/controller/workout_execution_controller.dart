@@ -28,6 +28,18 @@ final syncQueueStreamProvider = StreamProvider<List<SyncQueueData>>((ref) {
   return repo.watchSyncQueue();
 });
 
+/// Stream of all completed workout sessions (for History View)
+final completedSessionsStreamProvider = StreamProvider<List<WorkoutSessionData>>((ref) {
+  final repo = ref.watch(workoutRepositoryProvider);
+  return repo.watchCompletedSessions();
+});
+
+/// Future provider fetching all set logs recorded in a session
+final sessionLogsFutureProvider = FutureProvider.family<List<WorkoutSetLogData>, String>((ref, sessionClientId) {
+  final repo = ref.watch(workoutRepositoryProvider);
+  return repo.getSessionLogs(sessionClientId);
+});
+
 /// Rest timer state
 class RestTimerState {
   final bool isActive;

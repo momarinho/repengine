@@ -148,24 +148,27 @@ Este checklist complementa os Sprints do roadmap, rastreando individualmente cad
   - [x] Acesso alternativo com botão "Discard Workout" no [`WorkoutSummaryDialog`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/workout_summary_dialog.dart).
   - [x] Limpeza atômica no SQLite: deleção de `workout_sessions`, purga de `workout_set_logs` e remoção de registros pendentes na `sync_queue` para não replicar dados descartados.
   - [x] Testes unitários no [`workout_repository_test.dart`](file:///home/mateus/Projects/repengine/mobile/test/features/workout_execution/workout_repository_test.dart) e de widget no [`workout_execution_screen_test.dart`](file:///home/mateus/Projects/repengine/mobile/test/features/workout_execution/workout_execution_screen_test.dart).
-- [ ] **Criador de Rotinas no Celular (`RoutineCreatorScreen` / Modal)**:
-  - [ ] Formulário ergonômico no tema Kanagawa Dark com nome e descrição da rotina.
-  - [ ] Construtor dinâmico de seções (dias de treino: Treino A, B, etc.).
-  - [ ] Adição de exercícios com catálogo nativo (*Squat, Bench Press, Deadlift, OHP, etc.*) ou customizado.
-  - [ ] Prescrição de séries, repetições, carga alvo inicial e tempo de descanso por exercício.
-- [ ] **Gravação Atômica & Modelo Estruturado (`WorkoutRepository.createRoutine`)**:
-  - [ ] Serialização determinística de blocos compatível com `routine_model.dart` (`blocksJson`).
-  - [ ] Inserção no Drift local (`RoutinesTable`) com ID local e reflexo imediato no `watchRoutines()`.
-  - [ ] Enfileiramento na `SyncQueueTable` para replicação no backend.
-- [ ] **Interface & Ponto de Entrada**:
-  - [ ] Botão `+ Create Routine` no cabeçalho do [`RoutineSelectorView`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/routine_selector_view.dart).
-  - [ ] Execução imediata do treino criado pelo atleta no HUD móvel com 1RM e timer.
-- [ ] **Calculadora de Anilhas (*Plate Calculator*)**:
-  - [ ] Bottom Sheet no `ThumbZonePad` decompondo qualquer carga alvo nas anilhas de barra olímpica (25, 20, 15, 10, 5, 2.5, 1.25kg).
-- [ ] **Histórico Local de Treinos Concluídos (`WorkoutHistoryView`)**:
-  - [ ] Tela para visualização de sessões finalizadas com volume total, séries e datas salvas no SQLite.
-- [ ] **Testes Automatizados**:
-  - [ ] Testes unitários de repositório e testes de widget para o fluxo de criação de rotinas.
+- [x] **Criador de Rotinas no Celular (`RoutineCreatorScreen` / Modal)**:
+  - [x] Formulário ergonômico no tema Kanagawa Dark com nome e descrição da rotina.
+  - [x] Construtor dinâmico de seções (dias de treino: Treino A, B, etc.).
+  - [x] Adição de exercícios com catálogo nativo (*Squat, Bench Press, Deadlift, OHP, etc.*) ou customizado.
+  - [x] Prescrição de séries, repetições, carga alvo inicial e tempo de descanso por exercício.
+- [x] **Gravação Atômica & Modelo Estruturado (`WorkoutRepository.createRoutine`)**:
+  - [x] Serialização determinística de blocos compatível com `routine_model.dart` (`blocksJson`).
+  - [x] Inserção no Drift local (`RoutinesTable`) com ID local e reflexo imediato no `watchRoutines()`.
+  - [x] Enfileiramento na `SyncQueueTable` para replicação no backend.
+- [x] **Interface & Ponto de Entrada**:
+  - [x] Botão `+ Create Routine` no cabeçalho do [`RoutineSelectorView`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/routine_selector_view.dart).
+  - [x] Execução imediata do treino criado pelo atleta no HUD móvel com 1RM e timer.
+- [x] **Calculadora de Anilhas (*Plate Calculator*)**:
+  - [x] Bottom Sheet no `ThumbZonePad`, AppBar e Dashboard decompondo qualquer carga alvo nas anilhas de barra olímpica (25, 20, 15, 10, 5, 2.5, 1.25kg) com seletor de barra (20kg, 15kg, 10kg, 0kg) e badges visuais por cores oficiais.
+  - [x] Testes de widget automatizados em `plate_calculator_test.dart`.
+- [x] **Histórico Local de Treinos Concluídos (`WorkoutHistoryView`)**:
+  - [x] Tela para visualização de sessões finalizadas com volume total (tonelagem em kg), duração, séries concluídas e detalhamento expansível de exercícios/séries salvos no SQLite.
+  - [x] Confirmação e exclusão atômica de sessões locais.
+  - [x] Testes de widget automatizados em `workout_history_test.dart`.
+- [x] **Testes Automatizados**:
+  - [x] Testes unitários de repositório e testes de widget para o fluxo de criação de rotinas (`routine_editor_test.dart`), calculadora de anilhas (`plate_calculator_test.dart`) e histórico (`workout_history_test.dart`).
 
 ---
 
