@@ -70,7 +70,34 @@ Future<Response> onRequest(RequestContext context) async {
     itemsResult.add(status);
   }
 
-  // 6. Montar o recibo final de sincronização
+  // 6. Finalizar ou abandonar sessões concluídas no Go Core APÓS a inserção de todas as séries
+  for (final session in payload.sessions) {
+    final serverId = session.clientId != null
+        ? sessionClientToServerId[session.clientId]
+        : session.id;
+
+    if (serverId != null && serverId > 0) {
+      if (session.status == 'completed') {
+        final status = await client.completeSession(
+          serverId,
+          authHeader,
+          clientId: session.clientId,
+          notes: session.notes ?? '',
+        );
+        itemsResult.add(status);
+      } else if (session.status == 'abandoned') {
+        final status = await client.abandonSession(
+          serverId,
+          authHeader,
+          clientId: session.clientId,
+          notes: session.notes ?? '',
+        );
+        itemsResult.add(status);
+      }
+    }
+  }
+
+  // 7. Montar o recibo final de sincronização
   final result = SyncPushResult(
     items: itemsResult,
     processedAt: DateTime.now().toUtc(),

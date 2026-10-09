@@ -71,6 +71,90 @@ class GoCoreClient {
     }
   }
 
+  /// Finaliza uma sessão de treino ativa no Go Core.
+  Future<SyncPushItemStatus> completeSession(
+    int sessionId,
+    String authHeader, {
+    String? clientId,
+    String notes = '',
+  }) async {
+    final effectiveClientId = clientId ?? 'session-$sessionId';
+    final url = Uri.parse('$baseUrl/workout-sessions/$sessionId/complete');
+
+    try {
+      final response = await _httpClient.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': authHeader,
+        },
+        body: jsonEncode({'notes': notes}),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return SyncPushItemStatus(
+          clientId: effectiveClientId,
+          status: SyncItemStatus.accepted,
+          serverId: sessionId,
+        );
+      } else {
+        return SyncPushItemStatus(
+          clientId: effectiveClientId,
+          status: SyncItemStatus.conflictFlagged,
+          message: 'Server error completing session: ${response.statusCode} - ${response.body}',
+        );
+      }
+    } catch (e) {
+      return SyncPushItemStatus(
+        clientId: effectiveClientId,
+        status: SyncItemStatus.conflictFlagged,
+        message: 'Network failure completing session: $e',
+      );
+    }
+  }
+
+  /// Abandona uma sessão de treino no Go Core.
+  Future<SyncPushItemStatus> abandonSession(
+    int sessionId,
+    String authHeader, {
+    String? clientId,
+    String notes = '',
+  }) async {
+    final effectiveClientId = clientId ?? 'session-$sessionId';
+    final url = Uri.parse('$baseUrl/workout-sessions/$sessionId/abandon');
+
+    try {
+      final response = await _httpClient.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': authHeader,
+        },
+        body: jsonEncode({'notes': notes}),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return SyncPushItemStatus(
+          clientId: effectiveClientId,
+          status: SyncItemStatus.accepted,
+          serverId: sessionId,
+        );
+      } else {
+        return SyncPushItemStatus(
+          clientId: effectiveClientId,
+          status: SyncItemStatus.conflictFlagged,
+          message: 'Server error abandoning session: ${response.statusCode} - ${response.body}',
+        );
+      }
+    } catch (e) {
+      return SyncPushItemStatus(
+        clientId: effectiveClientId,
+        status: SyncItemStatus.conflictFlagged,
+        message: 'Network failure abandoning session: $e',
+      );
+    }
+  }
+
   /// Encaminha um log de série individual para o Go Core.
   Future<SyncPushItemStatus> forwardSetLog(
     WorkoutSetLog log,

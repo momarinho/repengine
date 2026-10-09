@@ -90,6 +90,57 @@ void main() {
       },
     );
 
+    test('completeSession calls complete endpoint and returns accepted status', () async {
+      when(
+        () => mockHttp.post(
+          Uri.parse('http://api:8080/workout-sessions/42/complete'),
+          headers: any(named: 'headers'),
+          body: any(named: 'body'),
+        ),
+      ).thenAnswer(
+        (_) async => http.Response(
+          jsonEncode({'id': 42, 'status': 'completed'}),
+          200,
+        ),
+      );
+
+      final result = await client.completeSession(
+        42,
+        'Bearer test-token',
+        clientId: 'client-sess-1',
+        notes: 'Great workout',
+      );
+
+      expect(result.status, equals(SyncItemStatus.accepted));
+      expect(result.serverId, equals(42));
+      expect(result.clientId, equals('client-sess-1'));
+    });
+
+    test('abandonSession calls abandon endpoint and returns accepted status', () async {
+      when(
+        () => mockHttp.post(
+          Uri.parse('http://api:8080/workout-sessions/42/abandon'),
+          headers: any(named: 'headers'),
+          body: any(named: 'body'),
+        ),
+      ).thenAnswer(
+        (_) async => http.Response(
+          jsonEncode({'id': 42, 'status': 'abandoned'}),
+          200,
+        ),
+      );
+
+      final result = await client.abandonSession(
+        42,
+        'Bearer test-token',
+        clientId: 'client-sess-1',
+      );
+
+      expect(result.status, equals(SyncItemStatus.accepted));
+      expect(result.serverId, equals(42));
+      expect(result.clientId, equals('client-sess-1'));
+    });
+
     test(
       'forwardSetLog returns conflictFlagged when session_id is missing',
       () async {
