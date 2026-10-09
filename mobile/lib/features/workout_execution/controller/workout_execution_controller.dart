@@ -97,4 +97,49 @@ final selectedSectionIdProvider = StateProvider<String?>((ref) => null);
 /// Currently selected exercise index in active workout session
 final activeExerciseIndexProvider = StateProvider<int>((ref) => 0);
 
+/// State of customized exercises for the active workout session.
+/// Supports swapping, adding, and removing exercises on the fly.
+class ActiveSessionExercisesNotifier extends StateNotifier<List<RoutineExercise>?> {
+  String? _currentSessionId;
+  String? get currentSessionId => _currentSessionId;
+
+  ActiveSessionExercisesNotifier() : super(null);
+
+  void initialize(String sessionId, List<RoutineExercise> initial) {
+    _currentSessionId = sessionId;
+    state = List.of(initial);
+  }
+
+  void reset() {
+    _currentSessionId = null;
+    state = null;
+  }
+
+  void swapExercise(int index, RoutineExercise updated) {
+    if (state == null || index < 0 || index >= state!.length) return;
+    final list = List<RoutineExercise>.of(state!);
+    list[index] = updated;
+    state = list;
+  }
+
+  void addExercise(RoutineExercise exercise) {
+    final list = state != null ? List<RoutineExercise>.of(state!) : <RoutineExercise>[];
+    list.add(exercise);
+    state = list;
+  }
+
+  void removeExercise(int index) {
+    if (state == null || index < 0 || index >= state!.length || state!.length <= 1) return;
+    final list = List<RoutineExercise>.of(state!);
+    list.removeAt(index);
+    state = list;
+  }
+}
+
+final activeSessionExercisesProvider =
+    StateNotifierProvider<ActiveSessionExercisesNotifier, List<RoutineExercise>?>((ref) {
+  return ActiveSessionExercisesNotifier();
+});
+
+
 

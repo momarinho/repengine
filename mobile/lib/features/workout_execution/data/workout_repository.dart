@@ -5,6 +5,7 @@ import 'package:repengine_core/repengine_core.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/database_provider.dart';
+import '../domain/routine_model.dart';
 
 class ProgressionSuggestion {
   final double load;
@@ -516,6 +517,128 @@ class WorkoutRepository {
           ..where((t) => t.blockKey.equals(blockKey))
           ..limit(1))
         .getSingleOrNull();
+  }
+
+  /// Updates the template blocks of a routine in local SQLite with modified exercises and loads.
+  /// Also enqueues an UPDATE mutation in the sync queue for cloud replication.
+  Future<void> updateRoutineSectionExercises({
+    required int routineId,
+    required String sectionId,
+    required List<RoutineExercise> updatedExercises,
+  }) async {
+    await _db.transaction(() async {
+      final routine = await (_db.select(_db.routinesTable)
+            ..where((t) => t.id.equals(routineId))
+            ..limit(1))
+          .getSingleOrNull();
+
+      if (routine == null) return;
+
+      List<dynamic> blockList = [];
+      try {
+        if (routine.blocksJson.isNotEmpty && routine.blocksJson != '[]') {
+          blockList = jsonDecode(routine.blocksJson) as List<dynamic>;
+        }
+      } catch (_) {
+        blockList = [];
+      }
+
+      // If routine had default/empty blocks, construct from ParsedRoutine
+      if (blockList.isEmpty) {
+        final parsed = ParsedRoutine.fromRoutine(routine);
+        final reconstructedBlocks = <Map<String, dynamic>>[];
+        for (final sec in parsed.sections) {
+          reconstructedBlocks.add({
+            'id': sec.id,
+            'node_type_slug': 'section',
+            'data': {'title': sec.title, 'subtitle': sec.subtitle},
+          });
+          final exercisesToUse = sec.id == sectionId ? updatedExercises : sec.exercises;
+          for (final ex in exercisesToUse) {
+            reconstructedBlocks.add({
+              'id': ex.blockClientId,
+              'node_type_slug': ex.nodeTypeSlug,
+              'data': {
+                'exercise_name': ex.name,
+                'sets': ex.sets,
+                'reps': ex.reps,
+                'load': ex.targetLoad,
+                'rest_seconds': ex.restSeconds,
+              },
+            });
+          }
+        }
+        blockList = reconstructedBlocks;
+      } else {
+        // Find existing section block index
+        int sectionIndex = -1;
+        for (var i = 0; i < blockList.length; i++) {
+          final b = blockList[i] as Map<String, dynamic>;
+          if (b['id']?.toString() == sectionId ||
+              (b['node_type_slug'] == 'section' && b['id']?.toString() == sectionId)) {
+            sectionIndex = i;
+            break;
+          }
+        }
+
+        if (sectionIndex != -1) {
+          // Find boundary of next section
+          int nextSectionIndex = blockList.length;
+          for (var i = sectionIndex + 1; i < blockList.length; i++) {
+            final b = blockList[i] as Map<String, dynamic>;
+            if (b['node_type_slug'] == 'section') {
+              nextSectionIndex = i;
+              break;
+            }
+          }
+
+          // Build new exercise blocks for this section
+          final newExerciseBlocks = updatedExercises.map((ex) => {
+            'id': ex.blockClientId,
+            'node_type_slug': ex.nodeTypeSlug,
+            'data': {
+              'exercise_name': ex.name,
+              'sets': ex.sets,
+              'reps': ex.reps,
+              'load': ex.targetLoad,
+              'rest_seconds': ex.restSeconds,
+            },
+          }).toList();
+
+          // Replace old exercises in that section slice
+          final beforeSection = blockList.sublist(0, sectionIndex + 1);
+          final afterSection = blockList.sublist(nextSectionIndex);
+          blockList = [...beforeSection, ...newExerciseBlocks, ...afterSection];
+        }
+      }
+
+      final newBlocksJson = jsonEncode(blockList);
+      final now = DateTime.now().toUtc();
+
+      await (_db.update(_db.routinesTable)
+            ..where((t) => t.id.equals(routineId)))
+          .write(
+        RoutinesTableCompanion(
+          blocksJson: Value(newBlocksJson),
+          updatedAt: Value(now),
+        ),
+      );
+
+      // Enqueue sync mutation
+      await _db.into(_db.syncQueueTable).insert(
+            SyncQueueTableCompanion.insert(
+              entityClientId: 'routine-$routineId',
+              entityType: 'workflow',
+              action: 'UPDATE',
+              payload: jsonEncode({
+                'id': routineId,
+                'blocks_json': newBlocksJson,
+                'updated_at': now.toIso8601String(),
+              }),
+              createdAt: now,
+            ),
+          );
+    });
   }
 }
 

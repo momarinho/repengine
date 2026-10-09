@@ -248,10 +248,14 @@ class RoutineSelectorView extends ConsumerWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          selectedSection.title,
-                          style: AppTypography.titleMedium.copyWith(fontSize: 17),
+                        Expanded(
+                          child: Text(
+                            selectedSection.title,
+                            style: AppTypography.titleMedium.copyWith(fontSize: 17),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(

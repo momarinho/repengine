@@ -124,6 +124,13 @@ void main() {
   testWidgets('Athlete can switch between multiple exercises within active workout session', (
     WidgetTester tester,
   ) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.625;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     final repo = WorkoutRepository(db);
 

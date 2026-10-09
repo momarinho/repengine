@@ -167,3 +167,37 @@ Este checklist complementa os Sprints do roadmap, rastreando individualmente cad
 - [ ] **Testes Automatizados**:
   - [ ] Testes unitários de repositório e testes de widget para o fluxo de criação de rotinas.
 
+---
+
+## 🏋️‍♂️ 8. Sprint 9: UX de Academia, Edição Durante o Treino & Sobrescrita de Rotina
+- [ ] **Ergonomia e Legibilidade de Academia (*Gym-Proof HUD*)**:
+  - [ ] Aumentar escala tipográfica dos elementos centrais (carga alvo, repetições, número da série) para visualização rápida à distância (24–32px).
+  - [ ] Aumentar área de toque mínima dos seletores de carga e repetições no `ThumbZonePad` (botões maiores e táteis).
+  - [ ] Destacar cronômetro de descanso com feedback de alto contraste quando ativo e concluído.
+- [ ] **Linguagem Amigável & Desacoplamento Técnico**:
+  - [ ] Substituir jargões técnicos ("BFF Host", "Outbox", "Consensus 1RM", "Autoregulated target") por termos intuitivos ("Nuvem / Sincronização", "Recorde estimado", "Meta sugerida").
+  - [ ] Reorganizar gaveta de configurações mantendo status de sincronização amigável e opções de IP/diagnóstico em seção de "Configurações Avançadas".
+- [ ] **Edição Rápida Durante o Treino (*In-Workout Quick Edit*)**:
+  - [ ] Menu de ações no player ativo para trocar exercício quando um aparelho estiver ocupado.
+  - [ ] Adicionar exercício avulso à sessão de hoje.
+  - [ ] Remover exercício da sessão atual sem afetar histórico prévio.
+- [ ] **Sobrescrita Inteligente da Rotina Base ao Concluir Treino**:
+  - [ ] Modal de conclusão de treino exibindo resumo de novas cargas e exercícios realizados hoje.
+  - [ ] Opção para atualizar a rotina base (`routines.blocksJson`) no SQLite local com as cargas/ajustes executados hoje.
+  - [ ] Opção alternativa para salvar apenas o log de hoje mantendo a rotina template intacta.
+- [ ] **Testes Automatizados**:
+  - [ ] Testes unitários para substituição/adição de exercícios em sessão ativa e sobrescrita de rotina base.
+  - [ ] Testes de widget para o novo HUD ampliado e modal inteligente de conclusão.
+
+---
+
+## 📱 9. Sprint 10: Tela de Login Dedicada & Editor de Rotinas Mobile
+- [ ] **Fluxo de Autenticação & Perfil do Atleta**:
+  - [ ] Tela de Login dedicada com opções de entrar na Conta RepEngine Web ou "Treinar Offline / Convidado".
+  - [ ] Tela/aba de perfil do atleta com status de conexão/sync e opção de desconectar.
+- [ ] **Criador e Editor de Rotinas Mobile (`RoutineEditorScreen`)**:
+  - [ ] Construtor completo de treinos com divisões (Dia A, Dia B...) e exercícios customizados.
+  - [ ] Prescrição de séries, repetições, carga inicial e descanso.
+  - [ ] Persistência determinística no SQLite local e enfileiramento na Outbox para sincronização upstream.
+
+

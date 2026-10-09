@@ -25,6 +25,12 @@ abstract final class AppTypography {
     color: AppColors.onBackground,
   );
 
+  static const titleSmall = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+    color: AppColors.onBackground,
+  );
+
   // Body text and descriptions
   static const bodyLarge = TextStyle(
     fontSize: 16,
@@ -35,6 +41,13 @@ abstract final class AppTypography {
 
   static const bodyMedium = TextStyle(
     fontSize: 14,
+    fontWeight: FontWeight.w400,
+    color: AppColors.onSurfaceVariant,
+    height: 1.4,
+  );
+
+  static const bodySmall = TextStyle(
+    fontSize: 12,
     fontWeight: FontWeight.w400,
     color: AppColors.onSurfaceVariant,
     height: 1.4,

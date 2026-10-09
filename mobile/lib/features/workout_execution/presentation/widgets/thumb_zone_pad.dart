@@ -101,6 +101,7 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
                 color: AppColors.onSurfaceVariant,
                 letterSpacing: 1.2,
                 fontWeight: FontWeight.bold,
+                fontSize: 13,
               ),
             ),
             const SizedBox(height: 4),
@@ -117,7 +118,7 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.trending_up, size: 14, color: AppColors.primary),
+                    const Icon(Icons.trending_up, size: 16, color: AppColors.primary),
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
@@ -125,7 +126,7 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
                         style: AppTypography.labelSmall.copyWith(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w600,
-                          fontSize: 11,
+                          fontSize: 12,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -155,6 +156,7 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
                       style: AppTypography.labelSmall.copyWith(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w700,
+                        fontSize: 12,
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -162,7 +164,7 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
                       '(±${result.stdDev.toStringAsFixed(1)} kg)',
                       style: AppTypography.labelSmall.copyWith(
                         color: AppColors.onSurfaceVariant,
-                        fontSize: 10,
+                        fontSize: 11,
                       ),
                     ),
                   ],
@@ -180,6 +182,7 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
                   style: AppTypography.labelSmall.copyWith(
                     color: AppColors.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
+                    fontSize: 12,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -216,7 +219,7 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
                         const SizedBox(height: 4),
                         Text(
                           _load.toStringAsFixed(1),
-                          style: AppTypography.displayLarge.copyWith(fontSize: 28),
+                          style: AppTypography.displayLarge.copyWith(fontSize: 32),
                         ),
                         const SizedBox(height: 6),
                         FittedBox(
@@ -254,15 +257,23 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
                         const SizedBox(height: 4),
                         Text(
                           '$_reps',
-                          style: AppTypography.displayLarge.copyWith(fontSize: 28),
+                          style: AppTypography.displayLarge.copyWith(fontSize: 32),
                         ),
                         const SizedBox(height: 6),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            _QuickButton(label: '-1', onTap: () => _adjustReps(-1)),
+                            _QuickButton(
+                              label: '-1',
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 7),
+                              onTap: () => _adjustReps(-1),
+                            ),
                             const SizedBox(width: 8),
-                            _QuickButton(label: '+1', onTap: () => _adjustReps(1)),
+                            _QuickButton(
+                              label: '+1',
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 7),
+                              onTap: () => _adjustReps(1),
+                            ),
                           ],
                         ),
                       ],
@@ -282,7 +293,7 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryContainer,
                 foregroundColor: AppColors.onBackground,
-                minimumSize: const Size.fromHeight(50),
+                minimumSize: const Size.fromHeight(54),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -292,13 +303,14 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.check_circle_outline, size: 22),
+                    const Icon(Icons.check_circle_outline, size: 24),
                     const SizedBox(width: 8),
                     Text(
                       'LOG SET ($_load kg × $_reps)',
                       style: AppTypography.labelLarge.copyWith(
                         color: AppColors.onBackground,
-                        fontSize: 16,
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
@@ -315,8 +327,13 @@ class _ThumbZonePadState extends State<ThumbZonePad> {
 class _QuickButton extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
+  final EdgeInsetsGeometry padding;
 
-  const _QuickButton({required this.label, required this.onTap});
+  const _QuickButton({
+    required this.label,
+    required this.onTap,
+    this.padding = const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -324,7 +341,7 @@ class _QuickButton extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        padding: padding,
         decoration: BoxDecoration(
           color: AppColors.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(8),
@@ -335,7 +352,7 @@ class _QuickButton extends StatelessWidget {
           style: AppTypography.labelSmall.copyWith(
             color: AppColors.onBackground,
             fontWeight: FontWeight.w700,
-            fontSize: 11,
+            fontSize: 13,
           ),
         ),
       ),
@@ -360,7 +377,7 @@ class _RpeChip extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.primaryContainer
@@ -375,7 +392,7 @@ class _RpeChip extends StatelessWidget {
           style: AppTypography.labelSmall.copyWith(
             color: isSelected ? AppColors.onBackground : AppColors.onSurfaceVariant,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-            fontSize: 11,
+            fontSize: 12,
           ),
         ),
       ),

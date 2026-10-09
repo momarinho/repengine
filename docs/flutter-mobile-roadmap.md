@@ -267,4 +267,40 @@ flowchart TD
   - Testes unitários de repositório para criação e leitura de rotinas customizadas locais.
   - Testes de widget para validação do formulário e feedback de criação.
 
+---
+
+### 🏋️‍♂️ SPRINT 9: Ergonomia de Academia, Edição Durante o Treino & Sobrescrita de Rotina
+> **Objetivo**: Elevar a usabilidade do aplicativo para o padrão "Gym-Proof", com tipografia de alta legibilidade, botões de toque amplo, linguagem humana sem jargões técnicos, edição rápida de exercícios em sessão ativa (para aparelhos ocupados) e pergunta inteligente de atualização da rotina base ao finalizar o treino.
+
+- [ ] **Ergonomia e Legibilidade de Academia (*Gym-Proof HUD*)**:
+  - Tipografia de alto contraste e relance rápido (24–32px) para métricas principais (carga, repetições, número da série).
+  - Touch targets ampliados no `ThumbZonePad` (mínimo 48–56dp) para digitação e ajuste rápido mesmo com mãos suadas.
+  - Cronômetro de descanso em destaque com feedback visual e sonoro/vibração.
+- [ ] **Linguagem Amigável & Desacoplamento Técnico**:
+  - Substituição de termos de engenharia ("BFF Host", "Outbox", "Consensus 1RM", "Autoregulated target") por termos intuitivos do atleta ("Nuvem / Sincronização", "Recorde estimado (1RM)", "Meta sugerida").
+  - Gaveta de configurações reorganizada com foco em status simples e seção expansível de configurações avançadas.
+- [ ] **Edição Rápida Durante o Treino (*In-Workout Quick Edit*)**:
+  - Substituição de exercício na sessão ativa (ex: máquina ocupada, trocar barra por halteres).
+  - Adição de exercício avulso à sessão de hoje.
+  - Remoção de exercício da sessão do dia.
+- [ ] **Sobrescrita Inteligente da Rotina Base ao Concluir Treino**:
+  - Resumo de conclusão com comparação entre cargas prescritas vs executadas.
+  - Opção de salvar novos recordes e cargas na rotina base (`routines.blocksJson`) no SQLite local para a próxima semana.
+  - Opção de salvar somente o histórico do treino de hoje sem alterar a rotina original.
+- [ ] **Testes Automatizados**:
+  - Testes unitários para substituição de exercícios e atualização de blocos de rotina.
+  - Testes de widget para o modal inteligente de conclusão e novo HUD ampliado.
+
+---
+
+### 📱 SPRINT 10: Autenticação Limpa & Editor Completo de Rotinas no Mobile
+> **Objetivo**: Conceder independência total do desktop ao atleta, com tela de login amigável e editor nativo completo de rotinas diretamente no celular.
+
+- [ ] **Fluxo de Autenticação Oficial & Perfil**:
+  - Tela de boas-vindas com opções de login na Conta RepEngine Web ou "Treinar Offline / Convidado".
+  - Tela de perfil para visualização de conta, status de sincronização e desconexão.
+- [ ] **Editor de Rotinas Mobile (`RoutineEditorScreen`)**:
+  - Formulário completo para criar e editar rotinas, seções/dias e exercícios pelo celular.
+  - Prescrição de séries, repetições, carga e descansos salvos atomicamente no SQLite local e sincronizados via Outbox.
+
 

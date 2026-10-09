@@ -13,6 +13,7 @@ import 'widgets/abandon_workout_dialog.dart';
 import 'widgets/circular_rest_timer.dart';
 import 'widgets/debug_settings_drawer.dart';
 import 'widgets/exercise_completed_pad.dart';
+import 'widgets/in_workout_edit_sheet.dart';
 import 'widgets/routine_selector_view.dart';
 import 'widgets/set_log_card.dart';
 import 'widgets/thumb_zone_pad.dart';
@@ -71,6 +72,7 @@ class WorkoutExecutionScreen extends ConsumerWidget {
                 final repo = ref.read(workoutRepositoryProvider);
                 final uniqueId = 'sess-${DateTime.now().millisecondsSinceEpoch}';
                 ref.read(activeExerciseIndexProvider.notifier).state = 0;
+                ref.read(activeSessionExercisesProvider.notifier).reset();
                 await repo.startSession(
                   clientId: uniqueId,
                   workflowId: workflowId,
@@ -91,10 +93,22 @@ class WorkoutExecutionScreen extends ConsumerWidget {
             (s) => s.id == session.sectionId,
             orElse: () => routine.sections.isNotEmpty ? routine.sections.first : ParsedRoutine.defaultGzclp().sections.first,
           );
-          final exercises = section.exercises.isNotEmpty
-              ? section.exercises
-              : ParsedRoutine.defaultGzclp().sections.first.exercises;
-          final activeExIndex = ref.watch(activeExerciseIndexProvider).clamp(0, exercises.length - 1);
+          final baseExercises = section.exercises;
+          final notifier = ref.read(activeSessionExercisesProvider.notifier);
+          final customExercises = ref.watch(activeSessionExercisesProvider);
+          final bool isMatchingSession = notifier.currentSessionId == session.clientId;
+
+          if (!isMatchingSession || customExercises == null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (ref.read(activeSessionExercisesProvider.notifier).currentSessionId != session.clientId) {
+                ref.read(activeSessionExercisesProvider.notifier).initialize(session.clientId, baseExercises);
+              }
+            });
+          }
+          final exercises = (isMatchingSession && customExercises != null)
+              ? customExercises
+              : baseExercises;
+          final activeExIndex = (ref.watch(activeExerciseIndexProvider)).clamp(0, exercises.length - 1).toInt();
 
           return Stack(
             children: [
@@ -139,9 +153,14 @@ class WorkoutExecutionScreen extends ConsumerWidget {
             (s) => s.id == session.sectionId,
             orElse: () => routine.sections.isNotEmpty ? routine.sections.first : ParsedRoutine.defaultGzclp().sections.first,
           );
-          final exercises = section.exercises.isNotEmpty
-              ? section.exercises
-              : ParsedRoutine.defaultGzclp().sections.first.exercises;
+          final notifier = ref.read(activeSessionExercisesProvider.notifier);
+          final customExercises = ref.watch(activeSessionExercisesProvider);
+          final bool isMatchingSession = notifier.currentSessionId == session.clientId;
+          final exercises = (isMatchingSession && customExercises != null)
+              ? customExercises
+              : (section.exercises.isNotEmpty
+                  ? section.exercises
+                  : ParsedRoutine.defaultGzclp().sections.first.exercises);
           final activeExIndex = ref.watch(activeExerciseIndexProvider).clamp(0, exercises.length - 1);
           final currentExercise = exercises[activeExIndex];
 
@@ -188,14 +207,17 @@ class WorkoutExecutionScreen extends ConsumerWidget {
                   builder: (ctx) => WorkoutSummaryDialog(
                     session: session,
                     logs: logs,
-                    onConfirm: () async {
-                      await ref.read(workoutRepositoryProvider).completeSession(session.clientId);
-                      ref.read(restTimerProvider.notifier).stop();
+                    onConfirm: ({bool updateTemplate = false}) async {
+                      await _handleSessionCompletion(
+                        ref: ref,
+                        session: session,
+                        logs: logs,
+                        exercises: exercises,
+                        updateTemplate: updateTemplate,
+                      );
                     },
                     onAbandon: () async {
-                      await ref.read(workoutRepositoryProvider).abandonSession(session.clientId);
-                      ref.read(restTimerProvider.notifier).stop();
-                      ref.read(activeExerciseIndexProvider.notifier).state = 0;
+                      await _handleSessionAbandonment(ref: ref, session: session);
                     },
                   ),
                 );
@@ -278,6 +300,53 @@ class WorkoutExecutionScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+Future<void> _handleSessionCompletion({
+  required WidgetRef ref,
+  required WorkoutSessionData session,
+  required List<WorkoutSetLogData> logs,
+  required List<RoutineExercise> exercises,
+  bool updateTemplate = false,
+}) async {
+  final repo = ref.read(workoutRepositoryProvider);
+  if (updateTemplate) {
+    final updated = exercises.map((ex) {
+      final exLogs = logs.where((l) => l.blockClientId == ex.blockClientId && l.completed).toList();
+      if (exLogs.isEmpty) return ex;
+      final maxLoad = exLogs.map((l) => double.tryParse(l.actualLoad) ?? 0.0).reduce((a, b) => a > b ? a : b);
+      final lastReps = exLogs.last.actualReps;
+      return RoutineExercise(
+        blockClientId: ex.blockClientId,
+        nodeTypeSlug: ex.nodeTypeSlug,
+        name: ex.name,
+        sets: ex.sets,
+        reps: lastReps.isNotEmpty ? lastReps : ex.reps,
+        targetLoad: maxLoad > 0 ? maxLoad : ex.targetLoad,
+        restSeconds: ex.restSeconds,
+      );
+    }).toList();
+
+    await repo.updateRoutineSectionExercises(
+      routineId: session.workflowId,
+      sectionId: session.sectionId,
+      updatedExercises: updated,
+    );
+  }
+  await repo.completeSession(session.clientId);
+  ref.read(restTimerProvider.notifier).stop();
+  ref.read(activeSessionExercisesProvider.notifier).reset();
+  ref.read(activeExerciseIndexProvider.notifier).state = 0;
+}
+
+Future<void> _handleSessionAbandonment({
+  required WidgetRef ref,
+  required WorkoutSessionData session,
+}) async {
+  await ref.read(workoutRepositoryProvider).abandonSession(session.clientId);
+  ref.read(restTimerProvider.notifier).stop();
+  ref.read(activeSessionExercisesProvider.notifier).reset();
+  ref.read(activeExerciseIndexProvider.notifier).state = 0;
 }
 
 class _ActiveSessionContent extends ConsumerWidget {
@@ -394,28 +463,27 @@ class _ActiveSessionContent extends ConsumerWidget {
                     builder: (ctx) => WorkoutSummaryDialog(
                       session: session,
                       logs: logs,
-                      onConfirm: () async {
-                        await ref
-                            .read(workoutRepositoryProvider)
-                            .completeSession(session.clientId);
-                        ref.read(restTimerProvider.notifier).stop();
+                      onConfirm: ({bool updateTemplate = false}) async {
+                        await _handleSessionCompletion(
+                          ref: ref,
+                          session: session,
+                          logs: logs,
+                          exercises: exercises,
+                          updateTemplate: updateTemplate,
+                        );
                       },
                       onAbandon: () async {
-                        await ref
-                            .read(workoutRepositoryProvider)
-                            .abandonSession(session.clientId);
-                        ref.read(restTimerProvider.notifier).stop();
-                        ref.read(activeExerciseIndexProvider.notifier).state = 0;
+                        await _handleSessionAbandonment(ref: ref, session: session);
                       },
                     ),
                   );
                 },
-                icon: const Icon(Icons.done_all, size: 13),
-                label: const Text('Finish', style: TextStyle(fontSize: 12)),
+                icon: const Icon(Icons.done_all, size: 14),
+                label: const Text('Finish', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.onBackground,
                   side: const BorderSide(color: AppColors.outlineVariant),
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -424,43 +492,63 @@ class _ActiveSessionContent extends ConsumerWidget {
             ],
           ),
 
-          // 2. EXERCISE SWITCHER CHIPS (if multiple exercises exist)
-          if (exercises.length > 1) ...[
-            const SizedBox(height: 4),
-            SizedBox(
-              height: 30,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: exercises.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 6),
-                itemBuilder: (context, index) {
-                  final ex = exercises[index];
-                  final isSelected = index == activeExerciseIndex;
-                  final exSetsDone = logs.where((l) => l.blockClientId == ex.blockClientId).length;
-                  final isAllDone = exSetsDone >= ex.sets && ex.sets > 0;
-
-                  return ChoiceChip(
-                    avatar: isAllDone
-                        ? const Icon(Icons.check_circle_rounded, size: 12, color: AppColors.success)
-                        : null,
-                    label: Text(ex.name),
-                    selected: isSelected,
-                    onSelected: (_) {
-                      ref.read(activeExerciseIndexProvider.notifier).state = index;
-                    },
-                    selectedColor: AppColors.primaryContainer,
+          // 2. EXERCISE SWITCHER CHIPS + ADD EXERCISE ACTION
+          const SizedBox(height: 4),
+          SizedBox(
+            height: 34,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: exercises.length + 1,
+              separatorBuilder: (_, _) => const SizedBox(width: 6),
+              itemBuilder: (context, index) {
+                if (index == exercises.length) {
+                  return ActionChip(
+                    avatar: const Icon(Icons.add, size: 14, color: AppColors.primary),
+                    label: const Text('Add'),
                     backgroundColor: AppColors.surfaceContainer,
-                    visualDensity: VisualDensity.compact,
-                    labelStyle: TextStyle(
-                      color: isSelected ? AppColors.onBackground : AppColors.onSurfaceVariant,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                      fontSize: 11,
+                    side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
+                    labelStyle: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
                     ),
+                    onPressed: () {
+                      InWorkoutEditSheet.showAdd(
+                        context: context,
+                        onSave: (newEx) {
+                          ref.read(activeSessionExercisesProvider.notifier).addExercise(newEx);
+                          ref.read(activeExerciseIndexProvider.notifier).state = exercises.length;
+                        },
+                      );
+                    },
                   );
-                },
-              ),
+                }
+                final ex = exercises[index];
+                final isSelected = index == activeExerciseIndex;
+                final exSetsDone = logs.where((l) => l.blockClientId == ex.blockClientId).length;
+                final isAllDone = exSetsDone >= ex.sets && ex.sets > 0;
+
+                return ChoiceChip(
+                  avatar: isAllDone
+                      ? const Icon(Icons.check_circle_rounded, size: 13, color: AppColors.success)
+                      : null,
+                  label: Text(ex.name),
+                  selected: isSelected,
+                  onSelected: (_) {
+                    ref.read(activeExerciseIndexProvider.notifier).state = index;
+                  },
+                  selectedColor: AppColors.primaryContainer,
+                  backgroundColor: AppColors.surfaceContainer,
+                  visualDensity: VisualDensity.compact,
+                  labelStyle: TextStyle(
+                    color: isSelected ? AppColors.onBackground : AppColors.onSurfaceVariant,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    fontSize: 12,
+                  ),
+                );
+              },
             ),
-          ],
+          ),
 
           const SizedBox(height: 4),
 
@@ -483,26 +571,53 @@ class _ActiveSessionContent extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Exercise Name & Rest Timer Pill
+                // Exercise Name & Swap & Rest Timer Pill
                 Row(
                   children: [
                     Expanded(
                       child: Text(
                         currentExercise.name,
                         style: AppTypography.titleMedium.copyWith(
-                          fontSize: 13,
+                          fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: AppColors.onBackground,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    IconButton(
+                      icon: const Icon(Icons.swap_horiz_rounded, size: 20, color: AppColors.primary),
+                      tooltip: 'Swap Exercise (e.g. machine busy)',
+                      style: IconButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(28, 28),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: () {
+                        InWorkoutEditSheet.showSwap(
+                          context: context,
+                          currentExercise: currentExercise,
+                          onSave: (updated) {
+                            ref.read(activeSessionExercisesProvider.notifier).swapExercise(activeExerciseIndex, updated);
+                          },
+                          onRemove: exercises.length > 1
+                              ? () {
+                                  ref.read(activeSessionExercisesProvider.notifier).removeExercise(activeExerciseIndex);
+                                  if (activeExerciseIndex >= exercises.length - 1) {
+                                    ref.read(activeExerciseIndexProvider.notifier).state =
+                                        (exercises.length - 2).clamp(0, 999);
+                                  }
+                                }
+                              : null,
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 4),
                     Text(
                       '${currentExercise.restSeconds}s rest',
                       style: AppTypography.labelSmall.copyWith(
                         color: AppColors.tertiary,
-                        fontSize: 10,
+                        fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -511,67 +626,71 @@ class _ActiveSessionContent extends ConsumerWidget {
                 const SizedBox(height: 4),
 
                 // Compact 3-Column Display Metrics
-                Row(
-                  children: [
-                    Text(
-                      completedSetsCount >= totalSets ? 'SETS ' : 'SET ',
-                      style: AppTypography.labelSmall.copyWith(
-                        color: completedSetsCount >= totalSets ? AppColors.success : AppColors.onSurfaceVariant,
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    children: [
+                      Text(
+                        completedSetsCount >= totalSets ? 'SETS ' : 'SET ',
+                        style: AppTypography.labelSmall.copyWith(
+                          color: completedSetsCount >= totalSets ? AppColors.success : AppColors.onSurfaceVariant,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    Text(
-                      completedSetsCount >= totalSets ? '$totalSets' : '$currentSetNumber',
-                      style: AppTypography.titleMedium.copyWith(
-                        fontSize: 14,
-                        color: completedSetsCount >= totalSets ? AppColors.success : AppColors.primary,
-                        fontWeight: FontWeight.bold,
+                      Text(
+                        completedSetsCount >= totalSets ? '$totalSets' : '$currentSetNumber',
+                        style: AppTypography.titleMedium.copyWith(
+                          fontSize: 16,
+                          color: completedSetsCount >= totalSets ? AppColors.success : AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    Text(
-                      completedSetsCount >= totalSets ? '/$totalSets ✓' : '/$totalSets',
-                      style: AppTypography.labelSmall.copyWith(
-                        fontSize: 10,
-                        color: completedSetsCount >= totalSets ? AppColors.success : AppColors.onSurfaceVariant,
-                        fontWeight: completedSetsCount >= totalSets ? FontWeight.bold : FontWeight.normal,
+                      Text(
+                        completedSetsCount >= totalSets ? '/$totalSets ✓' : '/$totalSets',
+                        style: AppTypography.labelSmall.copyWith(
+                          fontSize: 11,
+                          color: completedSetsCount >= totalSets ? AppColors.success : AppColors.onSurfaceVariant,
+                          fontWeight: completedSetsCount >= totalSets ? FontWeight.bold : FontWeight.normal,
+                        ),
                       ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'TARGET ',
-                      style: AppTypography.labelSmall.copyWith(
-                        color: AppColors.onSurfaceVariant,
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
+                      const SizedBox(width: 24),
+                      Text(
+                        'TARGET ',
+                        style: AppTypography.labelSmall.copyWith(
+                          color: AppColors.onSurfaceVariant,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    Text(
-                      '${currentExercise.reps} reps',
-                      style: AppTypography.titleMedium.copyWith(
-                        fontSize: 13,
-                        color: AppColors.onBackground,
-                        fontWeight: FontWeight.bold,
+                      Text(
+                        '${currentExercise.reps} reps',
+                        style: AppTypography.titleMedium.copyWith(
+                          fontSize: 15,
+                          color: AppColors.onBackground,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'LOAD ',
-                      style: AppTypography.labelSmall.copyWith(
-                        color: AppColors.onSurfaceVariant,
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
+                      const SizedBox(width: 24),
+                      Text(
+                        'LOAD ',
+                        style: AppTypography.labelSmall.copyWith(
+                          color: AppColors.onSurfaceVariant,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    Text(
-                      '${currentExercise.targetLoad.toStringAsFixed(currentExercise.targetLoad % 1 == 0 ? 0 : 1)} kg',
-                      style: AppTypography.titleMedium.copyWith(
-                        fontSize: 13,
-                        color: AppColors.onBackground,
-                        fontWeight: FontWeight.bold,
+                      Text(
+                        '${currentExercise.targetLoad.toStringAsFixed(currentExercise.targetLoad % 1 == 0 ? 0 : 1)} kg',
+                        style: AppTypography.titleMedium.copyWith(
+                          fontSize: 15,
+                          color: AppColors.onBackground,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 4),
 
@@ -582,8 +701,8 @@ class _ActiveSessionContent extends ConsumerWidget {
                     final isCurrent = index == completedSetsCount;
                     return Expanded(
                       child: Container(
-                        height: 3,
-                        margin: EdgeInsets.only(right: index < totalSets - 1 ? 3 : 0),
+                        height: 4,
+                        margin: EdgeInsets.only(right: index < totalSets - 1 ? 4 : 0),
                         decoration: BoxDecoration(
                           color: isDone
                               ? AppColors.primary
