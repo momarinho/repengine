@@ -179,6 +179,11 @@ class SyncEngine extends StateNotifier<SyncState> {
           await repository.upsertProgressionStates(pullResponse.progressionStates);
         }
 
+        // Upsert historical workout sessions for multi-day continuity
+        if (pullResponse.sessions.isNotEmpty) {
+          await repository.upsertHistoricalSessions(pullResponse.sessions);
+        }
+
         // Save latest server timestamp for next delta sync
         await prefs?.setString(
           _lastSyncedKey,

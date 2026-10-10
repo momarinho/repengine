@@ -22,6 +22,7 @@ class _AthleteAuthScreenState extends ConsumerState<AthleteAuthScreen> {
   bool _obscurePassword = true;
   bool _showAdvancedServer = false;
   bool _isSyncing = false;
+  bool _isScanning = false;
 
   @override
   void initState() {
@@ -35,6 +36,32 @@ class _AthleteAuthScreenState extends ConsumerState<AthleteAuthScreen> {
     _passwordController.dispose();
     _serverController.dispose();
     super.dispose();
+  }
+
+  Future<void> _autoDetectHost() async {
+    setState(() => _isScanning = true);
+    ref.read(serverHealthProvider.notifier).resetAutoDiscoveryAttempt();
+    final found = await ref.read(serverHostProvider.notifier).autoDiscover();
+    if (!mounted) return;
+    setState(() => _isScanning = false);
+
+    if (found != null) {
+      _serverController.text = found;
+      await ref.read(serverHealthProvider.notifier).checkHealth();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('RepEngine PC detected at $found!'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No RepEngine PC found on Wi-Fi. Ensure Docker is running on port 8081.'),
+        ),
+      );
+    }
   }
 
   Future<void> _handleLogin() async {
@@ -278,6 +305,20 @@ class _AthleteAuthScreenState extends ConsumerState<AthleteAuthScreen> {
   }
 
   Widget _buildLoginForm(AuthState authState, bool isAuthenticating) {
+    final currentHost = ref.watch(serverHostProvider);
+    final health = ref.watch(serverHealthProvider);
+
+    ref.listen<String>(serverHostProvider, (_, next) {
+      if (_serverController.text != next) {
+        _serverController.text = next;
+      }
+    });
+
+    final isConnectionError = authState.errorMessage != null &&
+        (authState.errorMessage!.contains('connect') ||
+            authState.errorMessage!.contains('Socket') ||
+            authState.errorMessage!.contains('Timeout'));
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -330,16 +371,44 @@ class _AthleteAuthScreenState extends ConsumerState<AthleteAuthScreen> {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppColors.error.withValues(alpha: 0.5)),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.error_outline, color: AppColors.error, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    authState.errorMessage!,
-                    style: const TextStyle(color: AppColors.error, fontSize: 12),
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.error_outline, color: AppColors.error, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        isConnectionError
+                            ? 'Could not connect to PC at $currentHost. Ensure Docker is running and phone is on the same Wi-Fi.'
+                            : authState.errorMessage!,
+                        style: const TextStyle(color: AppColors.error, fontSize: 12),
+                      ),
+                    ),
+                  ],
                 ),
+                if (isConnectionError) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: _isScanning ? null : _autoDetectHost,
+                      icon: _isScanning
+                          ? const SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.error),
+                            )
+                          : const Icon(Icons.radar_rounded, size: 14, color: AppColors.error),
+                      label: Text(
+                        _isScanning ? 'Scanning Wi-Fi...' : 'Auto-Detect PC on Wi-Fi',
+                        style: const TextStyle(color: AppColors.error, fontWeight: FontWeight.bold, fontSize: 11),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -371,7 +440,50 @@ class _AthleteAuthScreenState extends ConsumerState<AthleteAuthScreen> {
           ),
         ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
+
+        // Connection Target Status Indicator
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                health.isOnline ? Icons.check_circle_rounded : Icons.wifi_off_rounded,
+                size: 14,
+                color: health.isOnline ? AppColors.success : AppColors.onSurfaceVariant,
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  health.isOnline ? 'PC Online ($currentHost)' : 'PC Target: $currentHost',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: health.isOnline ? AppColors.success : AppColors.onSurfaceVariant,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (!health.isOnline) ...[
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: _isScanning ? null : _autoDetectHost,
+                  child: Text(
+                    _isScanning ? 'Scanning...' : 'Auto-Detect',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 12),
 
         // Sign In Button
         ElevatedButton(
@@ -440,23 +552,71 @@ class _AthleteAuthScreenState extends ConsumerState<AthleteAuthScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.surfaceContainerHighest,
-                    foregroundColor: AppColors.onBackground,
-                  ),
-                  onPressed: () async {
-                    final newHost = _serverController.text.trim();
-                    if (newHost.isNotEmpty) {
-                      await ref.read(serverHostProvider.notifier).setHost(newHost);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Host updated to $newHost')),
-                        );
-                      }
-                    }
-                  },
-                  child: const Text('Update Host'),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.surfaceContainerHighest,
+                          foregroundColor: AppColors.onBackground,
+                        ),
+                        onPressed: () async {
+                          final newHost = _serverController.text.trim();
+                          if (newHost.isNotEmpty) {
+                            await ref.read(serverHostProvider.notifier).setHost(newHost);
+                            await ref.read(serverHealthProvider.notifier).checkHealth();
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Host updated to $newHost')),
+                              );
+                            }
+                          }
+                        },
+                        child: const Text('Save Host'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryContainer,
+                          foregroundColor: AppColors.onBackground,
+                        ),
+                        onPressed: _isScanning ? null : _autoDetectHost,
+                        icon: _isScanning
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.radar_rounded, size: 16),
+                        label: Text(_isScanning ? 'Scanning...' : 'Auto-Detect'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    ActionChip(
+                      label: const Text('Wi-Fi PC (192.168.100.2)', style: TextStyle(fontSize: 11)),
+                      onPressed: () async {
+                        _serverController.text = 'http://192.168.100.2:8081';
+                        await ref.read(serverHostProvider.notifier).setHost('http://192.168.100.2:8081');
+                        await ref.read(serverHealthProvider.notifier).checkHealth();
+                      },
+                    ),
+                    ActionChip(
+                      label: const Text('Emulator (10.0.2.2)', style: TextStyle(fontSize: 11)),
+                      onPressed: () async {
+                        _serverController.text = 'http://10.0.2.2:8081';
+                        await ref.read(serverHostProvider.notifier).setHost('http://10.0.2.2:8081');
+                        await ref.read(serverHealthProvider.notifier).checkHealth();
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),

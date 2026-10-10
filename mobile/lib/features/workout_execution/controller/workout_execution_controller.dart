@@ -78,11 +78,20 @@ final restTimerProvider =
 /// Reactive provider calculating progression suggestion for an exercise block
 final progressionSuggestionProvider = FutureProvider.family<
     ProgressionSuggestion,
-    ({String blockClientId, int logCount, double? fallbackLoad, int? fallbackReps})>(
+    ({
+      String blockClientId,
+      String? sectionId,
+      String? sectionTitle,
+      int logCount,
+      double? fallbackLoad,
+      int? fallbackReps,
+    })>(
   (ref, params) async {
     final repo = ref.watch(workoutRepositoryProvider);
     return repo.getSuggestedProgressionForBlock(
       params.blockClientId,
+      sectionId: params.sectionId,
+      sectionTitle: params.sectionTitle,
       fallbackLoad: params.fallbackLoad ?? 100.0,
       fallbackReps: params.fallbackReps ?? 5,
     );

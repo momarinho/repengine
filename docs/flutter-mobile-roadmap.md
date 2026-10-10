@@ -306,4 +306,33 @@ flowchart TD
 - [x] **Testes Automatizados**:
   - Testes de widget para autenticação (`athlete_auth_screen_test.dart`) e editor de rotinas (`routine_editor_test.dart`).
 
+---
+
+### 🤖 SPRINT 11: RepEngine AI Copilot (Coach Generativo & Smart Workout Debrief)
+> **Objetivo**: Integrar inteligência artificial aplicada ao ecossistema RepEngine para eliminar a fricção no planejamento de rotinas e fornecer análises qualitativas de desempenho esportivo, preservando integralmente o determinismo matemático do Go Core e a autonomia Offline-First do Flutter.
+
+- [x] **Fronteira Arquitetural & Princípios de Engenharia**:
+  - **Determinismo Preservado**: Fórmulas de sobrecarga progressiva, cálculos de 1RM e integridade relacional permanecem 100% no Go Core (`api/`).
+  - **Offline-First Intocado**: A execução na academia e o registro de séries continuam 100% locais no SQLite/Drift, sem dependência de internet.
+  - **IA Assíncrona & Resiliente**: Chamadas de IA ocorrem em momentos conectados (criação de rotina pré-treino ou análise após sync push), com fallbacks graciosos caso esteja offline.
+- [x] **Coach Copilot: Gerador de Rotinas em Linguagem Natural (Google Genkit)**:
+  - Endpoint no Dart Frog BFF (`POST /api/v1/mobile/ai/generate_routine`) integrando Google Gemini 1.5 Flash via **Google Genkit 1.0** e **Structured JSON Outputs**.
+  - O treinador ou atleta digita ou seleciona: *"Treino Upper/Lower de 4 dias para hipertrofia, evitando supino com barra devido a desconforto no ombro"*.
+  - O LLM gera um payload estruturado compatível diretamente com a especificação `blocksJson` (`section`, `exercise`, `sets`, `reps`, `rest_time`, `target_load`).
+  - Botão "Criar com IA" no `RoutineSelectorView` / `RoutineEditorScreen` do Flutter.
+  - **Web AI Workout Architect (`AiArchitectModal.svelte`)**: No Web SvelteKit, modal avançado permitindo configurar objetivo, divisão, nível, equipamentos, restrições e aplicar diretamente ao Canvas (Substituir ou Anexar).
+- [ ] **Smart Workout Debrief (Análise Pós-Treino com Insights Esportivos)**:
+  - Disparado automaticamente após o sucesso do *sync push* da sessão de treino.
+  - Compara a prescrição teórica com os logs executados (volume total levantado, quebra de recordes de 1RM, tempo médio de descanso e consistência de RPE).
+  - Gera um resumo técnico e motivacional armazenado localmente e exibido no `WorkoutHistoryView` e no resumo da web.
+- [ ] **Smart Exercise Substitution (Substituição Biomecânica Inteligente)**:
+  - Assistente contextual no modal de substituição durante o treino ativo: quando uma máquina estiver ocupada, sugere 2 a 3 alternativas viáveis com base nos mesmos grupos musculares e padrões de movimento (ex: Leg Press ocupado -> Agachamento Búlgaro com halteres), ajustando a meta de carga sugerida.
+- [x] **Guardrails de Segurança Física & Fallbacks**:
+  - System prompts com regras estritas de ciência do esporte (limites máximos de volume por grupo muscular, prevenção de exercícios com contraindicação).
+  - Tratamento de timeout e indisponibilidade de rede com mensagens claras ao usuário e código HTTP 503 controlado se a API key não for configurada.
+- [x] **Testes Automatizados & Validação**:
+  - Testes unitários para parsing e validação de schema do JSON gerado pela IA no BFF (`gemini_client_test.dart` e `generate_routine_test.dart` - 39 testes).
+  - Testes de widget no Flutter para os fluxos com IA (`ai_routine_dialog_test.dart` e `ai_copilot_service_test.dart` - 64 testes).
+
+
 

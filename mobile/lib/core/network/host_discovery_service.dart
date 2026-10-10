@@ -38,8 +38,9 @@ class HostDiscoveryService {
     required Duration timeoutPerProbe,
     required int targetPort,
   }) async {
-    // 1. Fast check for well-known loopback / emulator hosts
+    // 1. Fast check for well-known loopback / emulator / LAN hosts
     final quickCandidates = [
+      'http://192.168.100.2:$targetPort',
       'http://localhost:$targetPort',
       'http://10.0.2.2:$targetPort',
     ];
@@ -64,7 +65,7 @@ class HostDiscoveryService {
 
   /// Extracts active local IPv4 subnet prefixes (e.g. '192.168.1' from '192.168.1.50').
   Future<Set<String>> _getLocalSubnets() async {
-    final subnets = <String>{};
+    final subnets = <String>{'192.168.100', '192.168.1', '192.168.0'};
     try {
       final interfaces = await NetworkInterface.list(
         type: InternetAddressType.IPv4,

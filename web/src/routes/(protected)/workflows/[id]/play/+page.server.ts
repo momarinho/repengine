@@ -41,7 +41,7 @@ export const load = (async ({ params, cookies, fetch, url }) => {
 
 	const workflow = normalizeWorkflow(await safeJson<Workflow>(workflowResponse));
 	const routine = normalizePlayerRoutine(workflow, url.searchParams.get('section'));
-	const sessionsResponse = await apiFetch(fetch, `/workflows/${params.id}/sessions?limit=8`, token, {
+	const sessionsResponse = await apiFetch(fetch, `/workflows/${params.id}/sessions?limit=30`, token, {
 		method: 'GET'
 	});
 	const sessionsPayload = sessionsResponse.ok

@@ -223,6 +223,9 @@
 
 	function openLoadPreview(section: PlayerSection | null) {
 		previewSection = section;
+		if (section) {
+			activeSection = section;
+		}
 		const newOverrides: Record<string, string> = {};
 		const blocksToInitialize = routine
 			? routine.blocks.filter((block) => {
@@ -309,11 +312,24 @@
 
 	function getLastSessionLogs(block: PlayerBlock): WorkoutSetLog[] {
 		if (!block) return [];
+		const targetSection = previewSection ?? activeSection;
 		for (const session of sessionHistory) {
 			if (activePersistedSession && session.id === activePersistedSession.id) {
 				continue;
 			}
 			if (!session.logs || session.logs.length === 0) continue;
+			if (targetSection) {
+				const hasSectionInfo = Boolean(session.section_id || session.section_title);
+				if (hasSectionInfo) {
+					const idMatches = session.section_id && String(session.section_id) === String(targetSection.id);
+					const titleMatches =
+						session.section_title &&
+						session.section_title.trim().toLowerCase() === targetSection.title.trim().toLowerCase();
+					if (!idMatches && !titleMatches) {
+						continue;
+					}
+				}
+			}
 			const blockLogs = session.logs.filter(
 				(log) =>
 					(block.workflowBlockID && log.workflow_block_id === block.workflowBlockID) ||
@@ -646,7 +662,7 @@
 	}
 
 	function getSectionByID(sectionID: string | null): PlayerSection | null {
-		return sectionID ? routine?.sections.find((section) => section.id === sectionID) ?? null : null;
+		return sectionID ? routine?.sections.find((section) => String(section.id) === String(sectionID)) ?? null : null;
 	}
 
 	function formatClock(totalSeconds: number): string {
@@ -1347,6 +1363,7 @@
 
 		completedSessionSummary = session;
 		activePersistedSession = null;
+		overrideLoads = {};
 		syncSessionHistory(session);
 		await refreshProgressionStates();
 	}
@@ -1424,6 +1441,7 @@
 		actualRPEByBlock = {};
 		actualRIRByBlock = {};
 		activityEntries = [];
+		overrideLoads = {};
 		sessionElapsedSeconds = 0;
 		isTimerRunning = false;
 		timerRemainingSeconds = routine ? getInitialTimerSeconds(routine.blocks[index]) : 0;
@@ -1559,7 +1577,7 @@
 				activePersistedSession ??
 				sessionHistory.find((session) => session.status === 'active') ??
 				null;
-			if (activeToAbandon && section && activeToAbandon.section_id !== section.id) {
+			if (activeToAbandon && section && String(activeToAbandon.section_id) !== String(section.id)) {
 				try {
 					await fetch(`/api/workout-sessions/${activeToAbandon.id}/abandon`, {
 						method: 'POST',
@@ -2121,6 +2139,7 @@
 				isSessionComplete = false;
 				if (routine.sections.length > 0) {
 					isChoosingSection = true;
+					resetRuntimeState(initialBlockIndex, initialSection, true);
 				} else {
 					resetRuntimeState(initialBlockIndex, initialSection, false);
 				}

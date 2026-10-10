@@ -65,7 +65,7 @@
 		try {
 			const [workflowRes, sessionsRes, progressionRes] = await Promise.all([
 				fetch(`/api/workflows/${id}`),
-				fetch(`/api/workflows/${id}/sessions?limit=8`),
+				fetch(`/api/workflows/${id}/sessions?limit=30`),
 				fetch(`/api/workflows/${id}/progression-states`)
 			]);
 

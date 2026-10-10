@@ -298,7 +298,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       }).toList();
 
       int savedRoutineId;
-      if (widget.routineToEdit != null) {
+      if (widget.routineToEdit != null && widget.routineToEdit!.id > 0) {
         savedRoutineId = widget.routineToEdit!.id;
         await repo.updateRoutine(
           id: savedRoutineId,
@@ -346,12 +346,15 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isEditing = widget.routineToEdit != null;
+    final isEditing = widget.routineToEdit != null && widget.routineToEdit!.id > 0;
+    final isAiDraft = widget.routineToEdit != null && widget.routineToEdit!.id <= 0;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          isEditing ? 'Edit Routine' : 'Create Routine',
+          isEditing
+              ? 'Edit Routine'
+              : (isAiDraft ? 'AI Routine Draft' : 'Create Routine'),
           style: AppTypography.titleMedium,
         ),
         actions: [

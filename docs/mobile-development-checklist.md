@@ -206,4 +206,26 @@ Este checklist complementa os Sprints do roadmap, rastreando individualmente cad
   - [x] Testes de widget para a tela de autenticação e perfil (`athlete_auth_screen_test.dart`).
   - [x] Testes de widget para criação, edição e exclusão de rotinas (`routine_editor_test.dart`).
 
+---
+
+## 🤖 10. Sprint 11: RepEngine AI Copilot (Coach Generativo & Smart Debrief)
+- [x] **Coach Copilot: Geração de Rotinas em Linguagem Natural (Google Genkit)**:
+  - [x] Endpoint no Dart Frog BFF (`POST /api/v1/mobile/ai/generate_routine`) com Google Genkit (`gemini-1.5-flash`) e *Structured JSON Outputs*.
+  - [x] Suporte a parâmetros estruturados de treino (disciplina, split, experiência, equipamentos, lesões/restrições).
+  - [x] Mapeamento e validação defensiva direta para blocos de treino (`blocksJson`) do RepEngine com slug canônico `exercise`.
+  - [x] Modal mobile dedicado `AiRoutineDialog` integrado com chips rápidos no `RoutineSelectorView` e abertura no `RoutineEditorScreen`.
+  - [x] **Web AI Workout Architect (`AiArchitectModal.svelte`)**: Motor avançado no Web Studio integrado ao Dashboard e Workflow Canvas com opções de Substituir ou Anexar rotina.
+- [ ] **Smart Workout Debrief (Análise Pós-Treino com Insights)**:
+  - [ ] Processamento de feedback qualitativo pós-sync push com comparação de planejado vs realizado.
+  - [ ] Card de resumo do treinador exibido no `WorkoutHistoryView` do mobile e no dashboard web.
+- [ ] **Substituição Biomecânica Inteligente no Treino Ativo**:
+  - [ ] Sugestão de exercícios alternativos com mesma ativação motora ao encontrar aparelhos ocupados.
+- [x] **Guardrails de Segurança & Resiliência Offline**:
+  - [x] Prompt com limites seguros de volume, cargas realistas e regras de ciência esportiva.
+  - [x] Fallback gracioso com aviso amigável quando o celular estiver sem conexão de rede ou sem API key (HTTP 503 controlado).
+- [x] **Testes Automatizados**:
+  - [x] Testes unitários no BFF para parsing defensivo, geração Genkit e enriquecimento de prompt (`gemini_client_test.dart` e `generate_routine_test.dart` - 39 testes).
+  - [x] Testes de widget no Flutter para os fluxos interativos de geração assistida por IA (`ai_routine_dialog_test.dart` e `ai_copilot_service_test.dart` - 64 testes).
+
+
 

@@ -64,10 +64,26 @@ Future<Response> onRequest(RequestContext context) async {
         .toList();
   }
 
-  // 5. Monta o DTO de resposta do nosso repengine_core
+  // 5. Busca progression states e histórico recente de sessões para os workflows
+  final allProgressionStates = <ProgressionState>[];
+  final allSessions = <WorkoutSession>[];
+  for (final w in allWorkflows.where((w) => !w.isDeleted)) {
+    try {
+      final states = await client.fetchProgressionStates(w.id, authHeader);
+      allProgressionStates.addAll(states);
+    } catch (_) {}
+    try {
+      final sessions = await client.fetchWorkflowSessions(w.id, authHeader, limit: 10);
+      allSessions.addAll(sessions);
+    } catch (_) {}
+  }
+
+  // 6. Monta o DTO de resposta do nosso repengine_core
   final responsePayload = SyncPullResponse(
     updatedWorkflows: updatedWorkflows,
     deletedWorkflowIds: deletedIds,
+    progressionStates: allProgressionStates,
+    sessions: allSessions,
     serverTimestamp: DateTime.now().toUtc(),
   );
 

@@ -5,6 +5,7 @@
 	import AddBlockModal from '$lib/editor/AddBlockModal.svelte';
 	import BlockRenderer from '$lib/blocks/BlockRenderer.svelte';
 	import QrCodeModal from '$lib/components/QrCodeModal.svelte';
+	import AiArchitectModal from '$lib/components/AiArchitectModal.svelte';
 	import { groupBlocksBySection, type SectionBlockGroup } from '$lib/sections/group';
 	import type {
 		DraftBlock,
@@ -40,6 +41,7 @@
 	let activeTab = $state<'editor' | 'preview' | 'history'>('editor');
 	let showAddBlock = $state(false);
 	let showQrModal = $state(false);
+	let showAiModal = $state(false);
 	let addBlockInsertIndex = $state(0);
 	let addBlockPlacementLabel = $state('');
 	let title = $state('');
@@ -221,6 +223,35 @@
 		blocks = nextBlocks.map((block, index) => ({ ...block, position: index }));
 		selectedBlockId = newBlock.client_id;
 		closeAddBlockModal();
+	}
+
+	function handleAiApply(generated: {
+		name: string;
+		description: string;
+		blocks: WorkflowBlockApi[];
+		action: 'replace' | 'append';
+	}): void {
+		recordHistory();
+		const incomingDraftBlocks = (generated.blocks ?? []).map((b, i) => toDraftBlock(b, i));
+
+		if (generated.action === 'replace') {
+			if (generated.name && generated.name.trim()) {
+				title = generated.name.trim();
+			}
+			if (generated.description && generated.description.trim()) {
+				description = generated.description.trim();
+			}
+			blocks = incomingDraftBlocks.map((b, idx) => ({ ...b, position: idx }));
+			selectedBlockId = incomingDraftBlocks[0]?.client_id ?? null;
+		} else {
+			const startingPos = blocks.length;
+			const reindexed = incomingDraftBlocks.map((b, idx) => ({
+				...b,
+				position: startingPos + idx
+			}));
+			blocks = [...blocks, ...reindexed];
+			selectedBlockId = reindexed[0]?.client_id ?? selectedBlockId;
+		}
 	}
 
 	function removeSelectedBlock(): void {
@@ -727,28 +758,48 @@
 							<p class="text-sm font-semibold text-on-surface">Canvas</p>
 							<p class="text-xs text-on-surface-variant">Drag to reorder. Changes auto-save after 1.5s.</p>
 						</div>
-						<button
-							type="button"
-							class="inline-flex items-center gap-2 rounded-md border border-outline-variant/20 bg-surface-container px-3 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
-							onclick={openAddFromToolbar}
-						>
-							<span class="material-symbols-outlined text-base">add</span>
-							{selectedBlock ? 'Add After Selected' : 'Add Block'}
-						</button>
+						<div class="flex items-center gap-2">
+							<button
+								type="button"
+								class="inline-flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/20"
+								onclick={() => (showAiModal = true)}
+							>
+								<span class="material-symbols-outlined text-base">auto_awesome</span>
+								AI Architect
+							</button>
+							<button
+								type="button"
+								class="inline-flex items-center gap-2 rounded-md border border-outline-variant/20 bg-surface-container px-3 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+								onclick={openAddFromToolbar}
+							>
+								<span class="material-symbols-outlined text-base">add</span>
+								{selectedBlock ? 'Add After Selected' : 'Add Block'}
+							</button>
+						</div>
 					</div>
 
 					{#if blocks.length === 0}
 						<div class="rounded-md border border-dashed border-outline-variant/30 bg-surface-container-low px-8 py-16 text-center">
 							<p class="text-base font-semibold text-on-surface">No blocks yet</p>
 							<p class="mt-2 text-sm text-on-surface-variant">Start the routine with a section, exercise, timed effort, repeat, wave, or rest block.</p>
-							<button
-								type="button"
-								class="mt-6 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-on-primary-fixed transition-opacity hover:opacity-90"
-								onclick={openAddAtStart}
-							>
-								<span class="material-symbols-outlined text-base">add</span>
-								Add first block
-							</button>
+							<div class="mt-6 flex flex-wrap justify-center items-center gap-3">
+								<button
+									type="button"
+									class="inline-flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/20"
+									onclick={() => (showAiModal = true)}
+								>
+									<span class="material-symbols-outlined text-base">auto_awesome</span>
+									Generate with AI Architect
+								</button>
+								<button
+									type="button"
+									class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-on-primary-fixed transition-opacity hover:opacity-90"
+									onclick={openAddAtStart}
+								>
+									<span class="material-symbols-outlined text-base">add</span>
+									Add first block
+								</button>
+							</div>
 						</div>
 					{:else}
 						<div class="space-y-4">
@@ -1856,5 +1907,12 @@
 				onclose={() => (showQrModal = false)}
 			/>
 		{/if}
+
+		<AiArchitectModal
+			open={showAiModal}
+			mode="editor"
+			onclose={() => (showAiModal = false)}
+			onapply={handleAiApply}
+		/>
 	</div>
 {/if}

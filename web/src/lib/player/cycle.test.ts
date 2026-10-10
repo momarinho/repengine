@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getNextAndLastCompletedSection, getSectionExercisePreview, formatRelativeDate } from './cycle.ts';
+import {
+	getNextAndLastCompletedSection,
+	getSectionExercisePreview,
+	formatRelativeDate,
+	getLastCompletedSessionForSection
+} from './cycle.ts';
 import type { PlayerSection, PlayerBlock } from './types.ts';
 import type { WorkoutSession } from '../workout-sessions/types.ts';
 
@@ -145,4 +150,42 @@ test('formatRelativeDate returns friendly relative descriptions', () => {
 
 	const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
 	assert.equal(formatRelativeDate(threeDaysAgo), '3 days ago');
+});
+
+test('getLastCompletedSessionForSection finds matching session by section_id or title', () => {
+	const history: WorkoutSession[] = [
+		{
+			id: 30,
+			workflow_id: 1,
+			user_id: 1,
+			section_id: 'sec-2',
+			section_title: 'Day B - Back & Biceps',
+			status: 'completed',
+			started_at: new Date().toISOString(),
+			completed_at: new Date().toISOString(),
+			notes: '',
+			log_count: 5
+		},
+		{
+			id: 29,
+			workflow_id: 1,
+			user_id: 1,
+			section_id: 'sec-1',
+			section_title: 'Day A - Chest & Triceps',
+			status: 'completed',
+			started_at: new Date().toISOString(),
+			completed_at: new Date().toISOString(),
+			notes: '',
+			log_count: 5
+		}
+	];
+
+	const targetSection = mockSections[1]; // sec-2
+	const match = getLastCompletedSessionForSection(targetSection, history);
+	assert.equal(match?.id, 30);
+	assert.equal(match?.section_id, 'sec-2');
+
+	const firstSection = mockSections[0]; // sec-1
+	const matchFirst = getLastCompletedSessionForSection(firstSection, history);
+	assert.equal(matchFirst?.id, 29);
 });

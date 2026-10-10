@@ -9,6 +9,8 @@ environment:
 dependencies:
   dart_frog: ^1.2.0
   dart_jsonwebtoken: ^2.14.0
+  genkit: ^1.0.0
+  genkit_google_genai: ^1.0.0
   http: ^1.2.0
   repengine_core:
     path: ../packages/repengine_core

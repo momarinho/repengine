@@ -17,6 +17,24 @@ export async function analyticsFetch(
 	return fetchFn(analyticsUrl(path), init);
 }
 
+export async function bffFetch(
+	fetchFn: typeof fetch,
+	path: string,
+	token: string | undefined,
+	init: RequestInit = {}
+): Promise<Response> {
+	const headers = new Headers(init.headers);
+
+	if (token) {
+		headers.set('Authorization', `Bearer ${token}`);
+	}
+
+	return fetchFn(analyticsUrl(path), {
+		...init,
+		headers
+	});
+}
+
 export async function apiFetch(
 	fetchFn: typeof fetch,
 	path: string,

@@ -37,6 +37,7 @@ venv/
 .dart_tool/
 .packages
 build/
+*.apk
 # IDE
 .idea/
 .vscode/

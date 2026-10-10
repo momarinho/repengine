@@ -48,6 +48,7 @@ services:
       GO_CORE_URL: http://api:8080
       JWT_SECRET: dev-secret-key
       PORT: 8080
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     depends_on:
       - api
     restart: on-failure

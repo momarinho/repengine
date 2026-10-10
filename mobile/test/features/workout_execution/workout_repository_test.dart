@@ -375,6 +375,123 @@ void main() {
     final queue = await db.select(db.syncQueueTable).get();
     expect(queue, isEmpty);
   });
+
+  test('getSuggestedProgressionForBlock isolates Day 1 from Day 3 logs for the same exercise block', () async {
+    // 1. Day 1 session completed with 35 kg on Floor Press
+    await repository.startSession(
+      clientId: 'sess-day1',
+      workflowId: 2,
+      sectionId: 'sec_day1',
+      sectionTitle: 'Day 1 - Squat & Floor Press',
+      startedAt: DateTime.utc(2026, 10, 1, 10),
+    );
+    await repository.logSet(
+      clientId: 'log-day1-1',
+      sessionClientId: 'sess-day1',
+      blockClientId: 'blk_floor_press',
+      nodeTypeSlug: 'linear_progression',
+      setIndex: 1,
+      prescribedReps: '10',
+      prescribedLoad: '35.0',
+      actualReps: '10',
+      actualLoad: '35.0',
+      actualRpe: '8.0',
+      completed: true,
+      createdAt: DateTime.utc(2026, 10, 1, 10, 5),
+    );
+    await repository.completeSession('sess-day1');
+
+    // 2. Day 3 session completed with 40 kg on Floor Press
+    await repository.startSession(
+      clientId: 'sess-day3',
+      workflowId: 2,
+      sectionId: 'sec_day3',
+      sectionTitle: 'Day 3 - Floor Press & Squat',
+      startedAt: DateTime.utc(2026, 10, 3, 10),
+    );
+    await repository.logSet(
+      clientId: 'log-day3-1',
+      sessionClientId: 'sess-day3',
+      blockClientId: 'blk_floor_press',
+      nodeTypeSlug: 'linear_progression',
+      setIndex: 1,
+      prescribedReps: '5',
+      prescribedLoad: '40.0',
+      actualReps: '5',
+      actualLoad: '40.0',
+      actualRpe: '8.0',
+      completed: true,
+      createdAt: DateTime.utc(2026, 10, 3, 10, 5),
+    );
+    await repository.completeSession('sess-day3');
+
+    // 3. Query progression specifically for Day 3 -> Must inherit from Day 3 (40 + 2.5 = 42.5 kg)
+    final suggestionDay3 = await repository.getSuggestedProgressionForBlock(
+      'blk_floor_press',
+      sectionId: 'sec_day3',
+      sectionTitle: 'Day 3 - Floor Press & Squat',
+      fallbackLoad: 35.0,
+      fallbackReps: 5,
+    );
+    expect(suggestionDay3.load, equals(42.5));
+    expect(suggestionDay3.isProgressed, isTrue);
+
+    // 4. Query progression specifically for Day 1 -> Must inherit from Day 1 (35 + 2.5 = 37.5 kg)
+    final suggestionDay1 = await repository.getSuggestedProgressionForBlock(
+      'blk_floor_press',
+      sectionId: 'sec_day1',
+      sectionTitle: 'Day 1 - Squat & Floor Press',
+      fallbackLoad: 30.0,
+      fallbackReps: 10,
+    );
+    expect(suggestionDay1.load, equals(37.5));
+    expect(suggestionDay1.isProgressed, isTrue);
+
+    // 5. Query for Day 2 (where Floor Press has never been performed) -> Falls back to Day 2 fallback load
+    final suggestionDay2 = await repository.getSuggestedProgressionForBlock(
+      'blk_floor_press',
+      sectionId: 'sec_day2',
+      sectionTitle: 'Day 2 - Overhead Press',
+      fallbackLoad: 25.0,
+      fallbackReps: 8,
+    );
+    expect(suggestionDay2.load, equals(25.0));
+  });
+
+  test('upsertHistoricalSessions populates completed sessions and logs into SQLite', () async {
+    final serverSession = WorkoutSession(
+      id: 99,
+      workflowId: 2,
+      userId: 1,
+      sectionId: 'sec_day3',
+      sectionTitle: 'Day 3 - Floor Press & Squat',
+      status: 'completed',
+      startedAt: DateTime.utc(2026, 10, 5, 18),
+      completedAt: DateTime.utc(2026, 10, 5, 19),
+      logs: [
+        WorkoutSetLog(
+          id: 1001,
+          sessionId: 99,
+          blockClientId: 'blk_test',
+          nodeTypeSlug: 'linear_progression',
+          setIndex: 1,
+          actualLoad: '45.0 kg',
+          actualReps: '5',
+          completed: true,
+          workflowBlockId: 3070,
+          createdAt: DateTime.utc(2026, 10, 5, 18, 5),
+        ),
+      ],
+    );
+
+    await repository.upsertHistoricalSessions([serverSession]);
+
+    final sessions = await db.select(db.workoutSessionsTable).get();
+    expect(sessions.any((s) => s.sectionId == 'sec_day3'), isTrue);
+
+    final logs = await db.select(db.workoutSetLogsTable).get();
+    expect(logs.any((l) => l.blockClientId == 'blk_test' && l.actualLoad == '45.0 kg'), isTrue);
+  });
 }
 
 

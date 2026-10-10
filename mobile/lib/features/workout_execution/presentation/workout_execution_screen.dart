@@ -260,6 +260,8 @@ class WorkoutExecutionScreen extends ConsumerWidget {
           final suggestion = ref.watch(
             progressionSuggestionProvider((
               blockClientId: currentExercise.blockClientId,
+              sectionId: session.sectionId,
+              sectionTitle: session.sectionTitle,
               logCount: logs.length,
               fallbackLoad: currentExercise.targetLoad,
               fallbackReps: int.tryParse(currentExercise.reps) ?? 5,
@@ -409,6 +411,8 @@ class _ActiveSessionContent extends ConsumerWidget {
     final suggestion = ref.watch(
       progressionSuggestionProvider((
         blockClientId: currentExercise.blockClientId,
+        sectionId: session.sectionId,
+        sectionTitle: session.sectionTitle,
         logCount: completedSetsCount,
         fallbackLoad: currentExercise.targetLoad,
         fallbackReps: int.tryParse(currentExercise.reps) ?? 5,
@@ -697,7 +701,7 @@ class _ActiveSessionContent extends ConsumerWidget {
                         ),
                       ),
                       Text(
-                        '${currentExercise.reps} reps',
+                        '${suggestion?.reps ?? currentExercise.reps} reps',
                         style: AppTypography.titleMedium.copyWith(
                           fontSize: 15,
                           color: AppColors.onBackground,
@@ -714,7 +718,7 @@ class _ActiveSessionContent extends ConsumerWidget {
                         ),
                       ),
                       Text(
-                        '${currentExercise.targetLoad.toStringAsFixed(currentExercise.targetLoad % 1 == 0 ? 0 : 1)} kg',
+                        '${(suggestion?.load ?? currentExercise.targetLoad).toStringAsFixed((suggestion?.load ?? currentExercise.targetLoad) % 1 == 0 ? 0 : 1)} kg',
                         style: AppTypography.titleMedium.copyWith(
                           fontSize: 15,
                           color: AppColors.onBackground,

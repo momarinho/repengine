@@ -69,7 +69,8 @@ void main() {
 
     expect(find.text('Diagnostics & Network'), findsOneWidget);
     expect(find.text('RepEngine Web Account'), findsOneWidget);
-    await tester.drag(find.byType(ListView).last, const Offset(0, -250));
+    expect(find.text('Google Gemini AI (BYOK)'), findsOneWidget);
+    await tester.drag(find.byType(ListView).last, const Offset(0, -550));
     await tester.pumpAndSettle();
     expect(find.text('Simulate Gym / Offline Mode'), findsOneWidget);
     expect(find.text('Cloud Synchronization'), findsOneWidget);

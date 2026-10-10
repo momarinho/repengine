@@ -2,6 +2,7 @@ package workoutsessions
 
 import (
 	"context"
+	"strconv"
 	"strings"
 
 	apperrors "github.com/momarinho/rep_engine/internal/errors"
@@ -94,11 +95,19 @@ func (s *Service) InsertSetLog(ctx context.Context, in InsertSetLogInput) (Worko
 		actualLoad = prescribedLoad
 	}
 
+	workflowBlockID := in.WorkflowBlockID
+	cleanBlockClientID := strings.TrimSpace(in.BlockClientID)
+	if workflowBlockID == nil && cleanBlockClientID != "" {
+		if id, err := strconv.Atoi(cleanBlockClientID); err == nil && id > 0 {
+			workflowBlockID = &id
+		}
+	}
+
 	log, err := s.repo.InsertSetLog(ctx, InsertSetLogInput{
 		UserID:              in.UserID,
 		SessionID:           in.SessionID,
-		WorkflowBlockID:     in.WorkflowBlockID,
-		BlockClientID:       strings.TrimSpace(in.BlockClientID),
+		WorkflowBlockID:     workflowBlockID,
+		BlockClientID:       cleanBlockClientID,
 		NodeTypeSlug:        strings.TrimSpace(in.NodeTypeSlug),
 		SetIndex:            in.SetIndex,
 		PrescribedReps:      prescribedReps,
@@ -145,8 +154,14 @@ func (s *Service) CompleteSession(ctx context.Context, in CompleteSessionInput) 
 	if s.progression != nil {
 		logs := make([]progressionstates.CompletedSetLog, 0, len(session.Logs))
 		for _, log := range session.Logs {
+			wBlockID := log.WorkflowBlockID
+			if wBlockID == nil && strings.TrimSpace(log.BlockClientID) != "" {
+				if id, err := strconv.Atoi(strings.TrimSpace(log.BlockClientID)); err == nil && id > 0 {
+					wBlockID = &id
+				}
+			}
 			logs = append(logs, progressionstates.CompletedSetLog{
-				WorkflowBlockID:     log.WorkflowBlockID,
+				WorkflowBlockID:     wBlockID,
 				BlockClientID:       log.BlockClientID,
 				NodeTypeSlug:        log.NodeTypeSlug,
 				SetIndex:            log.SetIndex,
@@ -243,8 +258,14 @@ func (s *Service) UpdateSetLog(ctx context.Context, in UpdateSetLogInput) (Worko
 		if err == nil && session.Status == "completed" {
 			logs := make([]progressionstates.CompletedSetLog, 0, len(session.Logs))
 			for _, l := range session.Logs {
+				wBlockID := l.WorkflowBlockID
+				if wBlockID == nil && strings.TrimSpace(l.BlockClientID) != "" {
+					if id, err := strconv.Atoi(strings.TrimSpace(l.BlockClientID)); err == nil && id > 0 {
+						wBlockID = &id
+					}
+				}
 				logs = append(logs, progressionstates.CompletedSetLog{
-					WorkflowBlockID:     l.WorkflowBlockID,
+					WorkflowBlockID:     wBlockID,
 					BlockClientID:       l.BlockClientID,
 					NodeTypeSlug:        l.NodeTypeSlug,
 					SetIndex:            l.SetIndex,

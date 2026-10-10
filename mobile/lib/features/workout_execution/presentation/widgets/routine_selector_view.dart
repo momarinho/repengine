@@ -10,6 +10,7 @@ import '../../domain/routine_model.dart';
 import '../routine_editor_screen.dart';
 import '../workout_history_screen.dart';
 import 'plate_calculator_sheet.dart';
+import '../../../ai_copilot/presentation/ai_routine_dialog.dart';
 
 class RoutineSelectorView extends ConsumerWidget {
   final Future<void> Function({
@@ -232,7 +233,7 @@ class RoutineSelectorView extends ConsumerWidget {
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
                 child: SizedBox(
-                  width: 360,
+                  width: 440,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -251,8 +252,22 @@ class RoutineSelectorView extends ConsumerWidget {
                             },
                           ),
                           OutlinedButton.icon(
+                            key: const Key('ai_routine_btn'),
+                            icon: const Icon(Icons.auto_awesome_rounded, size: 14),
+                            label: const Text('AI Routine', style: TextStyle(fontSize: 12)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.secondary,
+                              side: BorderSide(color: AppColors.secondary.withValues(alpha: 0.5)),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            onPressed: () => AiRoutineDialog.show(context),
+                          ),
+                          const SizedBox(width: 6),
+                          OutlinedButton.icon(
                             icon: const Icon(Icons.add, size: 14),
-                            label: const Text('New Routine', style: TextStyle(fontSize: 12)),
+                            label: const Text('New', style: TextStyle(fontSize: 12)),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.primary,
                               side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),

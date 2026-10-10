@@ -41,7 +41,7 @@ void main() {
       );
 
       expect(host, isNotNull);
-      expect(host, anyOf('http://localhost:8081', 'http://10.0.2.2:8081'));
+      expect(host, anyOf('http://192.168.100.2:8081', 'http://localhost:8081', 'http://10.0.2.2:8081'));
     });
 
     test('ignores endpoints that do not have repengine_mobile_bff signature', () async {
@@ -104,6 +104,11 @@ void main() {
         }
         return http.Response('Not found', 404);
       });
+
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
       await tester.pumpWidget(
         ProviderScope(

@@ -4,6 +4,7 @@
 	import type { PageData } from './$types';
 	import QrCodeModal from '$lib/components/QrCodeModal.svelte';
 	import PlayRoutineModal from '$lib/components/PlayRoutineModal.svelte';
+	import AiArchitectModal from '$lib/components/AiArchitectModal.svelte';
 
 	let { data }: { data: PageData } = $props();
 	const initialWorkflows = untrack(() => [...data.workflows]);
@@ -19,6 +20,7 @@
 	let deleteError = $state('');
 	let qrWorkflow = $state<typeof workflows[0] | null>(null);
 	let playWorkflow = $state<typeof workflows[0] | null>(null);
+	let showAiModal = $state(false);
 
 	const filters = [
 		{ key: 'all', label: 'All Routines' },
@@ -100,6 +102,14 @@
 			>
 				Browse Templates
 			</a>
+			<button
+				type="button"
+				onclick={() => (showAiModal = true)}
+				class="rounded-md border border-primary/40 bg-primary/10 px-3 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-semibold text-primary transition-colors hover:bg-primary/20 flex items-center gap-1.5 sm:gap-2"
+			>
+				<span class="material-symbols-outlined text-sm">auto_awesome</span>
+				AI Architect
+			</button>
 			<a href="/dashboard/new" data-sveltekit-reload class="btn-primary-gradient text-on-primary-fixed font-body font-semibold px-4 py-2 sm:px-6 sm:py-2.5 rounded-md flex items-center gap-1.5 sm:gap-2 hover:opacity-90 transition-opacity text-xs sm:text-sm">
 				<span class="material-symbols-outlined text-sm">add</span>
 				New Routine
@@ -211,10 +221,20 @@
 			<div class="text-center py-16">
 				<span class="material-symbols-outlined text-6xl text-on-surface-variant">folder_open</span>
 				<p class="mt-4 text-on-surface-variant font-body">No routines yet. Create your first one!</p>
-				<a href="/dashboard/new" data-sveltekit-reload class="btn-primary-gradient text-on-primary-fixed font-body font-semibold px-6 py-2.5 rounded-md inline-flex items-center gap-2 mt-6 hover:opacity-90 transition-opacity">
-					<span class="material-symbols-outlined text-sm">add</span>
-					New Routine
-				</a>
+				<div class="mt-6 flex flex-wrap justify-center items-center gap-3">
+					<button
+						type="button"
+						onclick={() => (showAiModal = true)}
+						class="rounded-md border border-primary/40 bg-primary/10 px-5 py-2.5 text-xs sm:text-sm font-semibold text-primary transition-colors hover:bg-primary/20 flex items-center gap-2"
+					>
+						<span class="material-symbols-outlined text-sm">auto_awesome</span>
+						Generate with AI Architect
+					</button>
+					<a href="/dashboard/new" data-sveltekit-reload class="btn-primary-gradient text-on-primary-fixed font-body font-semibold px-6 py-2.5 rounded-md inline-flex items-center gap-2 hover:opacity-90 transition-opacity text-xs sm:text-sm">
+						<span class="material-symbols-outlined text-sm">add</span>
+						New Routine
+					</a>
+				</div>
 			</div>
 		{:else}
 			<!-- Routines Grid -->
@@ -306,6 +326,12 @@
 			onclose={() => (playWorkflow = null)}
 		/>
 	{/if}
+
+	<AiArchitectModal
+		open={showAiModal}
+		mode="dashboard"
+		onclose={() => (showAiModal = false)}
+	/>
 </div>
 
 <style>

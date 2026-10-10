@@ -44,7 +44,7 @@ export function getNextAndLastCompletedSection(
 
 	let lastIdx = -1;
 	if (lastCompleted.section_id) {
-		lastIdx = playableSections.findIndex((s) => s.id === lastCompleted.section_id);
+		lastIdx = playableSections.findIndex((s) => String(s.id) === String(lastCompleted.section_id));
 	}
 	if (lastIdx === -1 && lastCompleted.section_title) {
 		const targetTitle = lastCompleted.section_title.trim().toLowerCase();
@@ -142,7 +142,7 @@ export function getLastCompletedSessionForSection(
 		sessionHistory.find(
 			(s) =>
 				s.status === 'completed' &&
-				(s.section_id === section.id || (Boolean(s.section_title) && s.section_title.trim().toLowerCase() === targetTitle))
+				(String(s.section_id) === String(section.id) || (Boolean(s.section_title) && s.section_title.trim().toLowerCase() === targetTitle))
 		) ?? null
 	);
 }

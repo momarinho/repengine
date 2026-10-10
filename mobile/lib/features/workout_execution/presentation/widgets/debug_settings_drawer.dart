@@ -22,6 +22,8 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
   late final TextEditingController _hostController;
   late final TextEditingController _emailController;
   late final TextEditingController _passwordController;
+  late final TextEditingController _geminiKeyController;
+  bool _obscureGeminiKey = true;
   bool _isTesting = false;
   bool _isScanning = false;
 
@@ -30,9 +32,11 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
     super.initState();
     final currentHost = ref.read(serverHostProvider);
     final authState = ref.read(authStateProvider);
+    final currentGeminiKey = ref.read(geminiApiKeyProvider);
     _hostController = TextEditingController(text: currentHost);
     _emailController = TextEditingController(text: authState.email ?? '');
     _passwordController = TextEditingController();
+    _geminiKeyController = TextEditingController(text: currentGeminiKey);
   }
 
   @override
@@ -40,6 +44,7 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
     _hostController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _geminiKeyController.dispose();
     super.dispose();
   }
 
@@ -90,6 +95,13 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
     final syncQueueAsync = ref.watch(syncQueueStreamProvider);
     final syncState = ref.watch(syncEngineProvider);
     final authState = ref.watch(authStateProvider);
+    final geminiKey = ref.watch(geminiApiKeyProvider);
+
+    ref.listen<String>(geminiApiKeyProvider, (_, next) {
+      if (_geminiKeyController.text != next) {
+        _geminiKeyController.text = next;
+      }
+    });
 
     return Drawer(
       backgroundColor: AppColors.surface,
@@ -145,19 +157,23 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
                   _buildAthleteAccountCard(authState, health),
                   const SizedBox(height: 16),
 
-                  // 3. HOST CONFIGURATION
+                  // 3. GEMINI AI (BYOK - BRING YOUR OWN KEY)
+                  _buildGeminiApiKeyCard(geminiKey),
+                  const SizedBox(height: 16),
+
+                  // 4. HOST CONFIGURATION
                   _buildHostConfigCard(currentHost),
                   const SizedBox(height: 16),
 
-                  // 4. GYM MODE (OFFLINE SIMULATION)
+                  // 5. GYM MODE (OFFLINE SIMULATION)
                   _buildOfflineSimulationCard(hostNotifier),
                   const SizedBox(height: 16),
 
-                  // 5. TWO-PHASE SYNC (PUSH & PULL)
+                  // 6. TWO-PHASE SYNC (PUSH & PULL)
                   _buildSyncActionCard(syncState, health),
                   const SizedBox(height: 20),
 
-                  // 6. DRIFT QUEUE INSPECTOR (SyncQueueTable)
+                  // 7. DRIFT QUEUE INSPECTOR (SyncQueueTable)
                   _buildSyncQueueInspector(syncQueueAsync),
                 ],
               ),
@@ -630,6 +646,140 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
     );
   }
 
+  Widget _buildGeminiApiKeyCard(String currentKey) {
+    final hasKey = currentKey.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainer,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: hasKey
+              ? AppColors.primary.withValues(alpha: 0.4)
+              : AppColors.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 20),
+              const SizedBox(width: 8),
+              const Text('Google Gemini AI (BYOK)', style: AppTypography.labelMedium),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: hasKey
+                      ? const Color(0x2298BB6C)
+                      : AppColors.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: hasKey ? AppColors.success : AppColors.outlineVariant,
+                    width: 0.8,
+                  ),
+                ),
+                child: Text(
+                  hasKey ? 'Configured' : 'Not Set',
+                  style: AppTypography.labelSmall.copyWith(
+                    color: hasKey ? AppColors.success : AppColors.onSurfaceVariant,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Your personal Gemini API key is stored locally on this phone. It enables AI workout generation in the gym without requiring your PC to be online.',
+            style: AppTypography.labelSmall.copyWith(color: AppColors.onSurfaceVariant),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _geminiKeyController,
+            obscureText: _obscureGeminiKey,
+            style: AppTypography.bodyMedium,
+            decoration: InputDecoration(
+              isDense: true,
+              filled: true,
+              fillColor: AppColors.surfaceContainerLowest,
+              prefixIcon: const Icon(Icons.key_rounded, size: 18, color: AppColors.onSurfaceVariant),
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      _obscureGeminiKey ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                      size: 18,
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                    onPressed: () {
+                      setState(() => _obscureGeminiKey = !_obscureGeminiKey);
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.save, size: 20, color: AppColors.primary),
+                    tooltip: 'Save Gemini API Key',
+                    onPressed: () async {
+                      await ref
+                          .read(geminiApiKeyProvider.notifier)
+                          .setApiKey(_geminiKeyController.text);
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Gemini API key saved locally!'),
+                          backgroundColor: AppColors.success,
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              hintText: 'AIzaSy...',
+              hintStyle: AppTypography.bodyMedium.copyWith(color: AppColors.outline),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppColors.outlineVariant),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppColors.outlineVariant),
+              ),
+            ),
+          ),
+          if (hasKey) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () async {
+                  _geminiKeyController.clear();
+                  await ref.read(geminiApiKeyProvider.notifier).setApiKey('');
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Gemini API key removed.'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.primary),
+                label: Text(
+                  'Remove Key',
+                  style: AppTypography.labelSmall.copyWith(color: AppColors.primary),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildHostConfigCard(String currentHost) {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -702,6 +852,7 @@ class _DebugSettingsDrawerState extends ConsumerState<DebugSettingsDrawer> {
             spacing: 8,
             runSpacing: 6,
             children: [
+              _presetChip('Wi-Fi PC (192.168.100.2)', 'http://192.168.100.2:8081'),
               _presetChip('Desktop (localhost)', 'http://localhost:8081'),
               _presetChip('Emulator (10.0.2.2)', 'http://10.0.2.2:8081'),
             ],

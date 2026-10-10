@@ -45,8 +45,8 @@ class ServerConfigNotifier extends StateNotifier<String> {
     if (kIsWeb) return 'http://localhost:8081';
     try {
       if (Platform.isAndroid) {
-        // On Android emulator, 10.0.2.2 maps to host PC localhost
-        return 'http://10.0.2.2:8081';
+        // Default to developer PC on local Wi-Fi (192.168.100.2:8081)
+        return 'http://192.168.100.2:8081';
       }
     } catch (_) {}
     return 'http://localhost:8081';
@@ -204,4 +204,37 @@ class ServerHealthNotifier extends StateNotifier<ServerConnectionState> {
 
 final serverHealthProvider = StateNotifierProvider<ServerHealthNotifier, ServerConnectionState>((ref) {
   return ServerHealthNotifier(ref);
+});
+
+/// Manages athlete's personal Google Gemini API key (BYOK) stored in SharedPreferences.
+class GeminiApiKeyNotifier extends StateNotifier<String> {
+  static const _apiKeyStorageKey = 'repengine_gemini_api_key';
+
+  GeminiApiKeyNotifier() : super('') {
+    _loadFromPrefs();
+  }
+
+  Future<void> _loadFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedKey = prefs.getString(_apiKeyStorageKey);
+    if (savedKey != null && savedKey.trim().isNotEmpty) {
+      state = savedKey.trim();
+    }
+  }
+
+  Future<void> setApiKey(String key) async {
+    final cleaned = key.trim();
+    state = cleaned;
+    final prefs = await SharedPreferences.getInstance();
+    if (cleaned.isNotEmpty) {
+      await prefs.setString(_apiKeyStorageKey, cleaned);
+    } else {
+      await prefs.remove(_apiKeyStorageKey);
+    }
+  }
+}
+
+final geminiApiKeyProvider =
+    StateNotifierProvider<GeminiApiKeyNotifier, String>((ref) {
+  return GeminiApiKeyNotifier();
 });

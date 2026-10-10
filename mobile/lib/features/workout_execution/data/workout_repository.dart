@@ -289,10 +289,18 @@ class WorkoutRepository {
     });
   }
 
+  double _parseLoadValue(String? raw, double fallback) {
+    if (raw == null || raw.trim().isEmpty) return fallback;
+    final cleaned = raw.replaceAll(RegExp(r'[^\d.]'), '').trim();
+    return double.tryParse(cleaned) ?? fallback;
+  }
+
   /// Dynamically computes recommended load and repetitions for the next set in the block,
-  /// integrating local SQLite history with repengine_core AutoregulationEngine.
+  /// strictly scoped to the active Day/Section to isolate progression curves across workout days.
   Future<ProgressionSuggestion> getSuggestedProgressionForBlock(
     String blockClientId, {
+    String? sectionId,
+    String? sectionTitle,
     double fallbackLoad = 100.0,
     int fallbackReps = 5,
   }) async {
@@ -313,7 +321,7 @@ class WorkoutRepository {
 
       if (currentSessionSets.isNotEmpty) {
         final lastSet = currentSessionSets.first;
-        final load = double.tryParse(lastSet.actualLoad) ?? fallbackLoad;
+        final load = _parseLoadValue(lastSet.actualLoad, fallbackLoad);
         final reps = int.tryParse(lastSet.actualReps) ?? fallbackReps;
         return ProgressionSuggestion(
           load: load,
@@ -324,24 +332,76 @@ class WorkoutRepository {
       }
     }
 
-    // 2. If at session start (no sets yet), query historical completed sessions
-    final allHistoricalLogs = await (_db.select(_db.workoutSetLogsTable)
-          ..where((t) =>
-              t.blockClientId.equals(blockClientId) &
-              t.completed.equals(true))
-          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
-        .get();
+    // 2. Query historical completed sessions STRICTLY SCOPED to this Day / Section
+    final effectiveSectionId = sectionId ?? activeSession?.sectionId;
+    final effectiveSectionTitle = sectionTitle ?? activeSession?.sectionTitle;
 
-    final pastLogs = activeSession != null
-        ? allHistoricalLogs
-            .where((l) => l.sessionClientId != activeSession.clientId)
-            .toList()
-        : allHistoricalLogs;
+    List<WorkoutSetLogData> lastSessionLogs = [];
 
-    if (pastLogs.isEmpty) {
+    if ((effectiveSectionId != null && effectiveSectionId.isNotEmpty) ||
+        (effectiveSectionTitle != null && effectiveSectionTitle.isNotEmpty)) {
+      final pastSessionsQuery = _db.select(_db.workoutSessionsTable)
+        ..where((s) {
+          var expr = s.status.isNotValue('active');
+          if (activeSession != null) {
+            expr = expr & s.clientId.isNotValue(activeSession.clientId);
+          }
+          if (effectiveSectionId != null && effectiveSectionId.isNotEmpty) {
+            expr = expr &
+                (s.sectionId.equals(effectiveSectionId) |
+                    (effectiveSectionTitle != null && effectiveSectionTitle.isNotEmpty
+                        ? s.sectionTitle.equals(effectiveSectionTitle)
+                        : const Constant(false)));
+          } else if (effectiveSectionTitle != null && effectiveSectionTitle.isNotEmpty) {
+            expr = expr & s.sectionTitle.equals(effectiveSectionTitle);
+          }
+          return expr;
+        })
+        ..orderBy([(s) => OrderingTerm.desc(s.startedAt), (s) => OrderingTerm.desc(s.id)]);
+
+      final pastSessions = await pastSessionsQuery.get();
+
+      for (final pastSession in pastSessions) {
+        final sessionLogs = await (_db.select(_db.workoutSetLogsTable)
+              ..where((t) =>
+                  t.sessionClientId.equals(pastSession.clientId) &
+                  t.blockClientId.equals(blockClientId) &
+                  t.completed.equals(true))
+              ..orderBy([(t) => OrderingTerm.asc(t.setIndex)]))
+            .get();
+        if (sessionLogs.isNotEmpty) {
+          lastSessionLogs = sessionLogs;
+          break; // Found the most recent matching Day/Section session
+        }
+      }
+    } else {
+      // Fallback for tests or workflows with unsectioned logs
+      final allHistoricalLogs = await (_db.select(_db.workoutSetLogsTable)
+            ..where((t) =>
+                t.blockClientId.equals(blockClientId) &
+                t.completed.equals(true))
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+          .get();
+
+      final pastLogs = activeSession != null
+          ? allHistoricalLogs
+              .where((l) => l.sessionClientId != activeSession.clientId)
+              .toList()
+          : allHistoricalLogs;
+
+      if (pastLogs.isNotEmpty) {
+        final lastSessionClientId = pastLogs.first.sessionClientId;
+        lastSessionLogs = pastLogs
+            .where((l) => l.sessionClientId == lastSessionClientId)
+            .toList();
+      }
+    }
+
+    // 3. If no historical logs found for this Day/Section, check progression state or fallback
+    if (lastSessionLogs.isEmpty) {
       final progressionState = await getProgressionStateForBlock(blockClientId);
       if (progressionState != null && progressionState.suggestedLoad != null) {
-        final syncedLoad = double.tryParse(progressionState.suggestedLoad!) ?? fallbackLoad;
+        final syncedLoad = _parseLoadValue(progressionState.suggestedLoad, fallbackLoad);
         return ProgressionSuggestion(
           load: syncedLoad,
           reps: fallbackReps,
@@ -358,19 +418,14 @@ class WorkoutRepository {
       );
     }
 
-    // Group sets from the most recent completed session
-    final lastSessionClientId = pastLogs.first.sessionClientId;
-    final lastSessionLogs = pastLogs
-        .where((l) => l.sessionClientId == lastSessionClientId)
-        .toList();
-
+    // 4. Calculate progressive overload from previous session of THIS Day/Section
     double maxLoad = 0.0;
     int targetReps = fallbackReps;
     double? lastRpe;
     bool anyFailed = false;
 
     for (final log in lastSessionLogs) {
-      final load = double.tryParse(log.actualLoad) ?? 0.0;
+      final load = _parseLoadValue(log.actualLoad, 0.0);
       if (load > maxLoad) maxLoad = load;
       final reps = int.tryParse(log.actualReps) ?? 0;
       final prescribed = int.tryParse(log.prescribedReps) ?? fallbackReps;
@@ -532,12 +587,92 @@ class WorkoutRepository {
         .watch();
   }
 
-  /// Retrieves the current progression state for a block key.
-  Future<ProgressionStateRow?> getProgressionStateForBlock(String blockKey) {
+  /// Retrieves the current progression state for a block key or workflow block ID.
+  Future<ProgressionStateRow?> getProgressionStateForBlock(String blockKeyOrId) async {
+    final asInt = int.tryParse(blockKeyOrId);
+    if (asInt != null) {
+      final byBlockId = await (_db.select(_db.progressionStatesTable)
+            ..where((t) => t.workflowBlockId.equals(asInt) | t.blockKey.equals(blockKeyOrId))
+            ..limit(1))
+          .getSingleOrNull();
+      if (byBlockId != null) return byBlockId;
+    }
     return (_db.select(_db.progressionStatesTable)
-          ..where((t) => t.blockKey.equals(blockKey))
+          ..where((t) => t.blockKey.equals(blockKeyOrId))
           ..limit(1))
         .getSingleOrNull();
+  }
+
+  /// Reconciles completed workout sessions and set logs fetched from server sync.
+  Future<void> upsertHistoricalSessions(List<WorkoutSession> sessions) async {
+    if (sessions.isEmpty) return;
+
+    await _db.transaction(() async {
+      for (final session in sessions) {
+        final sessionClientId = session.clientId != null && session.clientId!.isNotEmpty
+            ? session.clientId!
+            : 'sess_server_${session.id}';
+
+        final existing = await (_db.select(_db.workoutSessionsTable)
+              ..where((t) =>
+                  t.clientId.equals(sessionClientId) |
+                  (session.id != null ? t.serverId.equals(session.id!) : const Constant(false)))
+              ..limit(1))
+            .getSingleOrNull();
+
+        if (existing == null) {
+          await _db.into(_db.workoutSessionsTable).insert(
+                WorkoutSessionsTableCompanion.insert(
+                  clientId: sessionClientId,
+                  serverId: Value(session.id),
+                  workflowId: session.workflowId,
+                  sectionId: session.sectionId,
+                  sectionTitle: session.sectionTitle,
+                  status: Value(session.status),
+                  startedAt: session.startedAt,
+                  completedAt: Value(session.completedAt),
+                ),
+                mode: InsertMode.insertOrReplace,
+              );
+        }
+
+        for (final log in session.logs) {
+          final logClientId = log.clientId != null && log.clientId!.isNotEmpty
+              ? log.clientId!
+              : 'log_server_${log.id ?? '${session.id}_${log.setIndex}'}';
+
+          final existingLog = await (_db.select(_db.workoutSetLogsTable)
+                ..where((t) => t.clientId.equals(logClientId))
+                ..limit(1))
+              .getSingleOrNull();
+
+          if (existingLog == null) {
+            final effectiveBlockId = log.blockClientId.isNotEmpty
+                ? log.blockClientId
+                : (log.workflowBlockId?.toString() ?? '');
+
+            await _db.into(_db.workoutSetLogsTable).insert(
+                  WorkoutSetLogsTableCompanion.insert(
+                    clientId: logClientId,
+                    sessionClientId: existing?.clientId ?? sessionClientId,
+                    serverId: Value(log.id),
+                    blockClientId: effectiveBlockId,
+                    nodeTypeSlug: log.nodeTypeSlug,
+                    setIndex: log.setIndex,
+                    prescribedReps: Value(log.prescribedReps),
+                    prescribedLoad: Value(log.prescribedLoad),
+                    actualReps: Value(log.actualReps),
+                    actualLoad: Value(log.actualLoad),
+                    actualRpe: Value(log.actualRpe),
+                    completed: Value(log.completed),
+                    createdAt: session.completedAt ?? session.startedAt,
+                  ),
+                  mode: InsertMode.insertOrReplace,
+                );
+          }
+        }
+      }
+    });
   }
 
   /// Updates the template blocks of a routine in local SQLite with modified exercises and loads.

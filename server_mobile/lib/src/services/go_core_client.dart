@@ -171,6 +171,7 @@ class GoCoreClient {
       );
     }
 
+    final workflowBlockId = log.workflowBlockId ?? int.tryParse(log.blockClientId);
     final url = Uri.parse('$baseUrl/workout-sessions/$sessionId/logs');
 
     try {
@@ -181,7 +182,7 @@ class GoCoreClient {
           'Authorization': authHeader,
         },
         body: jsonEncode({
-          'workflow_block_id': log.workflowBlockId,
+          if (workflowBlockId != null) 'workflow_block_id': workflowBlockId,
           'block_client_id': log.blockClientId,
           'node_type_slug': log.nodeTypeSlug,
           'set_index': log.setIndex,
@@ -283,6 +284,64 @@ class GoCoreClient {
     );
 
     return hydratedWorkflows;
+  }
+
+  /// Busca progression states para um workflow específico no Go Core.
+  Future<List<ProgressionState>> fetchProgressionStates(
+    int workflowId,
+    String authHeader,
+  ) async {
+    final url = Uri.parse('$baseUrl/workflows/$workflowId/progression-states');
+    try {
+      final response = await _httpClient.get(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': authHeader,
+        },
+      );
+
+      if (response.statusCode != 200) {
+        return const [];
+      }
+
+      final list = jsonDecode(response.body) as List<dynamic>? ?? const [];
+      return list
+          .map((e) => ProgressionState.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Busca histórico recente de sessões de um workflow no Go Core.
+  Future<List<WorkoutSession>> fetchWorkflowSessions(
+    int workflowId,
+    String authHeader, {
+    int limit = 10,
+  }) async {
+    final url = Uri.parse('$baseUrl/workflows/$workflowId/sessions?limit=$limit');
+    try {
+      final response = await _httpClient.get(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': authHeader,
+        },
+      );
+
+      if (response.statusCode != 200) {
+        return const [];
+      }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final list = data['data'] as List<dynamic>? ?? const [];
+      return list
+          .map((e) => WorkoutSession.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return const [];
+    }
   }
 
   /// Autentica o atleta ou treinador no Go Core via e-mail e senha.
