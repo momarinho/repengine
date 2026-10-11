@@ -334,5 +334,45 @@ flowchart TD
   - Testes unitários para parsing e validação de schema do JSON gerado pela IA no BFF (`gemini_client_test.dart` e `generate_routine_test.dart` - 39 testes).
   - Testes de widget no Flutter para os fluxos com IA (`ai_routine_dialog_test.dart` e `ai_copilot_service_test.dart` - 64 testes).
 
+---
+
+### 🧩 SPRINT 12: Arquitetura Visual de Progressões & Motor de Intercâmbio JSON (Import/Export & Visual Graph)
+> **Objetivo**: Tornar a definição de sobrecarga progressiva 100% visual, modular e compreensível para o usuário (desacoplando regras de progressão do exercício em si através de blocos conectáveis), e estabelecer um formato canônico de intercâmbio de rotinas via JSON para importação/exportação universal, backups e integração perfeita com LLMs externas.
+
+- [ ] **1. Bloco Visual de Estratégia de Progressão (`progression_strategy`)**:
+  - **Desacoplamento Arquitetural**: O bloco `exercise` volta a ser puramente a prescrição biomecânica canônica (nome do exercício, séries base, repetições alvo, carga inicial, descanso). A inteligência de aumento ou periodização é delegada a um nó/modificador modular de progressão.
+  - **Svelte Flow Canvas (Web Routine Architect)**:
+    - Novo nó gráfico `ProgressionStrategyNode` com handle lateral de conexão conectando-se visualmente ao nó do `ExerciseNode`.
+    - Uma linha visual explícita demonstra a regra conectada ao exercício (ex: Supino Reto ➔ [Regra: Linear +2.5kg / sessão]).
+    - Capacidade de reaproveitar a mesma estratégia de progressão ligando-a a múltiplos exercícios ou criando regras distintas por exercício.
+  - **Mobile Routine Editor (Flutter HUD)**:
+    - Card de exercício com seletor/badge expansível: *"Estratégia de Progressão"*.
+    - Visualização clara do comportamento futuro: *"Se completar 3x5 ➔ próxima sessão: +2.5kg. Se falhar ➔ manter carga por 2 sessões antes de deload de 10%"*.
+  - **Estratégias Nativas Suportadas**:
+    1. **Linear Progression (LP)**: Incremento fixo por sessão/semana em caso de sucesso (com reset/deload percentual configurável).
+    2. **Double Progression**: Fixa a carga e progride as repetições dentro de uma faixa (ex: 8-12 reps); ao atingir 12 reps em todas as séries, incrementa a carga e retorna para 8 reps.
+    3. **Autoregulada por RIR/RPE**: Ajusta metas de carga da próxima sessão com base no esforço percebido registrado pelo atleta.
+    4. **GZCLP Multi-Stage**: Transição de estágios e esquemas de séries/repetições em caso de falha consecutiva (ex: 5x3+ ➔ 6x2+ ➔ 10x1+).
+
+- [ ] **2. Motor de Intercâmbio & Formato Canônico de Treino (`RepEngine Routine JSON v1`)**:
+  - **Padronização do Schema Declarativo**:
+    - Definição do schema JSON canônico (`repengine.routine.v1.json`) encapsulando: metadados da rotina (título, descrição, autor, tags), divisões/dias (`sections`), exercícios ordenados, parâmetros de carga/descanso e configurações de progressão.
+  - **Exportação Universal de Rotinas (Web & Mobile)**:
+    - Ações no Web Studio e no Mobile Routine Creator: *"Exportar Rotina (JSON)"*.
+    - Opções: Baixar arquivo `.json` ou *"Copiar para Área de Transferência"*.
+    - Permite compartilhamento direto entre usuários, backup e edição em editores de texto.
+  - **Importação com Validação Estrutural Defensiva (Web & Mobile)**:
+    - Modal de Importação com suporte a upload de arquivo `.json` ou colar texto JSON bruto.
+    - Validação de schema no cliente (Zod no SvelteKit / validador defensivo em Dart) com mensagens amigáveis de erro se o JSON estiver malformado.
+    - Tela/modal de **Preview da Rotina**: exibe os dias, blocos e exercícios antes de persistir no banco de dados.
+  - **Sinergia Total com LLMs & Prompts de IA**:
+    - Botão *"Copiar Prompt para ChatGPT / Claude"*: gera um prompt otimizado com a especificação do JSON do RepEngine para que o usuário possa pedir qualquer treino a qualquer IA externa e importá-lo em 1 segundo.
+    - O assistente nativo *AI Workout Architect* passa a emitir diretamente esse formato canônico como padrão da plataforma.
+
+- [ ] **3. Testes Automatizados & Validação**:
+  - Testes unitários para o validador e parser do JSON canônico no Dart e no Go/TypeScript.
+  - Testes de conexão de nós (edges) de progressão no Web Canvas.
+  - Testes de renderização e exportação/importação no app Flutter.
+
 
 

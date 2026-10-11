@@ -227,5 +227,22 @@ Este checklist complementa os Sprints do roadmap, rastreando individualmente cad
   - [x] Testes unitários no BFF para parsing defensivo, geração Genkit e enriquecimento de prompt (`gemini_client_test.dart` e `generate_routine_test.dart` - 39 testes).
   - [x] Testes de widget no Flutter para os fluxos interativos de geração assistida por IA (`ai_routine_dialog_test.dart` e `ai_copilot_service_test.dart` - 64 testes).
 
+---
+
+## 🧩 11. Sprint 12: Arquitetura Visual de Progressões & Motor de Intercâmbio JSON (Import/Export)
+- [ ] **Bloco Visual de Estratégia de Progressão (`progression_strategy`)**:
+  - [ ] Desacoplamento no modelo: bloco `exercise` focado em biomecânica e nó `progression_strategy` para a lógica de sobrecarga.
+  - [ ] Web Svelte Flow: nó conectável com linha indicativa (edge) ligando a estratégia ao exercício (`ProgressionStrategyNode`).
+  - [ ] Mobile Routine Editor: seletor de regras com preview didático das próximas sessões (Linear, Dupla, RPE, GZCLP).
+- [ ] **Motor de Intercâmbio JSON (`RepEngine Routine Schema v1`)**:
+  - [ ] Especificação do formato canônico padronizado para exportar/importar rotinas completas.
+  - [ ] Ação de Exportar rotina (download de `.json` ou cópia para área de transferência) no Web e Mobile.
+  - [ ] Ação de Importar rotina com preview e validação estrutural contra schemas inválidos.
+  - [ ] Gerador de prompts para IAs externas (ChatGPT, Claude) compatível com o schema do RepEngine.
+- [ ] **Testes Automatizados**:
+  - [ ] Testes unitários de parsing e serialização do schema JSON v1.
+  - [ ] Testes de validação de import/export e integridade dos blocos.
+
+
 
 

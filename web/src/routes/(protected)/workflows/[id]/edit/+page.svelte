@@ -6,6 +6,7 @@
 	import BlockRenderer from '$lib/blocks/BlockRenderer.svelte';
 	import QrCodeModal from '$lib/components/QrCodeModal.svelte';
 	import AiArchitectModal from '$lib/components/AiArchitectModal.svelte';
+	import RoutineJsonModal from '$lib/components/RoutineJsonModal.svelte';
 	import { groupBlocksBySection, type SectionBlockGroup } from '$lib/sections/group';
 	import type {
 		DraftBlock,
@@ -42,6 +43,8 @@
 	let showAddBlock = $state(false);
 	let showQrModal = $state(false);
 	let showAiModal = $state(false);
+	let showJsonModal = $state(false);
+	let jsonModalInitialTab = $state<'export' | 'import' | 'prompt'>('export');
 	let addBlockInsertIndex = $state(0);
 	let addBlockPlacementLabel = $state('');
 	let title = $state('');
@@ -155,6 +158,49 @@
 			current[key] = value;
 			return current;
 		});
+	}
+
+	function updateBlockProgression(clientId: string, partial: Record<string, unknown>): void {
+		recordHistory();
+		setBlockData(clientId, (current) => {
+			const currentProgression =
+				current.progression && typeof current.progression === 'object'
+					? (current.progression as Record<string, unknown>)
+					: {};
+			const updated = { ...currentProgression, ...partial };
+
+			if (updated.type === 'none') {
+				delete current.progression;
+				delete current.increment;
+				delete current.progression_rule;
+			} else {
+				current.progression = updated;
+				if (updated.type === 'linear') {
+					current.increment = typeof updated.increment === 'number' ? updated.increment : 2.5;
+					current.progression_rule = (updated.rule as string) || 'add_each_session';
+				}
+			}
+			return current;
+		});
+	}
+
+	function handleJsonApply(result: {
+		name: string;
+		description: string;
+		blocks: DraftBlock[];
+		action: 'replace' | 'append';
+	}): void {
+		recordHistory();
+		if (result.action === 'replace') {
+			title = result.name;
+			description = result.description;
+			blocks = result.blocks;
+			selectedBlockId = blocks[0]?.client_id ?? null;
+		} else {
+			blocks = [...blocks, ...result.blocks];
+		}
+		saveState = 'dirty';
+		statusMessage = 'Unsaved changes (JSON imported)';
 	}
 
 	function normalizeInsertIndex(index: number): number {
@@ -647,6 +693,15 @@
 						<span class="material-symbols-outlined text-base">qr_code_2</span>
 						<span class="hidden xl:inline">Mobile QR</span>
 					</button>
+					<button
+						type="button"
+						onclick={() => { jsonModalInitialTab = 'export'; showJsonModal = true; }}
+						class="inline-flex h-11 items-center gap-2 rounded-md border border-outline-variant/20 bg-surface-container-low px-3.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
+						title="Export or Import Routine as JSON"
+					>
+						<span class="material-symbols-outlined text-base">data_object</span>
+						<span class="hidden xl:inline">JSON</span>
+					</button>
 					<div class="inline-flex h-11 items-center rounded-md border border-outline-variant/20 bg-surface-container-low p-1">
 						<button
 							type="button"
@@ -761,6 +816,15 @@
 						<div class="flex items-center gap-2">
 							<button
 								type="button"
+								class="inline-flex items-center gap-2 rounded-md border border-outline-variant/25 bg-surface-container px-3 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+								onclick={() => { jsonModalInitialTab = 'import'; showJsonModal = true; }}
+								title="Import JSON into this routine"
+							>
+								<span class="material-symbols-outlined text-base">file_upload</span>
+								Import JSON
+							</button>
+							<button
+								type="button"
 								class="inline-flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/20"
 								onclick={() => (showAiModal = true)}
 							>
@@ -783,6 +847,14 @@
 							<p class="text-base font-semibold text-on-surface">No blocks yet</p>
 							<p class="mt-2 text-sm text-on-surface-variant">Start the routine with a section, exercise, timed effort, repeat, wave, or rest block.</p>
 							<div class="mt-6 flex flex-wrap justify-center items-center gap-3">
+								<button
+									type="button"
+									class="inline-flex items-center gap-2 rounded-md border border-outline-variant/25 bg-surface-container px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+									onclick={() => { jsonModalInitialTab = 'import'; showJsonModal = true; }}
+								>
+									<span class="material-symbols-outlined text-base">file_upload</span>
+									Import from JSON
+								</button>
 								<button
 									type="button"
 									class="inline-flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/20"
@@ -1284,6 +1356,152 @@
 											oninput={(event) => updateBlockField(selectedBlock.client_id, 'notes', (event.currentTarget as HTMLTextAreaElement).value)}
 										>{typeof selectedBlock.data.notes === 'string' ? selectedBlock.data.notes : ''}</textarea>
 									</div>
+
+									<!-- Overload & Progression Strategy -->
+									{#if true}
+										{@const prog = (selectedBlock.data.progression && typeof selectedBlock.data.progression === 'object'
+											? (selectedBlock.data.progression as Record<string, any>)
+											: typeof selectedBlock.data.increment === 'number'
+												? { type: 'linear', increment: selectedBlock.data.increment }
+												: { type: 'none' })}
+										<div class="rounded-xl border border-primary/25 bg-surface-container-low p-4 space-y-4">
+											<div class="flex items-center justify-between">
+												<div class="flex items-center gap-2">
+													<span class="material-symbols-outlined text-primary text-base">trending_up</span>
+													<span class="text-xs font-bold uppercase tracking-wider text-primary">Progression Strategy</span>
+												</div>
+												<span class="text-[11px] font-semibold text-on-surface-variant">Auto-overload</span>
+											</div>
+
+											<div class="space-y-2">
+												<label for="exercise-prog-type" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Strategy Model</label>
+												<select
+													id="exercise-prog-type"
+													class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+													value={prog.type || 'none'}
+													onchange={(event) => {
+														const val = (event.currentTarget as HTMLSelectElement).value;
+														updateBlockProgression(selectedBlock.client_id, {
+															type: val,
+															increment: val === 'linear' || val === 'double' ? (prog.increment ?? 2.5) : undefined,
+															min_reps: val === 'double' ? (prog.min_reps ?? 8) : undefined,
+															max_reps: val === 'double' ? (prog.max_reps ?? 12) : undefined,
+															target_rpe: val === 'rpe' ? (prog.target_rpe ?? 8) : undefined
+														});
+													}}
+												>
+													<option value="none">None (Fixed Load)</option>
+													<option value="linear">Linear Progression (+kg each session)</option>
+													<option value="double">Double Progression (Progress Reps ➔ Weight)</option>
+													<option value="rpe">Autoregulated (Target RPE / RIR)</option>
+												</select>
+											</div>
+
+											{#if prog.type === 'linear'}
+												<div class="space-y-3 pt-1 border-t border-outline-variant/15">
+													<div class="grid grid-cols-2 gap-3">
+														<div class="space-y-1.5">
+															<label for="prog-increment" class="text-xs font-medium text-on-surface-variant">Increment ({selectedBlock.data.load_unit || 'kg'})</label>
+															<input
+																id="prog-increment"
+																type="number"
+																step="0.5"
+																class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-1.5 text-sm text-on-surface outline-none"
+																value={prog.increment ?? 2.5}
+																oninput={(event) => updateBlockProgression(selectedBlock.client_id, { increment: Number((event.currentTarget as HTMLInputElement).value) })}
+															/>
+														</div>
+														<div class="space-y-1.5">
+															<label for="prog-deload" class="text-xs font-medium text-on-surface-variant">Deload on stall (%)</label>
+															<input
+																id="prog-deload"
+																type="number"
+																placeholder="10"
+																class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-1.5 text-sm text-on-surface outline-none"
+																value={prog.deload_percent ?? ''}
+																oninput={(event) => updateBlockProgression(selectedBlock.client_id, { deload_percent: Number((event.currentTarget as HTMLInputElement).value) || undefined })}
+															/>
+														</div>
+													</div>
+													<p class="text-[11px] text-on-surface-variant leading-relaxed">
+														💡 <strong>How it works:</strong> If you successfully complete all {selectedBlock.data.sets || 3} sets, the next session will automatically suggest +{prog.increment ?? 2.5} {selectedBlock.data.load_unit || 'kg'}.
+													</p>
+												</div>
+											{:else if prog.type === 'double'}
+												<div class="space-y-3 pt-1 border-t border-outline-variant/15">
+													<div class="grid grid-cols-3 gap-2">
+														<div class="space-y-1.5">
+															<label for="prog-min-reps" class="text-xs font-medium text-on-surface-variant">Min Reps</label>
+															<input
+																id="prog-min-reps"
+																type="number"
+																class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-2 py-1.5 text-sm text-on-surface outline-none"
+																value={prog.min_reps ?? 8}
+																oninput={(event) => updateBlockProgression(selectedBlock.client_id, { min_reps: Number((event.currentTarget as HTMLInputElement).value) })}
+															/>
+														</div>
+														<div class="space-y-1.5">
+															<label for="prog-max-reps" class="text-xs font-medium text-on-surface-variant">Top Reps</label>
+															<input
+																id="prog-max-reps"
+																type="number"
+																class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-2 py-1.5 text-sm text-on-surface outline-none"
+																value={prog.max_reps ?? 12}
+																oninput={(event) => updateBlockProgression(selectedBlock.client_id, { max_reps: Number((event.currentTarget as HTMLInputElement).value) })}
+															/>
+														</div>
+														<div class="space-y-1.5">
+															<label for="prog-double-inc" class="text-xs font-medium text-on-surface-variant">+ Weight</label>
+															<input
+																id="prog-double-inc"
+																type="number"
+																step="0.5"
+																class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-2 py-1.5 text-sm text-on-surface outline-none"
+																value={prog.increment ?? 2.5}
+																oninput={(event) => updateBlockProgression(selectedBlock.client_id, { increment: Number((event.currentTarget as HTMLInputElement).value) })}
+															/>
+														</div>
+													</div>
+													<p class="text-[11px] text-on-surface-variant leading-relaxed">
+														💡 <strong>Double Progression:</strong> Keep the load fixed and progress reps from {prog.min_reps ?? 8} to {prog.max_reps ?? 12}. Upon achieving {selectedBlock.data.sets || 3}x{prog.max_reps ?? 12}, increase +{prog.increment ?? 2.5} {selectedBlock.data.load_unit || 'kg'} and reset to {prog.min_reps ?? 8} reps.
+													</p>
+												</div>
+											{:else if prog.type === 'rpe'}
+												<div class="space-y-3 pt-1 border-t border-outline-variant/15">
+													<div class="grid grid-cols-2 gap-3">
+														<div class="space-y-1.5">
+															<label for="prog-rpe" class="text-xs font-medium text-on-surface-variant">Target RPE (1-10)</label>
+															<input
+																id="prog-rpe"
+																type="number"
+																step="0.5"
+																min="5"
+																max="10"
+																class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-1.5 text-sm text-on-surface outline-none"
+																value={prog.target_rpe ?? 8}
+																oninput={(event) => updateBlockProgression(selectedBlock.client_id, { target_rpe: Number((event.currentTarget as HTMLInputElement).value) })}
+															/>
+														</div>
+														<div class="space-y-1.5">
+															<label for="prog-rir" class="text-xs font-medium text-on-surface-variant">Reps in Reserve (RIR)</label>
+															<input
+																id="prog-rir"
+																type="number"
+																min="0"
+																max="5"
+																class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-1.5 text-sm text-on-surface outline-none"
+																value={prog.target_rir ?? 2}
+																oninput={(event) => updateBlockProgression(selectedBlock.client_id, { target_rir: Number((event.currentTarget as HTMLInputElement).value) })}
+															/>
+														</div>
+													</div>
+													<p class="text-[11px] text-on-surface-variant leading-relaxed">
+														💡 <strong>Autoregulation:</strong> Load is autoregulated based on perceived exertion. Increase load if RPE is below target; maintain or reduce if fatigue is elevated.
+													</p>
+												</div>
+											{/if}
+										</div>
+									{/if}
 								</div>
 							{:else if selectedBlock.node_type_slug === 'exercise_timed'}
 								<div class="space-y-5">
@@ -1913,6 +2131,16 @@
 			mode="editor"
 			onclose={() => (showAiModal = false)}
 			onapply={handleAiApply}
+		/>
+
+		<RoutineJsonModal
+			open={showJsonModal}
+			mode="editor"
+			initialTab={jsonModalInitialTab}
+			workflow={workflow ? { id: workflow.id, name: title || workflow.name, description, is_public: isPublic } : undefined}
+			{blocks}
+			onclose={() => (showJsonModal = false)}
+			onapply={handleJsonApply}
 		/>
 	</div>
 {/if}

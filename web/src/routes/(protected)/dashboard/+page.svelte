@@ -5,6 +5,8 @@
 	import QrCodeModal from '$lib/components/QrCodeModal.svelte';
 	import PlayRoutineModal from '$lib/components/PlayRoutineModal.svelte';
 	import AiArchitectModal from '$lib/components/AiArchitectModal.svelte';
+	import RoutineJsonModal from '$lib/components/RoutineJsonModal.svelte';
+	import type { DraftBlock } from '$lib/editor/types';
 
 	let { data }: { data: PageData } = $props();
 	const initialWorkflows = untrack(() => [...data.workflows]);
@@ -21,6 +23,35 @@
 	let qrWorkflow = $state<typeof workflows[0] | null>(null);
 	let playWorkflow = $state<typeof workflows[0] | null>(null);
 	let showAiModal = $state(false);
+	let showJsonModal = $state(false);
+	let jsonModalInitialTab = $state<'export' | 'import' | 'prompt'>('import');
+	let jsonWorkflow = $state<typeof workflows[0] | null>(null);
+	let jsonWorkflowBlocks = $state<DraftBlock[]>([]);
+	let isExportLoading = $state(false);
+
+	async function exportWorkflow(w: typeof workflows[0]): Promise<void> {
+		if (isExportLoading) return;
+		isExportLoading = true;
+		try {
+			const res = await fetch(`/api/workflows/${w.id}`);
+			if (res.ok) {
+				const full = await res.json();
+				jsonWorkflow = full;
+				jsonWorkflowBlocks = (full.blocks ?? []).map((b: any, idx: number) => ({
+					client_id: `blk-${idx}`,
+					node_type_slug: b.node_type_slug,
+					position: b.position ?? idx,
+					data: b.data ?? {}
+				}));
+				jsonModalInitialTab = 'export';
+				showJsonModal = true;
+			}
+		} catch (e) {
+			console.error('Failed to load workflow for export', e);
+		} finally {
+			isExportLoading = false;
+		}
+	}
 
 	const filters = [
 		{ key: 'all', label: 'All Routines' },
@@ -102,6 +133,14 @@
 			>
 				Browse Templates
 			</a>
+			<button
+				type="button"
+				onclick={() => { jsonWorkflow = null; jsonWorkflowBlocks = []; jsonModalInitialTab = 'import'; showJsonModal = true; }}
+				class="rounded-md border border-outline-variant/20 px-3 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface flex items-center gap-1.5 sm:gap-2"
+			>
+				<span class="material-symbols-outlined text-sm">data_object</span>
+				Import JSON
+			</button>
 			<button
 				type="button"
 				onclick={() => (showAiModal = true)}
@@ -281,6 +320,15 @@
 								<button
 									type="button"
 									class="rounded-md border border-outline-variant/20 bg-surface-container-high px-2.5 py-2 text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-colors flex items-center justify-center"
+									onclick={() => exportWorkflow(workflow)}
+									title="Export Routine (JSON)"
+									aria-label={`Export ${workflow.name} as JSON`}
+								>
+									<span class="material-symbols-outlined text-base">data_object</span>
+								</button>
+								<button
+									type="button"
+									class="rounded-md border border-outline-variant/20 bg-surface-container-high px-2.5 py-2 text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-colors flex items-center justify-center"
 									onclick={() => (qrWorkflow = workflow)}
 									title="Open on Mobile via QR"
 									aria-label={`Open ${workflow.name} on mobile`}
@@ -331,6 +379,15 @@
 		open={showAiModal}
 		mode="dashboard"
 		onclose={() => (showAiModal = false)}
+	/>
+
+	<RoutineJsonModal
+		open={showJsonModal}
+		mode="dashboard"
+		initialTab={jsonModalInitialTab}
+		workflow={jsonWorkflow ? { id: jsonWorkflow.id, name: jsonWorkflow.name, description: jsonWorkflow.description, is_public: jsonWorkflow.is_public } : undefined}
+		blocks={jsonWorkflowBlocks}
+		onclose={() => { showJsonModal = false; jsonWorkflow = null; jsonWorkflowBlocks = []; }}
 	/>
 </div>
 
