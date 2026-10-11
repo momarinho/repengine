@@ -842,3 +842,68 @@ func TestListProgressionStates_SynchronizesDirectSetsReps(t *testing.T) {
 		t.Fatalf("expected reps_planned to sync to \"3\", got %q", reps)
 	}
 }
+
+func TestApplySession_ExerciseWithLinearProgressionObject(t *testing.T) {
+	ctx := context.Background()
+	var gotState UpsertProgressionStateInput
+
+	repo := &fakeRepo{
+		userOwnsWorkflowFunc: func(ctx context.Context, userID, workflowID int) (bool, error) {
+			return true, nil
+		},
+		listWorkflowBlocksFunc: func(ctx context.Context, workflowID int) ([]workflowBlockConfig, error) {
+			return []workflowBlockConfig{
+				{
+					ID:           15,
+					NodeTypeSlug: "exercise",
+					Position:     0,
+					Data: map[string]any{
+						"exercise_name": "Bench Press",
+						"sets":          3,
+						"reps":          "5",
+						"load_value":    80.0,
+						"load_unit":     "kg",
+						"progression": map[string]any{
+							"type":      "linear",
+							"increment": 2.5,
+							"rule":      "add_each_session",
+						},
+					},
+				},
+			}, nil
+		},
+		listProgressionStatesFunc: func(ctx context.Context, userID, workflowID int) ([]ProgressionState, error) {
+			return nil, nil
+		},
+		upsertProgressionStateFunc: func(ctx context.Context, in UpsertProgressionStateInput) (ProgressionState, error) {
+			gotState = in
+			return ProgressionState{}, nil
+		},
+	}
+
+	service := NewService(repo)
+
+	err := service.ApplySessionProgression(ctx, ApplySessionProgressionInput{
+		UserID:     1,
+		WorkflowID: 1,
+		SessionID:  10,
+		Logs: []CompletedSetLog{
+			{WorkflowBlockID: intPtr(15), Completed: true, SetIndex: 1, PrescribedReps: "5", PrescribedLoad: "80 kg", ActualReps: "5", ActualLoad: "80 kg", ActualRPE: "8"},
+			{WorkflowBlockID: intPtr(15), Completed: true, SetIndex: 2, PrescribedReps: "5", PrescribedLoad: "80 kg", ActualReps: "5", ActualLoad: "80 kg", ActualRPE: "8"},
+			{WorkflowBlockID: intPtr(15), Completed: true, SetIndex: 3, PrescribedReps: "5", PrescribedLoad: "80 kg", ActualReps: "5", ActualLoad: "80 kg", ActualRPE: "8.5"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if gotState.StateType != StateTypeLinear {
+		t.Fatalf("expected linear state, got %q", gotState.StateType)
+	}
+	if gotState.Outcome != OutcomeIncrease {
+		t.Fatalf("expected OutcomeIncrease, got %s", gotState.Outcome)
+	}
+	if gotState.SuggestedLoad != "82.5 kg" {
+		t.Fatalf("expected SuggestedLoad 82.5 kg, got %s", gotState.SuggestedLoad)
+	}
+}

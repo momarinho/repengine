@@ -379,35 +379,43 @@ func intervalRepeatBlock(title string, rounds int, reps string, phases []map[str
 
 func calisthenicsDoubleProgressionBlock(exercise, reps string, sets int, restSeconds int, notes string) templateBlockSeed {
 	return templateBlockSeed{
-		NodeTypeSlug: "linear_progression",
+		NodeTypeSlug: "exercise",
 		Data: map[string]any{
-			"exercise_name":    exercise,
-			"sets":             sets,
-			"reps":             reps,
-			"start_load":       0.0,
-			"load_unit":        "kg",
-			"increment":        0.0,
-			"progression_rule": "double_progression",
-			"rest_seconds":     restSeconds,
-			"notes":            notes,
+			"exercise_name": exercise,
+			"sets":          sets,
+			"reps":          reps,
+			"load_value":    0.0,
+			"load_unit":     "kg",
+			"rest_seconds":  restSeconds,
+			"notes":         notes,
+			"progression": map[string]any{
+				"type":      "double",
+				"min_reps":  8,
+				"max_reps":  12,
+				"increment": 2.5,
+			},
 		},
 	}
 }
 
 func calisthenicsStepProgressionBlock(exercise, reps, sequence string, restSeconds int, notes string) templateBlockSeed {
 	return templateBlockSeed{
-		NodeTypeSlug: "linear_progression",
+		NodeTypeSlug: "exercise",
 		Data: map[string]any{
-			"exercise_name":    exercise,
-			"sets":             3,
-			"reps":             reps,
-			"start_load":       0.0,
-			"load_unit":        "kg",
-			"increment":        0.0,
-			"progression_rule": "double_progression",
-			"fail_sequence":    sequence,
-			"rest_seconds":     restSeconds,
-			"notes":            notes,
+			"exercise_name": exercise,
+			"sets":          3,
+			"reps":          reps,
+			"load_value":    0.0,
+			"load_unit":     "kg",
+			"rest_seconds":  restSeconds,
+			"notes":         notes,
+			"progression": map[string]any{
+				"type":          "double",
+				"min_reps":      8,
+				"max_reps":      12,
+				"increment":     2.5,
+				"fail_sequence": sequence,
+			},
 		},
 	}
 }
@@ -431,36 +439,43 @@ func calisthenicsSupersetBlock(exA, exB, repsA, repsB string, sets, restSeconds 
 
 func linearProgressionBlock(exercise, reps, loadUnit string, sets int, startLoad, increment float64, restSeconds int) templateBlockSeed {
 	return templateBlockSeed{
-		NodeTypeSlug: "linear_progression",
+		NodeTypeSlug: "exercise",
 		Data: map[string]any{
-			"exercise_name":    exercise,
-			"sets":             sets,
-			"reps":             reps,
-			"start_load":       startLoad,
-			"load_unit":        loadUnit,
-			"increment":        increment,
-			"progression_rule": "add_each_session",
-			"rest_seconds":     restSeconds,
+			"exercise_name": exercise,
+			"sets":          sets,
+			"reps":          reps,
+			"load_value":    startLoad,
+			"load_unit":     loadUnit,
+			"rest_seconds":  restSeconds,
+			"notes":         "",
+			"progression": map[string]any{
+				"type":      "linear",
+				"increment": increment,
+				"rule":      "add_each_session",
+			},
 		},
 	}
 }
 
 func gzclpT1Block(exercise string, startLoad float64, loadUnit string, increment float64, restSeconds int, notes string) templateBlockSeed {
 	return templateBlockSeed{
-		NodeTypeSlug: "linear_progression",
+		NodeTypeSlug: "exercise",
 		Data: map[string]any{
-			"exercise_name":      exercise,
-			"sets":               3,
-			"reps":               "5",
-			"start_load":         startLoad,
-			"load_unit":          loadUnit,
-			"increment":          increment,
-			"progression_rule":   "add_each_session",
-			"rest_seconds":       restSeconds,
-			"fail_sequence":      "3x5 -> 5x3 -> 6x2",
-			"reset_percent":      0.85,
-			"rounding_precision": 2.5,
-			"notes":              notes,
+			"exercise_name": exercise,
+			"sets":          3,
+			"reps":          "5",
+			"load_value":    startLoad,
+			"load_unit":     loadUnit,
+			"rest_seconds":  restSeconds,
+			"notes":         notes,
+			"progression": map[string]any{
+				"type":               "linear",
+				"increment":          increment,
+				"rule":               "add_each_session",
+				"fail_sequence":      "3x5 -> 5x3 -> 6x2",
+				"reset_percent":      0.85,
+				"rounding_precision": 2.5,
+			},
 		},
 	}
 }

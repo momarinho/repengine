@@ -13,6 +13,8 @@
 
 	let { open, nodeTypes, placementLabel = '', onclose, onselect }: Props = $props();
 
+	const visibleNodeTypes = $derived(nodeTypes.filter((nt) => nt.slug !== 'linear_progression'));
+
 	function handleBackdrop(event: MouseEvent): void {
 		if (event.target === event.currentTarget) {
 			onclose();
@@ -48,7 +50,7 @@
 			</div>
 
 			<div class="grid gap-4 p-6 md:grid-cols-2 xl:grid-cols-3">
-				{#each nodeTypes as nodeType}
+				{#each visibleNodeTypes as nodeType}
 					<button type="button" class="text-left" onclick={() => onselect(nodeType)}>
 						<NodeTypeCard
 							slug={nodeType.slug}

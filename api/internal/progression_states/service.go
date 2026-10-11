@@ -188,6 +188,12 @@ func (s *Service) buildNextState(
 	case "wave":
 		return buildWaveProgressionState(block, logs, existing, hasExisting, session), true
 	case "exercise", "exercise_timed":
+		if prog, ok := block.Data["progression"].(map[string]any); ok && prog != nil {
+			progType := asString(prog["type"])
+			if progType == "linear" || progType == "double" {
+				return buildLinearProgressionState(block, logs, existing, hasExisting, session), true
+			}
+		}
 		if !looksLikeSkillProgression(block) {
 			return UpsertProgressionStateInput{}, false
 		}
@@ -272,13 +278,28 @@ func buildLinearProgressionState(
 	session ApplySessionProgressionInput,
 ) UpsertProgressionStateInput {
 	failSequenceStr := asString(block.Data["fail_sequence"])
+	if failSequenceStr == "" {
+		if prog, ok := block.Data["progression"].(map[string]any); ok {
+			failSequenceStr = asString(prog["fail_sequence"])
+		}
+	}
 	resetPercent := parseNumberValue(block.Data["reset_percent"])
+	if resetPercent <= 0 {
+		if prog, ok := block.Data["progression"].(map[string]any); ok {
+			resetPercent = parseNumberValue(prog["reset_percent"])
+		}
+	}
 	if resetPercent <= 0 {
 		resetPercent = 0.85 // default to 85% GZCLP reset
 	}
 	precision := parseNumberValue(block.Data["rounding_precision"])
 	deloadWeeks := intOrDefault(block.Data["deload_weeks"], 0)
 	deloadPercent := parseNumberValue(block.Data["deload_percent"])
+	if deloadPercent <= 0 {
+		if prog, ok := block.Data["progression"].(map[string]any); ok {
+			deloadPercent = parseNumberValue(prog["deload_percent"])
+		}
+	}
 	if deloadPercent <= 0 {
 		deloadPercent = 0.90 // default to 90% deload
 	}
@@ -320,6 +341,11 @@ func buildLinearProgressionState(
 	lowerTarget, _ := parseRepRange(repsPrescribed)
 
 	increment := parseNumberValue(block.Data["increment"])
+	if increment == 0 {
+		if prog, ok := block.Data["progression"].(map[string]any); ok {
+			increment = parseNumberValue(prog["increment"])
+		}
+	}
 	loadUnit := asString(block.Data["load_unit"])
 
 	currentLoad := resolveLinearCurrentLoad(block, logs, existing, hasExisting, loadUnit)
@@ -617,7 +643,7 @@ func progressionStateFromUpsert(in UpsertProgressionStateInput) ProgressionState
 }
 
 func (s *Service) syncProgressionStateWithBlock(state *ProgressionState, block resolvedWorkflowBlock) {
-	if state.NodeTypeSlug != "linear_progression" {
+	if state.NodeTypeSlug != "linear_progression" && state.NodeTypeSlug != "exercise" {
 		return
 	}
 	if state.Metadata == nil {
@@ -625,6 +651,11 @@ func (s *Service) syncProgressionStateWithBlock(state *ProgressionState, block r
 	}
 
 	blockFailSeq := asString(block.Data["fail_sequence"])
+	if blockFailSeq == "" {
+		if prog, ok := block.Data["progression"].(map[string]any); ok {
+			blockFailSeq = asString(prog["fail_sequence"])
+		}
+	}
 	stateFailSeq := asString(state.Metadata["fail_sequence"])
 
 	if blockFailSeq != stateFailSeq {
@@ -878,8 +909,11 @@ func resolveLinearCurrentLoad(
 	if hasExisting && strings.TrimSpace(existing.SuggestedLoad) != "" && existing.SuggestedLoad != "0" && existing.SuggestedLoad != "0 kg" && existing.SuggestedLoad != "0.0" && existing.SuggestedLoad != "0.0 kg" {
 		return existing.SuggestedLoad
 	}
-	// 3. Check if block has a configured start_load > 0
+	// 3. Check if block has a configured start_load or load_value > 0
 	if configured := parseNumberValue(block.Data["start_load"]); configured > 0 {
+		return formatLoad(configured, loadUnit)
+	}
+	if configured := parseNumberValue(block.Data["load_value"]); configured > 0 {
 		return formatLoad(configured, loadUnit)
 	}
 	// 4. Fallback to any non-empty log actual load
