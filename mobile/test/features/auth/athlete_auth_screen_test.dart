@@ -15,6 +15,9 @@ class FakeAuthNotifier extends StateNotifier<AuthState> implements AuthNotifier 
   FakeAuthNotifier(super.state);
 
   @override
+  Future<void> get initialized => Future.value();
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 

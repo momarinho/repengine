@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
@@ -19,6 +20,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final Ref ref;
   final http.Client _client;
   SharedPreferences? prefs;
+  final Completer<void> _initCompleter = Completer<void>();
+
+  Future<void> get initialized => _initCompleter.future;
 
   AuthNotifier(
     this.ref, {
@@ -30,18 +34,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> _loadFromPrefs() async {
-    prefs ??= await SharedPreferences.getInstance();
-    final token = prefs?.getString(_tokenKey);
-    final userId = prefs?.getInt(_userIdKey);
-    final email = prefs?.getString(_emailKey);
+    try {
+      prefs ??= await SharedPreferences.getInstance();
+      final token = prefs?.getString(_tokenKey);
+      final userId = prefs?.getInt(_userIdKey);
+      final email = prefs?.getString(_emailKey);
 
-    if (token != null && token.isNotEmpty && userId != null) {
-      state = AuthState(
-        status: AuthStatus.authenticated,
-        token: token,
-        userId: userId,
-        email: email,
-      );
+      if (token != null && token.isNotEmpty && userId != null) {
+        state = AuthState(
+          status: AuthStatus.authenticated,
+          token: token,
+          userId: userId,
+          email: email,
+        );
+      }
+    } finally {
+      if (!_initCompleter.isCompleted) {
+        _initCompleter.complete();
+      }
     }
   }
 
@@ -138,10 +148,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await ref.read(workoutRepositoryProvider).clearRoutines();
     ref.read(selectedRoutineIdProvider.notifier).state = null;
     ref.read(selectedSectionIdProvider.notifier).state = null;
+    ref.read(guestModeActiveProvider.notifier).state = false;
 
     state = const AuthState(status: AuthStatus.guest);
   }
 }
+
+/// Track if the athlete opted to continue in guest mode without logging in.
+final guestModeActiveProvider = StateProvider<bool>((ref) => false);
+
+/// Tracks completion of initial authentication check from local storage.
+final authInitializedProvider = FutureProvider<bool>((ref) async {
+  final notifier = ref.watch(authStateProvider.notifier);
+  await notifier.initialized;
+  return true;
+});
 
 /// Global provider for athlete authentication
 final authStateProvider =

@@ -75,13 +75,16 @@ class _AthleteAuthScreenState extends ConsumerState<AthleteAuthScreen> {
         );
 
     if (success && mounted) {
+      ref.read(guestModeActiveProvider.notifier).state = false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Logged in successfully as $email'),
           backgroundColor: AppColors.success,
         ),
       );
-      Navigator.of(context).pop();
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
     }
   }
 
@@ -507,7 +510,12 @@ class _AthleteAuthScreenState extends ConsumerState<AthleteAuthScreen> {
           style: OutlinedButton.styleFrom(
             minimumSize: const Size.fromHeight(46),
           ),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            ref.read(guestModeActiveProvider.notifier).state = true;
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            }
+          },
           child: const Text('Train Offline / Guest Mode'),
         ),
 
