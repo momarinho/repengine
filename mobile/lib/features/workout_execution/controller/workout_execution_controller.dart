@@ -85,6 +85,10 @@ final progressionSuggestionProvider = FutureProvider.family<
       int logCount,
       double? fallbackLoad,
       int? fallbackReps,
+      double? loadIncrement,
+      String? progressionType,
+      int? minReps,
+      int? maxReps,
     })>(
   (ref, params) async {
     final repo = ref.watch(workoutRepositoryProvider);
@@ -94,6 +98,10 @@ final progressionSuggestionProvider = FutureProvider.family<
       sectionTitle: params.sectionTitle,
       fallbackLoad: params.fallbackLoad ?? 100.0,
       fallbackReps: params.fallbackReps ?? 5,
+      loadIncrement: params.loadIncrement ?? 2.5,
+      progressionType: params.progressionType,
+      minReps: params.minReps,
+      maxReps: params.maxReps,
     );
   },
 );

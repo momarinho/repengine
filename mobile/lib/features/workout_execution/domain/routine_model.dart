@@ -11,6 +11,11 @@ class RoutineExercise {
   final String reps;
   final double targetLoad;
   final int restSeconds;
+  final String? progressionType;
+  final double? progressionIncrement;
+  final int? progressionMinReps;
+  final int? progressionMaxReps;
+  final String? progressionRule;
 
   const RoutineExercise({
     required this.blockClientId,
@@ -20,6 +25,11 @@ class RoutineExercise {
     this.reps = '5',
     this.targetLoad = 100.0,
     this.restSeconds = 90,
+    this.progressionType,
+    this.progressionIncrement,
+    this.progressionMinReps,
+    this.progressionMaxReps,
+    this.progressionRule,
   });
 }
 
@@ -291,6 +301,17 @@ class ParsedRoutine {
                 '') ??
             90;
 
+        final prog = data['progression'] as Map<String, dynamic>?;
+        final progType = prog?['type']?.toString() ??
+            (slug == 'linear_progression' || data['increment'] != null ? 'linear' : null);
+        final progIncrement = double.tryParse(
+            prog?['increment']?.toString() ?? data['increment']?.toString() ?? '');
+        final minReps = int.tryParse(prog?['min_reps']?.toString() ?? '');
+        final maxReps = int.tryParse(prog?['max_reps']?.toString() ?? '');
+        final progRule = prog?['rule']?.toString() ??
+            prog?['progression_rule']?.toString() ??
+            data['progression_rule']?.toString();
+
         currentExercises.add(RoutineExercise(
           blockClientId: blockId,
           nodeTypeSlug: slug.isNotEmpty ? slug : 'exercise',
@@ -299,6 +320,11 @@ class ParsedRoutine {
           reps: reps,
           targetLoad: load,
           restSeconds: rest,
+          progressionType: progType,
+          progressionIncrement: progIncrement,
+          progressionMinReps: minReps,
+          progressionMaxReps: maxReps,
+          progressionRule: progRule,
         ));
       }
     }
@@ -338,5 +364,122 @@ class ParsedRoutine {
       updatedAt: DateTime.now().toUtc(),
       blocksJson: '[]',
     ));
+  }
+}
+
+/// Defensive parser for canonical RepEngine Routine JSON v1 and external AI formats
+@immutable
+class CanonicalRoutineImport {
+  final String name;
+  final String description;
+  final List<RoutineSection> sections;
+
+  const CanonicalRoutineImport({
+    required this.name,
+    this.description = '',
+    required this.sections,
+  });
+
+  static CanonicalRoutineImport parse(String jsonString) {
+    if (jsonString.trim().isEmpty) {
+      throw const FormatException('JSON content is empty.');
+    }
+
+    final dynamic decoded = jsonDecode(jsonString);
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Root JSON must be an object.');
+    }
+
+    final name = decoded['name']?.toString() ??
+        decoded['routine_name']?.toString() ??
+        'Imported Routine';
+    final description = decoded['description']?.toString() ?? '';
+
+    final rawSections = decoded['sections'] ?? decoded['days'];
+    final sections = <RoutineSection>[];
+
+    if (rawSections is List) {
+      for (var sIdx = 0; sIdx < rawSections.length; sIdx++) {
+        final secRaw = rawSections[sIdx];
+        if (secRaw is! Map<String, dynamic>) continue;
+
+        final secTitle = secRaw['title']?.toString() ?? 'Day ${sIdx + 1}';
+        final secSubtitle = secRaw['subtitle']?.toString() ?? '';
+        final rawBlocks = secRaw['blocks'] ?? secRaw['exercises'];
+        final exercises = <RoutineExercise>[];
+
+        if (rawBlocks is List) {
+          for (var bIdx = 0; bIdx < rawBlocks.length; bIdx++) {
+            final b = rawBlocks[bIdx];
+            if (b is! Map<String, dynamic>) continue;
+
+            final type = b['type']?.toString() ?? b['node_type_slug']?.toString() ?? 'exercise';
+            if (type == 'rest' || type == 'section') continue;
+
+            final exName = b['exercise_name']?.toString() ??
+                b['name']?.toString() ??
+                'Exercise ${exercises.length + 1}';
+            final sets = int.tryParse(b['sets']?.toString() ?? '') ?? 3;
+            final reps = b['reps']?.toString() ?? '5';
+            final load = double.tryParse(
+                    b['target_load']?.toString() ??
+                        b['load_value']?.toString() ??
+                        b['start_load']?.toString() ??
+                        b['load']?.toString() ??
+                        '') ??
+                0.0;
+            final rest = int.tryParse(b['rest_seconds']?.toString() ?? '') ?? 90;
+
+            final prog = b['progression'] as Map<String, dynamic>?;
+            final progType = prog?['type']?.toString();
+            final progInc = double.tryParse(prog?['increment']?.toString() ?? '');
+            final minR = int.tryParse(prog?['min_reps']?.toString() ?? '');
+            final maxR = int.tryParse(prog?['max_reps']?.toString() ?? '');
+            final rule = prog?['rule']?.toString();
+
+            exercises.add(RoutineExercise(
+              blockClientId: 'blk_${sIdx}_$bIdx',
+              nodeTypeSlug: type,
+              name: exName,
+              sets: sets,
+              reps: reps,
+              targetLoad: load,
+              restSeconds: rest,
+              progressionType: progType,
+              progressionIncrement: progInc,
+              progressionMinReps: minR,
+              progressionMaxReps: maxR,
+              progressionRule: rule,
+            ));
+          }
+        }
+
+        sections.add(RoutineSection(
+          id: 'sec_${sIdx + 1}',
+          title: secTitle,
+          subtitle: secSubtitle,
+          exercises: exercises,
+        ));
+      }
+    }
+
+    if (sections.isEmpty) {
+      throw const FormatException('No valid workout days or exercises found in JSON.');
+    }
+
+    return CanonicalRoutineImport(
+      name: name,
+      description: description,
+      sections: sections,
+    );
+  }
+
+  ParsedRoutine toParsedRoutine([int id = 0]) {
+    return ParsedRoutine(
+      id: id,
+      name: name,
+      description: description,
+      sections: sections,
+    );
   }
 }

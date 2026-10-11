@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:repengine_core/repengine_core.dart';
 import 'package:repengine_mobile/core/database/app_database.dart';
 import 'package:repengine_mobile/features/workout_execution/data/workout_repository.dart';
+import 'package:repengine_mobile/features/workout_execution/domain/routine_model.dart';
 
 void main() {
   late AppDatabase db;
@@ -491,6 +492,154 @@ void main() {
 
     final logs = await db.select(db.workoutSetLogsTable).get();
     expect(logs.any((l) => l.blockClientId == 'blk_test' && l.actualLoad == '45.0 kg'), isTrue);
+  });
+
+  test('getSuggestedProgressionForBlock respects custom loadIncrement', () async {
+    // Session completed with 100kg
+    await repository.startSession(
+      clientId: 'sess-sq-1',
+      workflowId: 1,
+      sectionId: 'sec_day1',
+      sectionTitle: 'Day 1',
+      startedAt: DateTime.utc(2026, 10, 8, 10),
+    );
+    await repository.logSet(
+      clientId: 'log-sq-1',
+      sessionClientId: 'sess-sq-1',
+      blockClientId: 'blk_squat',
+      nodeTypeSlug: 'exercise_squat',
+      setIndex: 1,
+      prescribedReps: '5',
+      prescribedLoad: '100.0',
+      actualReps: '5',
+      actualLoad: '100.0',
+      actualRpe: '8.0',
+      completed: true,
+      createdAt: DateTime.utc(2026, 10, 8, 10, 5),
+    );
+    await repository.completeSession('sess-sq-1');
+
+    // Query progression with 5.0kg increment (e.g. Squat)
+    final suggestion = await repository.getSuggestedProgressionForBlock(
+      'blk_squat',
+      sectionId: 'sec_day1',
+      fallbackLoad: 100.0,
+      loadIncrement: 5.0,
+    );
+
+    expect(suggestion.load, equals(105.0));
+    expect(suggestion.isProgressed, isTrue);
+  });
+
+  test('getSuggestedProgressionForBlock handles double progression logic', () async {
+    // 1. Session where max reps (12) were achieved
+    await repository.startSession(
+      clientId: 'sess-curl-1',
+      workflowId: 1,
+      sectionId: 'sec_arm',
+      sectionTitle: 'Arm Day',
+      startedAt: DateTime.utc(2026, 10, 8, 11),
+    );
+    await repository.logSet(
+      clientId: 'log-curl-1',
+      sessionClientId: 'sess-curl-1',
+      blockClientId: 'blk_curl',
+      nodeTypeSlug: 'exercise_curl',
+      setIndex: 1,
+      prescribedReps: '12',
+      prescribedLoad: '15.0',
+      actualReps: '12',
+      actualLoad: '15.0',
+      actualRpe: '8.0',
+      completed: true,
+      createdAt: DateTime.utc(2026, 10, 8, 11, 5),
+    );
+    await repository.completeSession('sess-curl-1');
+
+    final suggestionAdvancement = await repository.getSuggestedProgressionForBlock(
+      'blk_curl',
+      sectionId: 'sec_arm',
+      progressionType: 'double',
+      minReps: 8,
+      maxReps: 12,
+      loadIncrement: 2.0,
+    );
+
+    // Hit top of range (12 reps) -> advance load to 17kg and reset reps to 8
+    expect(suggestionAdvancement.load, equals(17.0));
+    expect(suggestionAdvancement.reps, equals(8));
+    expect(suggestionAdvancement.isProgressed, isTrue);
+
+    // 2. Session where intermediate reps (10) were achieved without failure
+    await repository.startSession(
+      clientId: 'sess-curl-2',
+      workflowId: 1,
+      sectionId: 'sec_arm2',
+      sectionTitle: 'Arm Day 2',
+      startedAt: DateTime.utc(2026, 10, 9, 11),
+    );
+    await repository.logSet(
+      clientId: 'log-curl-2',
+      sessionClientId: 'sess-curl-2',
+      blockClientId: 'blk_curl_2',
+      nodeTypeSlug: 'exercise_curl',
+      setIndex: 1,
+      prescribedReps: '10',
+      prescribedLoad: '15.0',
+      actualReps: '10',
+      actualLoad: '15.0',
+      actualRpe: '8.0',
+      completed: true,
+      createdAt: DateTime.utc(2026, 10, 9, 11, 5),
+    );
+    await repository.completeSession('sess-curl-2');
+
+    final suggestionRepAdvance = await repository.getSuggestedProgressionForBlock(
+      'blk_curl_2',
+      sectionId: 'sec_arm2',
+      progressionType: 'double',
+      minReps: 8,
+      maxReps: 12,
+      loadIncrement: 2.0,
+    );
+
+    // Maintained load (15kg) and aims for next rep target (11 reps)
+    expect(suggestionRepAdvance.load, equals(15.0));
+    expect(suggestionRepAdvance.reps, equals(11));
+  });
+
+  test('createRoutine serializes canonical progression object into SQLite blocksJson', () async {
+    final routine = await repository.createRoutine(
+      name: 'PPL Program',
+      sections: [
+        const RoutineSection(
+          id: 'sec_push',
+          title: 'Push Day',
+          exercises: [
+            RoutineExercise(
+              blockClientId: 'blk_bench',
+              nodeTypeSlug: 'exercise',
+              name: 'Bench Press',
+              sets: 3,
+              reps: '8-12',
+              targetLoad: 80.0,
+              progressionType: 'double',
+              progressionIncrement: 2.5,
+              progressionMinReps: 8,
+              progressionMaxReps: 12,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    expect(routine.name, equals('PPL Program'));
+    final parsed = ParsedRoutine.fromRoutine(routine);
+    final ex = parsed.sections.first.exercises.first;
+    expect(ex.progressionType, equals('double'));
+    expect(ex.progressionIncrement, equals(2.5));
+    expect(ex.progressionMinReps, equals(8));
+    expect(ex.progressionMaxReps, equals(12));
   });
 }
 

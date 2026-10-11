@@ -265,6 +265,10 @@ class WorkoutExecutionScreen extends ConsumerWidget {
               logCount: logs.length,
               fallbackLoad: currentExercise.targetLoad,
               fallbackReps: int.tryParse(currentExercise.reps) ?? 5,
+              loadIncrement: currentExercise.progressionIncrement,
+              progressionType: currentExercise.progressionType,
+              minReps: currentExercise.progressionMinReps,
+              maxReps: currentExercise.progressionMaxReps,
             )),
           ).value ?? ProgressionSuggestion(load: currentExercise.targetLoad, reps: int.tryParse(currentExercise.reps) ?? 5);
 
@@ -416,6 +420,10 @@ class _ActiveSessionContent extends ConsumerWidget {
         logCount: completedSetsCount,
         fallbackLoad: currentExercise.targetLoad,
         fallbackReps: int.tryParse(currentExercise.reps) ?? 5,
+        loadIncrement: currentExercise.progressionIncrement,
+        progressionType: currentExercise.progressionType,
+        minReps: currentExercise.progressionMinReps,
+        maxReps: currentExercise.progressionMaxReps,
       )),
     ).value;
 
@@ -611,14 +619,40 @@ class _ActiveSessionContent extends ConsumerWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        currentExercise.name,
-                        style: AppTypography.titleMedium.copyWith(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.onBackground,
-                        ),
-                        overflow: TextOverflow.ellipsis,
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              currentExercise.name,
+                              style: AppTypography.titleMedium.copyWith(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.onBackground,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (currentExercise.progressionType != null) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                currentExercise.progressionType == 'double'
+                                    ? '${currentExercise.progressionMinReps ?? 8}-${currentExercise.progressionMaxReps ?? 12} reps'
+                                    : '+${currentExercise.progressionIncrement ?? 2.5}kg',
+                                style: AppTypography.labelSmall.copyWith(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                     IconButton(

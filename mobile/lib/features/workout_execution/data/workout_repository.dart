@@ -303,6 +303,10 @@ class WorkoutRepository {
     String? sectionTitle,
     double fallbackLoad = 100.0,
     int fallbackReps = 5,
+    double loadIncrement = 2.5,
+    String? progressionType,
+    int? minReps,
+    int? maxReps,
   }) async {
     // 1. Check if sets were already completed in the current active session
     final activeSession = await (_db.select(_db.workoutSessionsTable)
@@ -448,10 +452,38 @@ class WorkoutRepository {
       failed: anyFailed,
     );
 
+    // Double progression handling
+    if (progressionType == 'double' && minReps != null && maxReps != null) {
+      if (!anyFailed && targetReps >= maxReps) {
+        final newLoad = (maxLoad > 0 ? maxLoad : fallbackLoad) + loadIncrement;
+        return ProgressionSuggestion(
+          load: newLoad,
+          reps: minReps,
+          reasoning: 'Reached maximum reps ($maxReps). Increasing load by $loadIncrement kg and resetting to $minReps reps.',
+          isProgressed: true,
+        );
+      } else if (!anyFailed) {
+        final nextReps = (targetReps < maxReps) ? targetReps + 1 : targetReps;
+        return ProgressionSuggestion(
+          load: maxLoad > 0 ? maxLoad : fallbackLoad,
+          reps: nextReps,
+          reasoning: 'Target hit! Maintain load and aim for $nextReps reps next time (range: $minReps-$maxReps).',
+          isProgressed: nextReps > targetReps,
+        );
+      } else {
+        return ProgressionSuggestion(
+          load: maxLoad > 0 ? maxLoad : fallbackLoad,
+          reps: targetReps,
+          reasoning: 'Target missed. Keep load and retry $targetReps reps.',
+          isProgressed: false,
+        );
+      }
+    }
+
     final autoregResult = AutoregulationEngine.evaluate(
       exerciseName: lastSessionLogs.first.nodeTypeSlug,
       sessions: [historicalSession],
-      loadIncrement: 2.5,
+      loadIncrement: loadIncrement,
     );
 
     return ProgressionSuggestion(
@@ -749,16 +781,28 @@ class WorkoutRepository {
           }
 
           // Build new exercise blocks for this section
-          final newExerciseBlocks = updatedExercises.map((ex) => {
-            'id': ex.blockClientId,
-            'node_type_slug': ex.nodeTypeSlug,
-            'data': {
+          final newExerciseBlocks = updatedExercises.map((ex) {
+            final dataMap = <String, dynamic>{
               'exercise_name': ex.name,
               'sets': ex.sets,
               'reps': ex.reps,
               'load': ex.targetLoad,
               'rest_seconds': ex.restSeconds,
-            },
+            };
+            if (ex.progressionType != null) {
+              dataMap['progression'] = {
+                'type': ex.progressionType,
+                if (ex.progressionIncrement != null) 'increment': ex.progressionIncrement,
+                if (ex.progressionMinReps != null) 'min_reps': ex.progressionMinReps,
+                if (ex.progressionMaxReps != null) 'max_reps': ex.progressionMaxReps,
+                if (ex.progressionRule != null) 'rule': ex.progressionRule,
+              };
+            }
+            return {
+              'id': ex.blockClientId,
+              'node_type_slug': ex.nodeTypeSlug,
+              'data': dataMap,
+            };
           }).toList();
 
           // Replace old exercises in that section slice
@@ -829,16 +873,26 @@ class WorkoutRepository {
         blockIndex++;
         for (final ex in sec.exercises) {
           final exId = ex.blockClientId.isNotEmpty ? ex.blockClientId : 'blk_${newId}_$blockIndex';
+          final exerciseData = <String, dynamic>{
+            'exercise_name': ex.name,
+            'sets': ex.sets,
+            'reps': ex.reps,
+            'load': ex.targetLoad,
+            'rest_seconds': ex.restSeconds,
+          };
+          if (ex.progressionType != null) {
+            exerciseData['progression'] = {
+              'type': ex.progressionType,
+              if (ex.progressionIncrement != null) 'increment': ex.progressionIncrement,
+              if (ex.progressionMinReps != null) 'min_reps': ex.progressionMinReps,
+              if (ex.progressionMaxReps != null) 'max_reps': ex.progressionMaxReps,
+              if (ex.progressionRule != null) 'rule': ex.progressionRule,
+            };
+          }
           blockList.add({
             'id': exId,
             'node_type_slug': ex.nodeTypeSlug.isNotEmpty ? ex.nodeTypeSlug : 'exercise_custom',
-            'data': {
-              'exercise_name': ex.name,
-              'sets': ex.sets,
-              'reps': ex.reps,
-              'load': ex.targetLoad,
-              'rest_seconds': ex.restSeconds,
-            },
+            'data': exerciseData,
           });
           blockIndex++;
         }

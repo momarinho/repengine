@@ -10,6 +10,7 @@ import '../../domain/routine_model.dart';
 import '../routine_editor_screen.dart';
 import '../workout_history_screen.dart';
 import 'plate_calculator_sheet.dart';
+import 'routine_import_sheet.dart';
 import '../../../ai_copilot/presentation/ai_routine_dialog.dart';
 
 class RoutineSelectorView extends ConsumerWidget {
@@ -229,16 +230,16 @@ class RoutineSelectorView extends ConsumerWidget {
               const SizedBox(height: 16),
 
               // Routine Selector Header & Actions (New Routine & Edit Routine)
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: 440,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('ROUTINES', style: AppTypography.labelSmall),
-                      Row(
+              Row(
+                children: [
+                  const Text('ROUTINES', style: AppTypography.labelSmall),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerRight,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
                             icon: const Icon(Icons.edit_note_rounded, size: 22, color: AppColors.primary),
@@ -251,6 +252,20 @@ class RoutineSelectorView extends ConsumerWidget {
                               );
                             },
                           ),
+                          OutlinedButton.icon(
+                            key: const Key('import_routine_btn'),
+                            icon: const Icon(Icons.file_download_outlined, size: 14),
+                            label: const Text('Import', style: TextStyle(fontSize: 12)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.tertiary,
+                              side: BorderSide(color: AppColors.tertiary.withValues(alpha: 0.5)),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            onPressed: () => RoutineImportSheet.show(context: context, ref: ref),
+                          ),
+                          const SizedBox(width: 6),
                           OutlinedButton.icon(
                             key: const Key('ai_routine_btn'),
                             icon: const Icon(Icons.auto_awesome_rounded, size: 14),
@@ -285,9 +300,9 @@ class RoutineSelectorView extends ConsumerWidget {
                           ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
               const SizedBox(height: 8),
 
