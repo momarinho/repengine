@@ -1,248 +1,111 @@
-# 📋 RepEngine Mobile & Sincronização — Checklist Detalhado de Implementação
+# 📋 RepEngine Mobile & Sincronização — Checklist Detalhado de Implementação (EN Reference)
 
-Este checklist complementa os Sprints do roadmap, rastreando individualmente cada componente de UI, banco local Drift, backend Dart Frog e motor de sincronização.
-
----
-
-## 📱 1. Interface & Frontend (Flutter Mobile)
-
-### 🏋️ 1.1 Gym Execution HUD (Modo Treino)
-- [x] **Tema Atelier Dark & Tipografia**: Cores de alto contraste e tokens definidos ([`app_colors.dart`](file:///home/mateus/Projects/repengine/mobile/lib/core/theme/app_colors.dart), [`app_typography.dart`](file:///home/mateus/Projects/repengine/mobile/lib/core/theme/app_typography.dart)).
-- [x] **Tela Principal do Treino**: [`workout_execution_screen.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/workout_execution_screen.dart) com suporte a estado vazio e sessão em andamento.
-- [x] **Thumb Zone Pad (Ajuste Ergonômico de Séries)**:
-  - [x] Incrementos rápidos de carga (`-5`, `-2.5`, `+2.5`, `+5`).
-  - [x] Incrementos de repetições (`-1`, `+1`).
-  - [x] Botão massivo "CONCLUIR SÉRIE" no terço inferior da tela.
-  - [x] Conexão com fórmula estatística real de 1RM via `OneRepMaxCalculator` do core em tempo real.
-- [x] **Cronômetro Circular Nativo (120 FPS Canvas)**: [`circular_rest_timer.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/circular_rest_timer.dart) com vibração tátil nos 3s finais.
-- [x] **Cards de Séries Concluídas**: [`set_log_card.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/set_log_card.dart) com índice da série, carga, reps e 1RM estimado.
-- [x] **Transição Automática de Exercícios & Pad de Conclusão**:
-  - [x] Disparo automático do cronômetro de descanso e avanço para o próximo exercício ao concluir a última série prescrita.
-  - [x] [`exercise_completed_pad.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/exercise_completed_pad.dart) bloqueando séries extras em exercícios já finalizados e guiando com botão `NEXT: [EXERCÍCIO]`.
-  - [x] Estado final `ALL EXERCISES COMPLETED!` com atalho direto para `REVIEW & FINISH WORKOUT`.
-  - [x] Testes de regressão de widget em [`routine_selection_test.dart`](file:///home/mateus/Projects/repengine/mobile/test/features/workout_execution/routine_selection_test.dart).
-- [x] **Modal de Resumo do Treino Concluído**: Dialog com volume total levantado (kg), tempo de treino e total de séries gravadas no SQLite ([`workout_summary_dialog.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/workout_summary_dialog.dart)).
-
-### 🌐 1.2 Status de Nuvem & Diagnósticos (Modo Academia)
-- [x] **Cloud Sync Badge Dinâmico na AppBar**:
-  - [x] 🟢 `Sincronizado com o PC` (0 pendentes na fila).
-  - [x] 🟡 `Modo Academia` (N séries salvas offline no SQLite).
-  - [x] 🔵 `Sincronizando com o PC...` (envio em andamento).
-  - [x] ⚪ `PC Offline` (Docker inativo ou celular fora do Wi-Fi).
-- [x] **Gaveta de Ajustes & Diagnóstico (Debug Drawer)**:
-  - [x] Detecção Automática do Host BFF (`HostDiscoveryService` com probe paralelo na sub-rede local e validação da assinatura `repengine_mobile_bff`).
-  - [x] Botão "Auto-Detect PC (Wi-Fi)" com feedback dinâmico e reconexão silenciosa no startup/queda.
-  - [x] Campo editável para IP do PC com botões de atalho (`localhost`, `10.0.2.2`).
-  - [x] Botão "Testar Conexão" com medição de ping/latência em tempo real.
-  - [x] Switch "Simular Modo Academia (Offline)" para testes manuais.
-  - [x] Inspetor da Fila de Sincronização (`SyncQueueTable`) com visualização de mutações pendentes.
-  - [x] Botão "Sincronizar Agora" (Pull & Push manual).
+This checklist tracks the implementation progress across the Flutter mobile application, Drift SQLite local database, Dart Frog BFF, and the synchronization engine.
 
 ---
 
-## 💾 2. Banco Local Reativo (Drift / SQLite)
-- [x] **Esquema de Tabelas Locais**:
-  - [x] `RoutinesTable` (workflows locais).
-  - [x] `WorkoutSessionsTable` (sessões de treino).
-  - [x] `WorkoutSetLogsTable` (séries concluídas com `client_id`).
-  - [x] `SyncQueueTable` (fila outbox de mutações locais).
-  - [x] `ProgressionStatesTable` (cargas sugeridas e semanas ativas salvas localmente).
-- [x] **Repositório Atômico (`WorkoutRepository`)**:
-  - [x] `startSession()` com gravação simultânea na fila de sync.
-  - [x] `logSet()` com gravação atômica da série + mutação outbox.
-  - [x] `completeSession()` finalizando o treino e enfileirando sync.
-  - [x] Streams reativos (`watchActiveSession`, `watchSessionLogs`, `watchPendingSyncCount`).
-  - [x] Stream de inspeção da fila (`watchSyncQueue`).
-  - [x] Operações de rotinas e outbox (`watchRoutines`, `upsertWorkflows`, `deleteWorkflows`, `deleteQueueItemsByClientIds`).
+## 📱 1. Interface & Mobile Frontend (Flutter)
+
+### 🏋️ 1.1 Gym Execution HUD (Active Workout Mode)
+- [x] **Kanagawa Dark Theme & Typography**: High-contrast color tokens and typography ([`app_colors.dart`](file:///home/mateus/Projects/repengine/mobile/lib/core/theme/app_colors.dart), [`app_typography.dart`](file:///home/mateus/Projects/repengine/mobile/lib/core/theme/app_typography.dart)).
+- [x] **Main Workout Execution View**: [`workout_execution_screen.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/workout_execution_screen.dart) supporting empty state and active workout session.
+- [x] **Thumb Zone Pad (Ergonomic Set Logger)**:
+  - [x] Quick load adjusters (`-5kg`, `-2.5kg`, `+2.5kg`, `+5kg`).
+  - [x] Repetition adjusters (`-1`, `+1`).
+  - [x] Massive "LOG SET" button in natural thumb reach.
+  - [x] Real-time 1RM projection via `OneRepMaxCalculator` from `repengine_core`.
+- [x] **Native Circular Rest Timer (120 FPS Canvas)**: [`circular_rest_timer.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/circular_rest_timer.dart) with haptic vibrations during the final 3 seconds.
+- [x] **Completed Set Log Cards**: [`set_log_card.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/set_log_card.dart) showing set index, load, reps, and calculated 1RM.
+- [x] **Automatic Exercise Transitions & Completion Pad**:
+  - [x] Automatic rest timer trigger and auto-advance to the next exercise upon finishing prescribed sets.
+  - [x] [`exercise_completed_pad.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/exercise_completed_pad.dart) locking completed exercises and guiding athlete with `NEXT: [EXERCISE]`.
+  - [x] Final `ALL EXERCISES COMPLETED!` state with direct shortcut to `REVIEW & FINISH WORKOUT`.
+  - [x] Widget regression tests in [`routine_selection_test.dart`](file:///home/mateus/Projects/repengine/mobile/test/features/workout_execution/routine_selection_test.dart).
+- [x] **Workout Summary Modal**: Dialog showing total volume lifted (kg), total workout duration, and total sets logged in SQLite ([`workout_summary_dialog.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/workout_summary_dialog.dart)).
+
+### 🌐 1.2 Cloud Status & Diagnostics (Gym Mode)
+- [x] **Dynamic Cloud Sync Badge in AppBar**:
+  - [x] 🟢 `Synced with PC` (0 pending in queue).
+  - [x] 🟡 `Gym Mode / Offline` (N sets saved locally in SQLite).
+  - [x] 🔵 `Syncing with PC...` (dispatch in progress).
+  - [x] ⚪ `PC Offline` (Docker inactive or phone outside Wi-Fi).
+- [x] **Diagnostic Drawer**:
+  - [x] Automatic BFF host discovery (`HostDiscoveryService` with parallel subnet scan and signature validation).
+  - [x] "Auto-Detect PC (Wi-Fi)" button with live feedback and silent background reconnection.
+  - [x] Editable PC IP address with shortcut presets (`localhost`, `10.0.2.2`).
+  - [x] "Test Connection" button measuring round-trip latency.
+  - [x] "Simulate Gym Mode (Offline)" toggle for manual field testing.
+  - [x] Outbox Queue Inspector (`SyncQueueTable`) displaying pending payloads.
+  - [x] "Sync Now" button (manual pull & push).
 
 ---
 
-## 🔄 3. Rede & Motor de Sincronização (Outbox Worker)
-- [x] **Configuração do Servidor (`ServerConfig` / `ServerHealthNotifier`)**:
-  - [x] Persistência do host/porta no `shared_preferences` ([`server_config.dart`](file:///home/mateus/Projects/repengine/mobile/lib/core/network/server_config.dart)).
-  - [x] Endpoint de health check no BFF sem auth ([`server_mobile/routes/api/v1/health.dart`](file:///home/mateus/Projects/repengine/server_mobile/routes/api/v1/health.dart)) testado e rodando no Docker.
-  - [x] Heartbeat automático a cada 15s.
-- [x] **Cliente HTTP de Sincronização (`SyncHttpClient`)**:
-  - [x] Despacho em lote para `POST /api/v1/mobile/sync/push`.
-  - [x] Busca de atualizações em `GET /api/v1/mobile/sync/pull`.
-- [x] **Worker em Segundo Plano (`SyncEngine`)**:
-  - [x] Orquestrador de duas fases: Push de mutações locais -> Pull delta de rotinas.
-  - [x] Expulso atômico dos itens confirmados da `SyncQueueTable` via `deleteQueueItemsByClientIds`.
-  - [x] Integração reativa com badge na AppBar (`_CloudSyncBadge`) e drawer (`DebugSettingsDrawer`).
-  - [x] Auto-sync automático ao reconectar com o servidor do PC (listener reativo no heartbeat).
+## 💾 2. Local Reactive Storage (Drift / SQLite)
+- [x] **Local Table Schema**:
+  - [x] `RoutinesTable` (local routine workflows).
+  - [x] `WorkoutSessionsTable` (active and completed workout sessions).
+  - [x] `WorkoutSetLogsTable` (completed set logs with `client_id`).
+  - [x] `SyncQueueTable` (outbox queue of local mutations).
+  - [x] `ProgressionStatesTable` (prescribed loads and progression states cached locally).
+- [x] **Atomic Repository (`WorkoutRepository`)**:
+  - [x] `startSession()` with simultaneous outbox insertion.
+  - [x] `logSet()` with atomic set insertion + outbox mutation.
+  - [x] `completeSession()` finalizing session and enqueuing sync.
+  - [x] Reactive streams (`watchActiveSession`, `watchSessionLogs`, `watchPendingSyncCount`, `watchSyncQueue`).
+  - [x] Batch upserts and mutations (`watchRoutines`, `upsertWorkflows`, `deleteWorkflows`, `deleteQueueItemsByClientIds`).
 
 ---
 
-## 🔬 4. Ciência do Esporte & Analytics em Dart Puro
-- [x] **`packages/repengine_core/lib/src/sports_science/`**:
-  - [x] `one_rep_max.dart`: Fórmulas Brzycki, Epley, Mayhew, Wathen, Lombardi + consenso e intervalos de 95% ([`one_rep_max.dart`](file:///home/mateus/Projects/repengine/packages/repengine_core/lib/src/sports_science/one_rep_max.dart)).
-  - [x] `inol.dart`: Intensity Number of Lifts por série e acumulado com zonas de recuperação ([`inol.dart`](file:///home/mateus/Projects/repengine/packages/repengine_core/lib/src/sports_science/inol.dart)).
-  - [x] `workload_acwr.dart`: Razão de carga crônica x aguda (EWMA / Sweet Spot 0.8 - 1.3) ([`workload_acwr.dart`](file:///home/mateus/Projects/repengine/packages/repengine_core/lib/src/sports_science/workload_acwr.dart)).
-  - [x] `autoregulation.dart`: Motor de ajuste de carga por RPE/falhas consecutivas ([`autoregulation.dart`](file:///home/mateus/Projects/repengine/packages/repengine_core/lib/src/sports_science/autoregulation.dart)).
-  - [x] Testes unitários puros com 100% de cobertura e paridade (`dart test` aprovado).
-
-### 📱 4.1 Integração no Mobile (Flutter HUD)
-- [x] Conectar `OneRepMaxCalculator` no [`thumb_zone_pad.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/thumb_zone_pad.dart) para 1RM dinâmico enquanto digita carga/reps.
-- [x] Conectar `OneRepMaxCalculator` no [`set_log_card.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/set_log_card.dart) para exibir o 1RM histórico de cada série concluída.
-
-### 🖥️ 4.2 Exposição no Dart Frog BFF & Substituição do Python no Desktop Web
-- [x] **Endpoints Analíticos no Dart Frog BFF (`server_mobile`)**:
-  - [x] `POST /api/v1/1rm`: Recebe carga/reps do Desktop e responde consenso e projeções.
-  - [x] `POST /api/v1/autoregulation`: Avalia histórico de sessões do Desktop e sugere ação (`increase_load`, etc.).
-  - [x] `POST /api/v1/acwr`: Calcula razão aguda:crônica a partir das cargas diárias.
-- [x] **Virada de Chave na Web Desktop (SvelteKit)**:
-  - [x] Atualizar `docker-compose.dev.yml`: `ANALYTICS_URL: http://mobile-bff:8080`.
-  - [x] Validar carregamento do card `ScientificInsights` na Web Desktop consumindo o Dart Frog.
-- [x] **Descomissionamento do Python**:
-  - [x] Remover o contêiner `analytics` do `docker-compose.dev.yml` (economia de ~200MB de RAM).
-  - [x] Aposentar pasta `analytics/`.
+## 🔄 3. Network & Synchronization Engine (Outbox Worker)
+- [x] **Delta Sync Client (`SyncHttpClient`)**:
+  - [x] Automatic retry with exponential backoff.
+  - [x] Strict timeout protection and graceful offline fallback.
+- [x] **Push & Pull Reconciliation**:
+  - [x] Batch push dispatch of local outbox mutations to Dart Frog BFF.
+  - [x] Upstream pull syncing routines and progression states into SQLite.
+  - [x] Atomic queue purge after successful server acknowledgement.
 
 ---
 
-## 🏆 5. Sprint 6: Dashboard de Rotinas/Dias, Resolução de Conflitos, Visual & CI/CD
-- [x] **Seletor Offline de Rotinas e Dias de Treino (`RoutineSelectorView`)**:
-  - [x] Modelo de domínio `ParsedRoutine`, `RoutineSection`, `RoutineExercise` com parser de blocos ([`routine_model.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/domain/routine_model.dart)).
-  - [x] Coluna `blocksJson` no Drift (`RoutinesTable`) para armazenar blocos em JSON offline.
-  - [x] Seletor de rotina e de dias/seções com chips horizontais interativos.
-  - [x] Prévia detalhada de exercícios de cada dia de treino (séries, repetições, carga prescrita e descanso).
-  - [x] Botão dinâmico para iniciar o dia de treino selecionado.
-- [x] **Execução Multiexercício no HUD Ativo**:
-  - [x] Exibição do título dinâmico da seção/dia no cabeçalho do HUD.
-  - [x] Abas/chips horizontais para alternar entre exercícios do treino ativo sem perda de estado.
-  - [x] `ThumbZonePad` responsivo com `FittedBox` exibindo nome do exercício selecionado e sugestão individual de sobrecarga.
-- [x] **Resolução Determinística de Conflitos (Coach vs. Athlete)**:
-  - [x] Teste de integração ponta a ponta ([`deterministic_conflict_resolution_test.dart`](file:///home/mateus/Projects/repengine/mobile/test/features/sync/deterministic_conflict_resolution_test.dart)).
-  - [x] Validação de preservação 100% íntegra dos treinos offline do atleta com `client_id` enquanto o treinador atualiza a rotina no desktop.
-  - [x] Atualização atômica da rotina local no SQLite sem impacto nos registros já concluídos.
-- [x] **Testes de Regressão Visual e Responsividade de Design System**:
-  - [x] Teste de regressão visual ([`hud_visual_test.dart`](file:///home/mateus/Projects/repengine/mobile/test/features/workout_execution/hud_visual_test.dart)) validando tokens Kanagawa, hierarquia visual e touch targets mínimos de 48-54dp.
-  - [x] Responsividade validada para viewports de smartphones compactos a flagships (sem RenderFlex overflow).
-- [x] **Esteira de CI/CD em GitHub Actions**:
-  - [x] `.github/workflows/ci.yml` estendido com `core-test`, `bff-test`, `mobile-test` e `mobile-build-apk` com compilação e upload de release do APK.
+## 📱 4. Sprint 9: Gym-Proof UI Ergonomics & In-Workout Adjustments
+- [x] **Custom Exercise Swaps**:
+  - [x] Swap exercise in active workout session when equipment is occupied.
+  - [x] Add ad-hoc exercise on the fly.
+  - [x] Prompt to optionally overwrite base routine template or keep changes isolated to today's session.
+- [x] **Plate Calculator**: Visual breakdown for 20kg barbell with standard plates (25, 20, 15, 10, 5, 2.5, 1.25kg).
+- [x] **Local Workout History Screen**: Full completed workout timeline with date filters and volume summaries.
 
 ---
 
-## 🔐 6. Sprint 7: Conexão Real com Conta Web & Hidratação de Treinos
-- [x] **Hidratação de Blocos de Rotina (`blocksJson`) no Dart Frog BFF**:
-  - [x] `GoCoreClient.fetchWorkflows()` enriquecendo workflows com chamadas concorrentes a `GET /workflows/:id`.
-  - [x] Entrega de seções e exercícios completos com repetições, carga e descansos no `SyncPullResponse`.
-- [x] **Proxy de Autenticação no Dart Frog BFF**:
-  - [x] `POST /api/v1/mobile/auth/login` conectando com Go Core `POST /auth/login`.
-  - [x] Exceção estruturada `GoCoreAuthException` e bypass de rota pública no `_middleware.dart`.
-- [x] **Gerenciamento de Autenticação & Token no Mobile**:
-  - [x] `AuthState` e `AuthNotifier` ([`auth_repository.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/auth/data/auth_repository.dart)).
-  - [x] Persistência em `SharedPreferences` de token, user ID e email.
-  - [x] Injeção de JWT dinâmico no `SyncHttpClient` e gatilho de sync imediato pós-login.
-- [x] **Interface do Usuário (UI)**:
-  - [x] Card "Conta RepEngine Web" na gaveta de diagnóstico ([`debug_settings_drawer.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/debug_settings_drawer.dart)).
-  - [x] Banner informativo de status offline/conectado no seletor de rotina ([`routine_selector_view.dart`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/routine_selector_view.dart)).
-- [x] **Testes Automatizados**:
-  - [x] Testes no BFF (`go_core_client_test.dart`, `login_test.dart`, `_middleware_test.dart`).
-  - [x] Testes no Mobile (`auth_notifier_test.dart`, `workout_execution_screen_test.dart`).
+## 🔐 5. Sprint 10: Dedicated Athlete Login & Mobile Routine Studio
+- [x] **Authentication Flow & Athlete Profile**:
+  - [x] Dedicated login view with Web account credentials or "Train Offline / Guest Mode".
+  - [x] Reactive startup routing: boots to login screen when unauthenticated; boots directly to HUD when authenticated.
+  - [x] Athlete profile sheet with cloud sync status and safe logout.
+- [x] **Mobile Routine Studio (`RoutineEditorScreen`)**:
+  - [x] Multi-day routine builder with custom exercises, sets, reps, load, and rest times.
+  - [x] Deterministic local persistence in Drift SQLite and outbox sync dispatch.
 
 ---
 
-## 🏗️ 7. Sprint 8: Criador de Rotinas no Mobile & Recursos de Portfólio
-- [x] **Abandono de Treino com Purga Atômica (Abandon Workout)**:
-  - [x] Fluxo de confirmação com `AbandonWorkoutDialog` e botão ergonômico no topo do HUD.
-  - [x] Acesso alternativo com botão "Discard Workout" no [`WorkoutSummaryDialog`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/workout_summary_dialog.dart).
-  - [x] Limpeza atômica no SQLite: deleção de `workout_sessions`, purga de `workout_set_logs` e remoção de registros pendentes na `sync_queue` para não replicar dados descartados.
-  - [x] Testes unitários no [`workout_repository_test.dart`](file:///home/mateus/Projects/repengine/mobile/test/features/workout_execution/workout_repository_test.dart) e de widget no [`workout_execution_screen_test.dart`](file:///home/mateus/Projects/repengine/mobile/test/features/workout_execution/workout_execution_screen_test.dart).
-- [x] **Criador de Rotinas no Celular (`RoutineCreatorScreen` / Modal)**:
-  - [x] Formulário ergonômico no tema Kanagawa Dark com nome e descrição da rotina.
-  - [x] Construtor dinâmico de seções (dias de treino: Treino A, B, etc.).
-  - [x] Adição de exercícios com catálogo nativo (*Squat, Bench Press, Deadlift, OHP, etc.*) ou customizado.
-  - [x] Prescrição de séries, repetições, carga alvo inicial e tempo de descanso por exercício.
-- [x] **Gravação Atômica & Modelo Estruturado (`WorkoutRepository.createRoutine`)**:
-  - [x] Serialização determinística de blocos compatível com `routine_model.dart` (`blocksJson`).
-  - [x] Inserção no Drift local (`RoutinesTable`) com ID local e reflexo imediato no `watchRoutines()`.
-  - [x] Enfileiramento na `SyncQueueTable` para replicação no backend.
-- [x] **Interface & Ponto de Entrada**:
-  - [x] Botão `+ Create Routine` no cabeçalho do [`RoutineSelectorView`](file:///home/mateus/Projects/repengine/mobile/lib/features/workout_execution/presentation/widgets/routine_selector_view.dart).
-  - [x] Execução imediata do treino criado pelo atleta no HUD móvel com 1RM e timer.
-- [x] **Calculadora de Anilhas (*Plate Calculator*)**:
-  - [x] Bottom Sheet no `ThumbZonePad`, AppBar e Dashboard decompondo qualquer carga alvo nas anilhas de barra olímpica (25, 20, 15, 10, 5, 2.5, 1.25kg) com seletor de barra (20kg, 15kg, 10kg, 0kg) e badges visuais por cores oficiais.
-  - [x] Testes de widget automatizados em `plate_calculator_test.dart`.
-- [x] **Histórico Local de Treinos Concluídos (`WorkoutHistoryView`)**:
-  - [x] Tela para visualização de sessões finalizadas com volume total (tonelagem em kg), duração, séries concluídas e detalhamento expansível de exercícios/séries salvos no SQLite.
-  - [x] Confirmação e exclusão atômica de sessões locais.
-  - [x] Testes de widget automatizados em `workout_history_test.dart`.
-- [x] **Testes Automatizados**:
-  - [x] Testes unitários de repositório e testes de widget para o fluxo de criação de rotinas (`routine_editor_test.dart`), calculadora de anilhas (`plate_calculator_test.dart`) e histórico (`workout_history_test.dart`).
+## 🤖 6. Sprint 11: AI Workout Copilot
+- [x] **Natural Language Routine Generation**:
+  - [x] Dart Frog BFF endpoint (`POST /api/v1/mobile/ai/generate_routine`) powered by Google Genkit & Gemini 1.5 Flash.
+  - [x] Structured output parsing into canonical `exercise` blocks.
+  - [x] Mobile `AiRoutineDialog` with suggestion chips and routine editor integration.
+  - [x] Web Studio `AiArchitectModal.svelte` with Replace / Append capabilities.
 
 ---
 
-## 🏋️‍♂️ 8. Sprint 9: UX de Academia, Edição Durante o Treino & Sobrescrita de Rotina
-- [x] **Ergonomia e Legibilidade de Academia (*Gym-Proof HUD*)**:
-  - [x] Aumentar escala tipográfica dos elementos centrais (carga alvo, repetições, número da série) para visualização rápida à distância (24–32px).
-  - [x] Aumentar área de toque mínima dos seletores de carga e repetições no `ThumbZonePad` (botões maiores e táteis).
-  - [x] Destacar cronômetro de descanso com feedback de alto contraste quando ativo e concluído.
-- [x] **Linguagem Amigável & Desacoplamento Técnico**:
-  - [x] Substituir jargões técnicos ("BFF Host", "Outbox", "Consensus 1RM", "Autoregulated target") por termos intuitivos ("Nuvem / Sincronização", "Recorde estimado", "Meta sugerida").
-  - [x] Reorganizar gaveta de configurações mantendo status de sincronização amigável e opções de IP/diagnóstico em seção de "Configurações Avançadas".
-- [x] **Edição Rápida Durante o Treino (*In-Workout Quick Edit*)**:
-  - [x] Menu de ações no player ativo para trocar exercício quando um aparelho estiver ocupado.
-  - [x] Adicionar exercício avulso à sessão de hoje.
-  - [x] Remover exercício da sessão atual sem afetar histórico prévio.
-- [x] **Sobrescrita Inteligente da Rotina Base ao Concluir Treino**:
-  - [x] Modal de conclusão de treino exibindo resumo de novas cargas e exercícios realizados hoje.
-  - [x] Opção para atualizar a rotina base (`routines.blocksJson`) no SQLite local com as cargas/ajustes executados hoje.
-  - [x] Opção alternativa para salvar apenas o log de hoje mantendo a rotina template intacta.
-- [x] **Testes Automatizados**:
-  - [x] Testes unitários para substituição/adição de exercícios em sessão ativa e sobrescrita de rotina base.
-  - [x] Testes de widget para o novo HUD ampliado e modal inteligente de conclusão.
-
----
-
-## 📱 9. Sprint 10: Tela de Login Dedicada & Editor de Rotinas Mobile
-- [x] **Fluxo de Autenticação & Perfil do Atleta**:
-  - [x] Tela de Login dedicada com opções de entrar na Conta RepEngine Web ou "Treinar Offline / Convidado".
-  - [x] Tela/aba de perfil do atleta com status de conexão/sync e opção de desconectar.
-- [x] **Criador e Editor de Rotinas Mobile (`RoutineEditorScreen`)**:
-  - [x] Construtor completo de treinos com divisões (Dia A, Dia B...) e exercícios customizados.
-  - [x] Prescrição de séries, repetições, carga inicial e descanso.
-  - [x] Persistência determinística no SQLite local e enfileiramento na Outbox para sincronização upstream.
-- [x] **Testes Automatizados**:
-  - [x] Testes de widget para a tela de autenticação e perfil (`athlete_auth_screen_test.dart`).
-  - [x] Testes de widget para criação, edição e exclusão de rotinas (`routine_editor_test.dart`).
-
----
-
-## 🤖 10. Sprint 11: RepEngine AI Copilot (Coach Generativo & Smart Debrief)
-- [x] **Coach Copilot: Geração de Rotinas em Linguagem Natural (Google Genkit)**:
-  - [x] Endpoint no Dart Frog BFF (`POST /api/v1/mobile/ai/generate_routine`) com Google Genkit (`gemini-1.5-flash`) e *Structured JSON Outputs*.
-  - [x] Suporte a parâmetros estruturados de treino (disciplina, split, experiência, equipamentos, lesões/restrições).
-  - [x] Mapeamento e validação defensiva direta para blocos de treino (`blocksJson`) do RepEngine com slug canônico `exercise`.
-  - [x] Modal mobile dedicado `AiRoutineDialog` integrado com chips rápidos no `RoutineSelectorView` e abertura no `RoutineEditorScreen`.
-  - [x] **Web AI Workout Architect (`AiArchitectModal.svelte`)**: Motor avançado no Web Studio integrado ao Dashboard e Workflow Canvas com opções de Substituir ou Anexar rotina.
-- [ ] **Smart Workout Debrief (Análise Pós-Treino com Insights)**:
-  - [ ] Processamento de feedback qualitativo pós-sync push com comparação de planejado vs realizado.
-  - [ ] Card de resumo do treinador exibido no `WorkoutHistoryView` do mobile e no dashboard web.
-- [ ] **Substituição Biomecânica Inteligente no Treino Ativo**:
-  - [ ] Sugestão de exercícios alternativos com mesma ativação motora ao encontrar aparelhos ocupados.
-- [x] **Guardrails de Segurança & Resiliência Offline**:
-  - [x] Prompt com limites seguros de volume, cargas realistas e regras de ciência esportiva.
-  - [x] Fallback gracioso com aviso amigável quando o celular estiver sem conexão de rede ou sem API key (HTTP 503 controlado).
-- [x] **Testes Automatizados**:
-  - [x] Testes unitários no BFF para parsing defensivo, geração Genkit e enriquecimento de prompt (`gemini_client_test.dart` e `generate_routine_test.dart` - 39 testes).
-  - [x] Testes de widget no Flutter para os fluxos interativos de geração assistida por IA (`ai_routine_dialog_test.dart` e `ai_copilot_service_test.dart` - 64 testes).
-
----
-
-## 🧩 11. Sprint 12: Arquitetura Visual de Progressões & Motor de Intercâmbio JSON (Import/Export)
-- [ ] **Bloco Visual de Estratégia de Progressão (`progression_strategy`)**:
-  - [ ] Desacoplamento no modelo: bloco `exercise` focado em biomecânica e nó `progression_strategy` para a lógica de sobrecarga.
-  - [ ] Web Svelte Flow: nó conectável com linha indicativa (edge) ligando a estratégia ao exercício (`ProgressionStrategyNode`).
-  - [ ] Mobile Routine Editor: seletor de regras com preview didático das próximas sessões (Linear, Dupla, RPE, GZCLP).
-- [ ] **Motor de Intercâmbio JSON (`RepEngine Routine Schema v1`)**:
-  - [ ] Especificação do formato canônico padronizado para exportar/importar rotinas completas.
-  - [ ] Ação de Exportar rotina (download de `.json` ou cópia para área de transferência) no Web e Mobile.
-  - [ ] Ação de Importar rotina com preview e validação estrutural contra schemas inválidos.
-  - [ ] Gerador de prompts para IAs externas (ChatGPT, Claude) compatível com o schema do RepEngine.
-- [ ] **Testes Automatizados**:
-  - [ ] Testes unitários de parsing e serialização do schema JSON v1.
-  - [ ] Testes de validação de import/export e integridade dos blocos.
-
-
-
-
+## 🧩 7. Sprint 12: Visual Progressions & Canonical Routine JSON Hub
+- [x] **Structured Progression Sub-Blocks**:
+  - [x] Exercises include structured `progression` object (`linear`, `double`).
+  - [x] Web Studio `BlockExercise.svelte` with connected visual progression sub-blocks.
+  - [x] Official database templates migrated to canonical `exercise` with structured progression.
+  - [x] Mobile Gym HUD badges and dynamic autoregulation calculation (Double Progression & custom load increments).
+- [x] **Canonical Routine JSON Hub (`repengine.routine.v1.json`)**:
+  - [x] 1-Click Export and Import on Web Studio and Mobile.
+  - [x] Mobile `RoutineImportSheet` with clipboard paste, real-time validation, and instant preview.
+  - [x] Prompt generator for external LLMs (ChatGPT / Claude) matching the RepEngine canonical schema.
+- [x] **Automated Test Coverage**:
+  - [x] Unit tests for canonical parser, double progression logic, and custom increments (74 mobile tests passing).

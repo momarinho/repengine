@@ -4,24 +4,21 @@
 [![Docker](https://github.com/momarinho/repengine/actions/workflows/docker.yml/badge.svg)](https://github.com/momarinho/repengine/actions/workflows/docker.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**RepEngine** is a high-performance, full-stack workout routine builder and player. It features a custom block-based editor, asynchronous templates cloning, real-time training execution tracking, and automatic progression/autoregulation recommendations based on logged set history (RPE/RIR).
+**RepEngine** is an offline-first, high-performance training routine studio and physical gym execution platform. It unifies a reactive web block architect, an asynchronous template clone engine, intelligent progression engines (Linear, Wave, Double Progression), an AI workout architect, and a native Flutter mobile companion designed for zero-latency execution in connectivity-challenged gyms.
 
-Designed as a modern local-first-friendly SaaS web application, it bridges the gap between complex training block configurations and frictionless physical execution in the gym.
+Designed around the **Dual-Workflow Architecture**, RepEngine bridges the gap between deep routine programming at a desktop workstation and frictionless, sweat-proof workout tracking on mobile.
 
 ---
 
 ## 📷 Interface Showcase
 
-Here is a quick look at the RepEngine interface in action:
-
-| 🖥️ **Dashboard** | 🛠️ **Block-Based Editor** |
+| 🖥️ **Web Routine Architect** | 🛠️ **Block Studio & Progressions** |
 |:---:|:---:|
 | ![Dashboard](docs/screenshots/1-dashboard.png) | ![Block-Based Editor](docs/screenshots/2-editor.png) |
 | ⚡ **Active Workout Player** | 📊 **Progression Analytics** |
 | ![Active Workout Player](docs/screenshots/3-player.png) | ![Progression Analytics](docs/screenshots/4-history-analytics.png) |
-| ⏱️ **Hands-Free Interval Timer (Web Audio)** | |
-| ![Hands-Free Interval Timer](docs/screenshots/5-interval-timer.png) | |
-
+| ⏱️ **Web Audio Interval Timer** | 📱 **Flutter Gym HUD (Kanagawa Dark)** |
+| ![Hands-Free Interval Timer](docs/screenshots/5-interval-timer.png) | *(Thumb-First Mobile HUD with Local Drift SQLite)* |
 
 ---
 
@@ -29,10 +26,35 @@ Here is a quick look at the RepEngine interface in action:
 
 ```mermaid
 graph TD
-    Client[SvelteKit Client] -- REST / Auth Cookie --> API[Go Fiber Core API]
-    Client -- REST / Insights --> Analytics[Python FastAPI Analytics Service]
-    API -- pgxpool --> DB[(PostgreSQL 16)]
-    API -- Background Worker --> Queue[Clone Jobs Engine]
+    subgraph Client Tier
+        Web[Web Studio - SvelteKit 5 Runes]
+        Mobile[Mobile App - Flutter / Riverpod / Drift SQLite]
+    end
+
+    subgraph Service Tier
+        BFF[Mobile BFF - Dart Frog :8081]
+        CoreAPI[Go Fiber Core API :8080]
+        Analytics[Python FastAPI Analytics :8000]
+    end
+
+    subgraph Shared Core
+        SharedPkg[repengine_core - Dart Sports Science & Sync Models]
+    end
+
+    subgraph Storage Tier
+        DB[(PostgreSQL 16)]
+        LocalDB[(Mobile SQLite / Drift)]
+    end
+
+    Web -- REST / Auth Cookie --> CoreAPI
+    Web -- REST / Insights --> Analytics
+    Mobile -- Local Reactive Streams --> LocalDB
+    Mobile -.-> SharedPkg
+    BFF -.-> SharedPkg
+    Mobile -- HTTP / Outbox Sync Push & Pull --> BFF
+    BFF -- Upstream Bearer Proxy & Sync --> CoreAPI
+    CoreAPI -- pgxpool --> DB
+    CoreAPI -- Background Worker --> Queue[Clone Jobs Engine]
     Queue -- Async Clone --> DB
 ```
 
@@ -40,128 +62,139 @@ graph TD
 
 ## 🚀 Key Engineering & Architecture Showcases
 
-This project is built using production-grade patterns, focusing on security, concurrency safety, data integrity, and high performance.
+### 📱 1. Native Offline-First Mobile Companion (Flutter & Drift)
+* **Thumb-Zone Ergonomics**: Built with an Atelier Kanagawa Dark high-contrast theme, thumb-reachable incremental pads (`-5`, `-2.5`, `+2.5`, `+5`), single-tap rep adjustments, and massive set completion targets for sweaty-hand operation.
+* **Reactive Local SQLite**: Powered by [Drift](https://drift.simonbinder.eu/) with atomic outbox tables (`routinesTable`, `workoutSessionsTable`, `workoutSetLogsTable`, `syncQueueTable`). All operations complete locally in $< 5\text{ms}$ with zero network dependency.
+* **Deterministic Outbox Sync Engine**: When connectivity is available, an automated sync loop flushes pending mutations to the Dart Frog BFF and Go Core via atomic batches, handling network drops, token refresh, and background reconciliation.
+* **Zero-Config LAN Auto-Discovery**: Mobile automatically probes the local Wi-Fi subnet (`/24`) in parallel to detect the desktop Docker BFF instance (`repengine_mobile_bff` on port 8081), enabling automatic connection without manual IP entry.
 
-### 📊 1. Native SVG Analytics Engine (No Bloat)
-*   **Custom Vector Charts**: Built a native SVG-based chart renderer using Svelte 5 runes (`$derived`, `$state`) to compute coordinate projection scales on the fly.
-*   **Zero Dependencies**: Completely avoids loading heavy chart libraries (like Chart.js or D3), keeping the client bundle light and performant.
-*   **Interactive Tooltips**: Supports mouse tracking to trigger tooltips displaying precise workout volume and RPE progression.
+### 🧩 2. Canonical Routine JSON Engine (Studio & Mobile Hub)
+* **Unified Schema v1**: Routines are represented by a portable, canonical JSON specification (`schema_version: 1`, `sections`, `blocks`, and embedded `progression` nodes).
+* **Cross-Platform Compatibility**: Full 1-click export and import across Web Studio, AI assistant prompts, and Mobile.
+* **Defensive Parsing**: Validates required structural keys while gracefully tolerating alternative AI formats (`days`/`exercises` vs `sections`/`blocks`), providing clear validation diagnostics.
 
-### 🔄 2. In-Memory Undo/Redo Engine
-*   **Transactional History Stack**: Implemented a localized state manager in the editor using Svelte 5 to store deep-cloned snapshots of routine blocks.
-*   **Shortcut Bindings**: Intercepts keyboard events for `Ctrl+Z` / `Cmd+Z` (Undo) and `Ctrl+Y` / `Cmd+Y` / `Ctrl+Shift+Z` (Redo).
-*   **Visual Indicators**: Features polished, reactive action buttons in the workspace header that disable dynamically based on stack depth.
+### 📈 3. Structured Progression Sub-blocks
+* **First-Class Progression Models**: Integrated progression metadata directly into canonical `exercise` blocks, supporting:
+  * **Linear Progression**: Configurable load increment (+kg per successful session) with autoregulation adjustments.
+  * **Double Progression**: Rep range cycling (`min_reps` to `max_reps`). Reaching max reps across sets increases load and resets reps to the lower bound; otherwise maintains load and advances target reps.
+* **Visual Graph Rendering**: The Web Studio renders visually connected progression badges and inline sub-block editors (`BlockExercise.svelte`), eliminating detached legacy nodes while preserving backwards compatibility.
 
-### 🧪 3. Playwright E2E Test Suite
-*   **Full User Lifecycle Test**: Automates verification of critical paths: user registration, session-only login, workflow template design, real-time logging execution with rest-skipping simulation, and database persistence assertion on the history dashboard.
-*   **Resilience & Stability**: Configured to run headlessly under Docker or local CI pipelines, protecting core features from regressions.
+### 📊 4. Native SVG Analytics Engine (Zero Bloat)
+* **Custom Vector Charts**: Built a native SVG-based chart renderer using Svelte 5 runes (`$derived`, `$state`) to compute coordinate projection scales dynamically on the client.
+* **Zero Dependencies**: Completely avoids loading heavy chart libraries (like Chart.js or D3), keeping the web bundle ultralight.
+* **Interactive Tooltips**: Supports mouse tracking to trigger tooltips displaying precise workout volume and RPE progression.
 
-### 📖 4. Interactive API Documentation
-*   **Embedded Spec Serving**: Serves the OpenAPI 3.0 specification (`openapi.yaml`) embedded directly into the Go binary using `go:embed`.
-*   **Styled Swagger UI**: Integrated Swagger UI available at `/docs`, custom-themed using CSS filters to match RepEngine's dark-mode design system.
+### 🔄 5. In-Memory Transactional Undo/Redo
+* **State Snapshot Stack**: Implemented a localized state manager in the Svelte 5 editor storing deep-cloned snapshots of routine blocks.
+* **Shortcut Bindings**: Intercepts keyboard events for `Ctrl+Z` / `Cmd+Z` (Undo) and `Ctrl+Y` / `Cmd+Y` / `Ctrl+Shift+Z` (Redo).
+* **Visual Stack Depth**: Polished, reactive action buttons in the workspace header that enable/disable dynamically based on history depth.
 
-### 🛡️ 5. Concurrency & Data Integrity
-*   **Optimistic Concurrency Control**: Edit conflicts in the block editor are prevented using timestamp comparisons (`updated_at`). If two editors update the same routine concurrently, the API rejects the slower request with a `409 Conflict` status, returning the server's current timestamp to allow client-side reconciliation.
-*   **PostgreSQL Advisory Locks**: Schema migrations are applied automatically at boot via an embedded file system (`go:embed`). Execution is serialized across multiple application instances using transactional advisory locks to prevent concurrent schema corruption during rolling deployments.
-*   **Relational Hardening**: Tight database schema constraints (`CHECK` blocks, cascading foreign keys, unified numeric metrics) maintain raw entry history while computing clean, normalized columns for progression logic.
-
-### 🔒 6. Security & Hardening
-*   **Secure Authentication**: Custom stateless JWT authentication with issuer/audience claims validation, secure-only cookies, token-revocation storage upon logout, and brute-force protection through rate limiters on registration/login endpoints.
-*   **Least Privilege Execution**: Final production Docker containers drop root privileges and run under a minimal, dedicated `appuser` (using Alpine Linux), minimizing attack surfaces in host environments.
+### 🛡️ 6. Concurrency, Advisory Locks & Data Integrity
+* **Optimistic Concurrency Control**: Edit conflicts in the block editor are prevented using timestamp comparisons (`updated_at`). Conflicting updates are rejected with `409 Conflict`, returning the server timestamp for reconciliation.
+* **PostgreSQL Advisory Locks**: Schema migrations run automatically at boot via an embedded file system (`go:embed`), serialized across multiple application instances using transactional advisory locks.
+* **Relational Hardening**: Strict database schema constraints (`CHECK` blocks, cascading foreign keys, unified metrics) maintain raw entry history while calculating normalized columns for progression engines.
 
 ### ⏱️ 7. Real-Time Web Audio Interval Engine
-*   **Zero-Dependency Synthesizer**: Built a native Web Audio API sound generator that dynamically creates audio cues (3-2-1 countdown beeps at 600Hz, sprint chimes, rest alerts, and victory chords) without external audio asset downloads or playback latency.
-*   **Hands-Free Multi-Phase Execution**: Automatically parses structured interval protocols (such as 30s base pace / 15s all-out sprint / 15s rest) or dynamic regex intervals (`30/15/15`, Tabata `20/10`), cycling through phases, announcing phase switches, auto-logging completed rounds, and progressing seamlessly hands-free.
-*   **High-Visibility HUD**: Features an interactive interval dashboard with animated glowing phase badges, giant tabular countdown typography, round progress pills, audio toggle controls, and quick-skip/pause capabilities.
+* **Zero-Dependency Synthesizer**: Built a native Web Audio API sound generator that dynamically creates audio cues (3-2-1 countdown beeps at 600Hz, sprint chimes, rest alerts, and victory chords) without external audio asset downloads.
+* **Hands-Free Multi-Phase Execution**: Automatically parses interval protocols (`30/15/15`, Tabata `20/10`), cycling through phases, announcing switches, auto-logging completed rounds, and progressing hands-free.
+* **High-Visibility HUD**: Features glowing phase badges, giant tabular countdown typography, round progress pills, audio toggles, and screen wake lock integration.
 
-### 📱 8. Dual-Workflow Model & Mobile Gym HUD
-*   **Physical Friction Elimination**: Solves the split between desktop routine programming ("Routine Architect") and in-gym workout execution ("Gym Execution HUD").
-*   **Screen Wake Lock API**: Leverages `navigator.wakeLock` to prevent mobile screens from sleeping during rests between sets, auto-reacquiring on tab visibility changes and releasing on workout completion.
-*   **Native Dialpad Inputs (`inputmode`)**: Explicitly triggers `inputmode="decimal"` and `inputmode="numeric"` so mobile OS renders large numeric dialpads directly, avoiding cumbersome QWERTY switching with sweaty hands.
-*   **Hardware Haptic Feedback**: Integrates `navigator.vibrate` synchronized with rest-interval countdowns (3-2-1 beeps) and phase transitions.
-*   **Send-to-Phone QR Bridge**: Desktop editor and dashboard generate dynamic standalone SVG QR codes to transition an active session from desktop to a smartphone camera in seconds.
-*   **Resilient Local-First Offline Queue**: Set logs persist to `localStorage` when network connectivity drops in underground gyms and automatically flush upon reconnecting via `window.addEventListener('online')`.
-
-### 🐍 9. Python / FastAPI Athletic Intelligence & Autoregulation Microservice
-*   **Polyglot Microservices Architecture**: Decouples the low-latency Go core API (handling session persistence, locks, and concurrency) from an advanced Python 3.12 / FastAPI analytics engine designed for scientific data modeling.
-*   **Statistical 1RM Consensus**: Aggregates 5 canonical formulas (Brzycki, Epley, Mayhew, Wathen, Lombardi) adjusted for athlete RPE / Reps in Reserve, yielding consensus estimates, standard deviations, 95% confidence intervals, and projected 1-12 rep load targets.
-*   **ACWR Fatigue & Injury Prevention**: Calculates Acute:Chronic Workload Ratios via coupled rolling windows and EWMA (Exponentially Weighted Moving Average) models to detect non-functional overreaching, safe progression sweet-spots (0.8–1.3), and injury-prone spikes (>1.5).
-*   **Intelligent Autoregulation Recommender**: Evaluates chronological workout session histories, analyzing RPE drift and consecutive stall patterns to output progressive overload recommendations (+increment), load maintenance, or periodization cycle resets (-15%).
+### 🐍 8. Athletic Intelligence & Sports Science Microservice
+* **Statistical 1RM Consensus**: Aggregates 5 canonical formulas (Brzycki, Epley, Mayhew, Wathen, Lombardi) adjusted for athlete RPE / Reps in Reserve.
+* **ACWR Fatigue & Injury Prevention**: Calculates Acute:Chronic Workload Ratios via coupled rolling windows and EWMA models to detect non-functional overreaching and optimal training sweet-spots (0.8–1.3).
+* **Autoregulation Engine**: Shared core package (`packages/repengine_core`) and Python FastAPI engine evaluating chronological workout sessions to recommend progressive overload (+increment), load maintenance, or periodization cycle resets (-15%).
 
 ---
 
 ## 🛠️ Tech Stack
 
-*   **Core Backend**: Go (v1.25), Fiber framework, `pgx/pgxpool` (native PostgreSQL driver), JWT, `slog` (structured logging), Prometheus metrics.
-*   **Analytics & AI Microservice**: Python (v3.12), FastAPI, Pydantic v2, NumPy, Uvicorn, Pytest.
-*   **Frontend**: SvelteKit (Svelte 5 runes), TypeScript, TailwindCSS, Web Audio API, Screen Wake Lock API, Vibration API, `localStorage` local-first runtime state.
-*   **Database**: PostgreSQL 16.
-*   **CI/CD & DevOps**: GitHub Actions (Linting, Tests, Docker Build & Push), Docker Compose, Nginx (TLS Termination).
-
----
-
-## 🎮 Current Feature Surface
-
-### Implemented
-*   **Block-Based Editor**: Contextual block insertion supporting linear progression, wave loading, repeats, rest intervals, and timed exercises.
-*   **Active Workout Player (Gym HUD)**: Real-time section execution, interactive timer/rest tracker, native numeric dialpads, Screen Wake Lock, and set-by-set input logging (Load, Reps, RPE, RIR).
-*   **Hands-Free Interval Engine**: Automated multi-phase interval player with native Web Audio sound cues (3-2-1 warnings, sprint chimes, rest cues), haptic vibrations, and hands-free round progression for conditioning workouts (Jump Rope, HIIT, Tabata).
-*   **Local Send-to-Phone QR Bridge**: Dynamic in-app SVG QR code generator to transition training sessions from desktop to phone instantly.
-*   **Action-Oriented Mobile Dashboard**: Quick-launch hero workout card for 1-tap training starts and elevated primary action hierarchy.
-*   **Pre-Built Hybrid Templates**: Seeded official templates including GZCLP adapted for Calisthenics & Barbell Hybrid with dedicated jump rope conditioning and linear progression.
-*   **Smart Progression Suggestions**: Real-time suggestion engine adjusting target loads/reps for linear and wave progression nodes based on completed set difficulty.
-*   **Version History & Restore**: Automatic serialization of workflow snapshots with restore capabilities and rollback mechanisms.
-*   **Account Settings**: Password resets, email/profile updates, and complete session invalidation on credential updates.
-*   **Interactive API Docs**: Dynamic Swagger UI embedded directly into the Go binary at `/docs`.
-*   **Progression Analytics**: Custom-built responsive SVG charts displaying training volume and RPE changes over time.
-*   **Editor History Actions**: Built-in Undo/Redo stack with full Svelte 5 integration and hotkeys.
+| Domain | Technologies |
+|:---|:---|
+| **Core API** | Go (1.24+), Fiber, `pgx/pgxpool` (native PostgreSQL driver), JWT, `slog`, Prometheus metrics |
+| **Mobile App** | Flutter (3.47+), Dart (3.13+), Riverpod 2, Drift (SQLite), `flutter_test` |
+| **Mobile BFF** | Dart Frog, JWT proxy, batch sync reconciliation |
+| **Shared Sports Core** | Pure Dart package (`repengine_core`), Autoregulation, 1RM consensus, ACWR, INOL |
+| **Web Studio** | SvelteKit (Svelte 5 runes), TypeScript, TailwindCSS, Web Audio API, Screen Wake Lock API |
+| **Analytics Microservice** | Python 3.12, FastAPI, Pydantic v2, NumPy, Pytest |
+| **Database** | PostgreSQL 16 (Relational Core), SQLite 3 (Mobile Local-First) |
+| **DevOps & Containers** | Docker Compose, GitHub Actions, Alpine Linux minimal runtime |
 
 ---
 
 ## 🏃 Running Locally
 
-### With Docker (Recommended)
+### 1. Full Stack with Docker (Recommended)
 
-Start the entire stack (Database, API, and Web App):
+Starts PostgreSQL, Go Core API, Mobile BFF, Python Analytics, and the SvelteKit Web App:
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-*   **Web App**: [http://localhost:3000](http://localhost:3000)
-*   **API Service / Docs**: [http://localhost:8080/docs](http://localhost:8080/docs)
-*   **API Healthcheck**: `curl http://localhost:8080/health`
+* **Web Studio**: [http://localhost:3000](http://localhost:3000)
+* **Core API / Docs**: [http://localhost:8080/docs](http://localhost:8080/docs)
+* **Mobile BFF**: [http://localhost:8081](http://localhost:8081)
+* **Analytics Microservice**: [http://localhost:8000/docs](http://localhost:8000/docs)
+
+### 2. Running Flutter Mobile
+
+From the `mobile/` directory:
+
+```bash
+cd mobile
+
+# Run all 74 unit and widget tests
+flutter test
+
+# Run linter
+flutter analyze
+
+# Launch on connected Android device or emulator
+flutter run
+
+# Build production release APK
+flutter build apk --release
+```
+
+To install the release APK directly to a connected device via ADB:
+
+```bash
+adb install -r build/app/outputs/flutter-apk/app-release.apk
+```
 
 ---
 
 ## 🧪 Validation & Tests
 
-### Backend Tests
-Execute unit tests from `api/`:
+### Backend Unit Tests (Go)
 ```bash
+cd api
 CGO_ENABLED=0 go test ./...
 ```
 
-### Frontend Checks
-Validate TypeScript and Svelte syntax from `web/`:
+### Shared Core Tests (Dart)
 ```bash
+cd packages/repengine_core
+dart test
+```
+
+### Mobile Tests (Flutter)
+```bash
+cd mobile
+flutter test
+```
+
+### Frontend Syntax & Type Checks (SvelteKit)
+```bash
+cd web
 npm run check
 ```
 
-### E2E Integration Tests (Playwright)
-Run end-to-end tests from `web/`:
+### End-to-End Tests (Playwright)
 ```bash
+cd web
 npx playwright test
 ```
-
-### Performance Benchmark
-Run the workflow update benchmark from `api/` (requires a valid JWT):
-```bash
-export BENCH_TOKEN='YOUR_JWT_TOKEN'
-go run ./cmd/bench_put_workflow
-```
-
-Latest local benchmark status: **PASS** (Avg: **4.10ms** / p95: **4.45ms**).
 
 ---
 
