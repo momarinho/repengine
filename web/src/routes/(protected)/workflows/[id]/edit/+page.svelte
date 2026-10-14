@@ -1144,16 +1144,22 @@
 										</button>
 									</div>
 									{#if !isSectionCollapsed(group)}
-										<div class="mt-3 space-y-2.5 sm:space-y-3 border-l-2 border-outline-variant/30 pl-2 sm:pl-3 min-w-0">
+										<div class="mt-3 space-y-2 sm:space-y-2.5 sm:border-l-2 sm:border-outline-variant/30 sm:pl-3 min-w-0">
 											{#each group.blocks as block (block.client_id)}
 												{@const index = blocks.findIndex((candidate) => candidate.client_id === block.client_id)}
-												<div class="rounded-xl border border-white/5 bg-surface-container p-3 sm:p-4 min-w-0">
-													<div class="mb-2 flex items-center gap-2.5 text-xs uppercase tracking-[0.16em] text-on-surface-variant">
-														<span class="font-bold text-primary">#{index + 1}</span>
-														<span class="truncate">{nodeTypeMap.get(block.node_type_slug)?.name ?? blockLabel(block.node_type_slug)}</span>
+												{#if block.node_type_slug === 'rest'}
+													<div class="rounded-lg bg-surface-container-lowest/50 border border-white/5 px-2.5 py-1.5 min-w-0">
+														<BlockRenderer block={block} nodeType={nodeTypeMap.get(block.node_type_slug)} />
 													</div>
-													<BlockRenderer block={block} nodeType={nodeTypeMap.get(block.node_type_slug)} />
-												</div>
+												{:else}
+													<div class="rounded-xl border border-white/5 bg-surface-container p-3 sm:p-4 min-w-0">
+														<div class="mb-2 flex items-center gap-2.5 text-xs uppercase tracking-[0.16em] text-on-surface-variant">
+															<span class="font-bold text-primary">#{index + 1}</span>
+															<span class="truncate">{nodeTypeMap.get(block.node_type_slug)?.name ?? blockLabel(block.node_type_slug)}</span>
+														</div>
+														<BlockRenderer block={block} nodeType={nodeTypeMap.get(block.node_type_slug)} />
+													</div>
+												{/if}
 											{/each}
 										</div>
 									{:else}

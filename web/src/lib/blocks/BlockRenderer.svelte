@@ -7,6 +7,7 @@
 	import BlockRepeat from './BlockRepeat.svelte';
 	import BlockRest from './BlockRest.svelte';
 	import BlockSection from './BlockSection.svelte';
+	import BlockSuperset from './BlockSuperset.svelte';
 	import BlockWave from './BlockWave.svelte';
 
 	type Props = {
@@ -31,6 +32,8 @@
 	<BlockRepeat {block} />
 {:else if block.node_type_slug === 'rest'}
 	<BlockRest {block} />
+{:else if block.node_type_slug === 'superset'}
+	<BlockSuperset {block} />
 {:else}
 	<div class="space-y-3">
 		<div class="flex items-start justify-between gap-3">

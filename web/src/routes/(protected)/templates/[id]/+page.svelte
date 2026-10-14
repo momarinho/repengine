@@ -142,7 +142,7 @@
 					<span class="material-symbols-outlined text-sm">arrow_back</span>
 					<span>Templates</span>
 				</a>
-				<h1 class="mt-1 font-headline text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-on-surface truncate">
+				<h1 class="mt-1 font-headline text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-on-surface break-words">
 					{template?.name ?? 'Template'}
 				</h1>
 			</div>
@@ -307,7 +307,7 @@
 												{group.kind}
 											</span>
 										</div>
-										<p class="mt-0.5 text-[11px] sm:text-xs text-on-surface-variant truncate">
+										<p class="mt-0.5 text-[11px] sm:text-xs text-on-surface-variant break-words leading-relaxed">
 											{group.subtitle || `${group.blocks.length} blocks`}
 										</p>
 									</div>

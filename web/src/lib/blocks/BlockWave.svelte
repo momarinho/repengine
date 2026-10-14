@@ -42,17 +42,17 @@
 	);
 </script>
 
-<div class="space-y-3 min-w-0 break-words">
-	<div class="flex items-start justify-between gap-3">
+<div class="space-y-2.5 min-w-0 break-words">
+	<div class="flex items-start justify-between gap-2.5">
 		<div class="min-w-0 flex-1">
-			<p class="text-sm font-semibold text-on-surface break-words">{exercise}</p>
-			<p class="text-xs text-on-surface-variant">Wave progression for week {activeWeek}</p>
+			<p class="text-sm sm:text-base font-bold text-on-surface break-words leading-snug">{exercise}</p>
+			<p class="text-[11px] text-on-surface-variant">Wave progression • Week {activeWeek}</p>
 		</div>
-		<span class="material-symbols-outlined text-primary shrink-0">waterfall_chart</span>
+		<span class="material-symbols-outlined text-secondary shrink-0 text-lg">waterfall_chart</span>
 	</div>
-	<div class="flex flex-wrap gap-1.5 text-xs text-on-surface-variant">
-		<span class="rounded bg-surface-container-high px-2 py-0.5 font-medium text-on-surface">{reps} reps</span>
-		<span class="rounded bg-secondary/10 text-secondary border border-secondary/20 px-2 py-0.5 font-semibold">{intensity}%</span>
+	<div class="flex flex-wrap gap-1.5 text-xs">
+		<span class="rounded bg-surface-container-high px-2 py-0.5 font-semibold text-on-surface">{reps} reps</span>
+		<span class="rounded bg-secondary/10 text-secondary border border-secondary/20 px-2 py-0.5 font-bold">{intensity}%</span>
 		<span class="rounded bg-surface-container-high px-2 py-0.5 font-medium text-on-surface">RPE {rpe}</span>
 	</div>
 </div>

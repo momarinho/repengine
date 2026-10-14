@@ -3078,9 +3078,95 @@
 				Offline: {syncQueue.length} set(s) pending sync. Saving automatically.
 			</div>
 		{/if}
+
+		<!-- Fixed Mobile Training HUD (Pinned for hands-free workout tracking) -->
+		<div class="w-full border-t border-white/5 bg-surface-container/95 px-3 py-2 backdrop-blur-xl sm:hidden">
+			{#if isRestingBetweenSets && intraSetRest}
+				<!-- Live Intra-Set Rest Countdown Strip -->
+				<div class="flex items-center justify-between gap-2">
+					<div class="flex items-center gap-2 min-w-0">
+						<span class="flex h-2 w-2 rounded-full bg-primary animate-ping shrink-0"></span>
+						<span class="text-[11px] font-bold uppercase tracking-wider text-primary shrink-0">Resting:</span>
+						<span class="font-display font-mono text-base font-bold text-primary tabular-nums shrink-0">
+							{formatClock(intraSetRest.remainingSeconds)}
+						</span>
+						<span class="text-[10px] text-on-surface-variant truncate">Next: {intraSetRest.nextLabel}</span>
+					</div>
+					<div class="flex items-center gap-1.5 shrink-0">
+						<button
+							type="button"
+							class="rounded-lg bg-primary/20 px-2 py-1 text-xs font-bold text-primary active:scale-95 transition-all cursor-pointer"
+							onclick={() => addIntraSetRestSeconds(30)}
+						>
+							+30s
+						</button>
+						<button
+							type="button"
+							class="rounded-lg bg-primary px-2.5 py-1 text-xs font-bold text-on-primary-fixed shadow active:scale-95 transition-all cursor-pointer"
+							onclick={() => clearIntraSetRest(true)}
+						>
+							Skip
+						</button>
+					</div>
+				</div>
+			{:else}
+				<!-- Active Movement & Target Strip -->
+				<div class="flex items-center justify-between gap-2">
+					<div class="min-w-0 flex-1">
+						<div class="flex items-center gap-1.5">
+							<span class="text-xs font-bold text-on-surface truncate max-w-[170px]">
+								{currentBlock.title}
+							</span>
+							{#if currentBlock.node_type_slug === 'exercise' || currentBlock.node_type_slug === 'linear_progression'}
+								<span class="rounded bg-primary/15 text-primary border border-primary/20 px-1.5 py-0.2 text-[10px] font-bold shrink-0">
+									Set {currentExerciseSet}/{currentBlockSets}
+								</span>
+							{:else if currentBlock.node_type_slug === 'wave'}
+								<span class="rounded bg-secondary/15 text-secondary border border-secondary/20 px-1.5 py-0.2 text-[10px] font-bold shrink-0">
+									Wave {currentWaveSetIndex + 1}/{currentWaveWeek?.prescriptions.length || 1}
+								</span>
+							{:else if currentBlock.node_type_slug === 'repeat'}
+								<span class="rounded bg-primary/15 text-primary border border-primary/20 px-1.5 py-0.2 text-[10px] font-bold shrink-0">
+									Rnd {currentRepeatRound}/{currentBlock.rounds || 1}
+								</span>
+							{:else if currentBlock.node_type_slug === 'rest' || currentBlock.node_type_slug === 'exercise_timed'}
+								<span class="rounded bg-tertiary/15 text-tertiary border border-tertiary/20 px-1.5 py-0.2 text-[10px] font-bold shrink-0 font-mono">
+									{formatClock(timerRemainingSeconds)}
+								</span>
+							{/if}
+						</div>
+					</div>
+
+					<!-- Target Indicators -->
+					<div class="flex items-center gap-1.5 shrink-0 text-xs">
+						{#if currentBlock.node_type_slug === 'exercise' || currentBlock.node_type_slug === 'linear_progression'}
+							<span class="rounded bg-surface-container-high px-2 py-0.5 font-bold text-on-surface text-[11px]">
+								{currentBlockReps} reps
+							</span>
+							{#if getResolvedPrescribedLoad(currentBlock)}
+								<span class="rounded bg-primary/15 border border-primary/25 px-2 py-0.5 font-bold text-primary text-[11px]">
+									{getResolvedPrescribedLoad(currentBlock)}
+								</span>
+							{/if}
+						{:else if currentBlock.node_type_slug === 'wave'}
+							<span class="rounded bg-surface-container-high px-2 py-0.5 font-bold text-on-surface text-[11px]">
+								{currentWaveSet?.reps} reps
+							</span>
+							<span class="rounded bg-secondary/15 border border-secondary/25 px-2 py-0.5 font-bold text-secondary text-[11px]">
+								{currentWaveSet?.intensity}%
+							</span>
+						{:else if currentBlock.node_type_slug === 'repeat' && activeIntervalPhase}
+							<span class="rounded bg-primary/15 text-primary border border-primary/25 font-bold px-2 py-0.5 text-[11px]">
+								{activeIntervalPhase.name} ({intervalPhaseSecondsLeft}s)
+							</span>
+						{/if}
+					</div>
+				</div>
+			{/if}
+		</div>
 	</header>
 
-	<main class="flex h-screen overflow-hidden pt-[3.75rem] pb-[calc(5rem+env(safe-area-inset-bottom))]">
+	<main class="flex h-screen overflow-hidden pt-[6.5rem] sm:pt-[3.75rem] pb-[calc(5rem+env(safe-area-inset-bottom))]">
 		<section class="custom-scrollbar flex-1 overflow-y-auto px-3 sm:px-6 md:px-8">
 			<div class="mx-auto max-w-3xl py-4 sm:py-6">
 				<div class="mb-4 sm:mb-6">
