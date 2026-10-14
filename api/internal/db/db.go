@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -80,9 +82,9 @@ func SeedNodeTypes(ctx context.Context) error {
 		schema                        string
 	}{
 		{"exercise", "Exercise", "A single exercise node", "dumbbell",
-			`{"exercise_name": "", "sets": 3, "reps": "", "rest_seconds": 90, "notes": "", "load_value": null, "load_unit": "kg"}`},
+			`{"exercise_name": "", "sets": 3, "reps": "", "rest_seconds": 90, "notes": "", "load_value": null, "load_unit": "kg", "progression": null}`},
 		{"exercise_timed", "Timed Exercise", "Exercise with duration", "timer",
-			`{"exercise_name": "", "duration": 30}`},
+			`{"exercise_name": "", "duration": 30, "progression": null}`},
 		{
 			"wave",
 			"Wave",
@@ -135,7 +137,8 @@ func SeedNodeTypes(ctx context.Context) error {
 				"rounding_precision": 2.5,
 				"notes": "",
 				"deload_weeks": null,
-				"deload_percent": null
+				"deload_percent": null,
+				"progression": null
 			}`,
 		},
 		{
@@ -377,7 +380,26 @@ func intervalRepeatBlock(title string, rounds int, reps string, phases []map[str
 }
 
 
+var digitPattern = regexp.MustCompile(`\d+`)
+
+func parseRepsMinMax(reps string) (int, int) {
+	matches := digitPattern.FindAllString(reps, -1)
+	if len(matches) == 0 {
+		return 8, 12
+	}
+	first, _ := strconv.Atoi(matches[0])
+	if len(matches) == 1 {
+		return first, first
+	}
+	last, _ := strconv.Atoi(matches[len(matches)-1])
+	if last < first {
+		last = first
+	}
+	return first, last
+}
+
 func calisthenicsDoubleProgressionBlock(exercise, reps string, sets int, restSeconds int, notes string) templateBlockSeed {
+	minReps, maxReps := parseRepsMinMax(reps)
 	return templateBlockSeed{
 		NodeTypeSlug: "exercise",
 		Data: map[string]any{
@@ -390,8 +412,8 @@ func calisthenicsDoubleProgressionBlock(exercise, reps string, sets int, restSec
 			"notes":         notes,
 			"progression": map[string]any{
 				"type":      "double",
-				"min_reps":  8,
-				"max_reps":  12,
+				"min_reps":  minReps,
+				"max_reps":  maxReps,
 				"increment": 2.5,
 			},
 		},
@@ -399,6 +421,7 @@ func calisthenicsDoubleProgressionBlock(exercise, reps string, sets int, restSec
 }
 
 func calisthenicsStepProgressionBlock(exercise, reps, sequence string, restSeconds int, notes string) templateBlockSeed {
+	minReps, maxReps := parseRepsMinMax(reps)
 	return templateBlockSeed{
 		NodeTypeSlug: "exercise",
 		Data: map[string]any{
@@ -411,8 +434,8 @@ func calisthenicsStepProgressionBlock(exercise, reps, sequence string, restSecon
 			"notes":         notes,
 			"progression": map[string]any{
 				"type":          "double",
-				"min_reps":      8,
-				"max_reps":      12,
+				"min_reps":      minReps,
+				"max_reps":      maxReps,
 				"increment":     2.5,
 				"fail_sequence": sequence,
 			},
@@ -495,8 +518,90 @@ func restBlock(duration int) templateBlockSeed {
 	}
 }
 
+func doubleProgressionBlock(exercise, reps string, sets int, targetLoad, increment float64, restSeconds int, notes string) templateBlockSeed {
+	minReps, maxReps := parseRepsMinMax(reps)
+	return templateBlockSeed{
+		NodeTypeSlug: "exercise",
+		Data: map[string]any{
+			"exercise_name": exercise,
+			"sets":          sets,
+			"reps":          reps,
+			"load_value":    targetLoad,
+			"load_unit":     "kg",
+			"rest_seconds":  restSeconds,
+			"notes":         notes,
+			"progression": map[string]any{
+				"type":      "double",
+				"min_reps":  minReps,
+				"max_reps":  maxReps,
+				"increment": increment,
+			},
+		},
+	}
+}
+
+func cardioBlock(exercise, duration, notes string) templateBlockSeed {
+	return templateBlockSeed{
+		NodeTypeSlug: "exercise",
+		Data: map[string]any{
+			"exercise_name": exercise,
+			"sets":          1,
+			"reps":          duration,
+			"load_value":    0.0,
+			"load_unit":     "kg",
+			"rest_seconds":  0,
+			"notes":         notes,
+			"progression": map[string]any{
+				"type": "none",
+			},
+		},
+	}
+}
+
+
 func SeedTemplates(ctx context.Context) error {
 	seeds := []templateSeed{
+		{
+			Name:        "Beginner 3-Day Physique & Functional Core Routine",
+			Description: "A beginner-friendly 3-day split engineered for balanced hypertrophy, progressive core development (top-down, bottom-up, and anti-extension), and waist control.",
+			Category:    "hypertrophy",
+			IsOfficial:  true,
+			Metadata: map[string]any{
+				"duration":  "8 weeks",
+				"frequency": "3 days/week",
+				"level":     "beginner",
+			},
+			Blocks: []templateBlockSeed{
+				// Day 1
+				sectionBlock("Day 1 - Quads, Glutes, Push & Upper Ab Flexion", "Squats, Hip Thrusts, Upper Body Press, Cable Crunch & Cardio", "day"),
+				doubleProgressionBlock("Smith Machine Squat", "8-10", 3, 30.0, 2.5, 90, "Feet slightly forward on the platform, lower under control to parallel. RIR 2."),
+				doubleProgressionBlock("Machine Hip Thrust", "8-10", 3, 40.0, 5.0, 90, "Drive through heels, pause 1 second at the top, keep chin tucked."),
+				doubleProgressionBlock("Incline Chest Press Machine", "10-12", 3, 20.0, 2.5, 60, "Smooth pressing path, keep shoulders packed against the back pad."),
+				doubleProgressionBlock("Cable Triceps Pushdown (Rope or Bar)", "10-12", 3, 15.0, 1.25, 60, "Keep upper arms glued to torso; fully extend at the bottom."),
+				doubleProgressionBlock("Kneeling Cable Crunch", "10-12", 3, 20.0, 2.5, 60, "Keep hips locked in place; curl ribcage down toward pelvis, exhaling fully at peak contraction."),
+				cardioBlock("Incline Treadmill Walk (Zone 2)", "10-15 min", "Incline 8-12%, speed 4.0-4.8 km/h. Easy conversational pace."),
+
+				// Day 2
+				sectionBlock("Day 2 - Posterior Chain, Pull & Lower Ab Control", "RDL, Lat Pulldown, Row, Hamstrings, Captain's Chair & Cardio", "day"),
+				doubleProgressionBlock("Dumbbell Romanian Deadlift", "8-10", 3, 12.0, 2.0, 90, "Push hips straight back until hamstrings stretch; keep weights close to shins."),
+				doubleProgressionBlock("Lat Pulldown Machine", "10-12", 3, 25.0, 2.5, 60, "Slight torso lean; drive elbows down toward the hips."),
+				doubleProgressionBlock("Seated Cable Row", "10-12", 3, 25.0, 2.5, 60, "Sit tall, pull handle into belly button while squeezing shoulder blades."),
+				doubleProgressionBlock("Lying or Seated Leg Curl Machine", "10-12", 3, 20.0, 2.5, 60, "Controlled 2-second lowering phase on every rep."),
+				doubleProgressionBlock("Dumbbell Biceps Curl", "10-12", 3, 6.0, 1.0, 60, "Keep elbows fixed under shoulders without swinging the torso."),
+				doubleProgressionBlock("Captain's Chair Knee Raise", "10-12", 3, 0.0, 0.0, 60, "Press forearms down into pads; curl pelvis up toward ribs at the top, avoiding momentum."),
+				cardioBlock("Elliptical or Incline Walk (Zone 2)", "10-15 min", "Low-impact steady-state cardiovascular work."),
+
+				// Day 3
+				sectionBlock("Day 3 - Glute/Leg Isolation, Shoulders & Deep Core Bracing", "Abduction, Extensions, Lateral Raises, Face Pulls, Dead Bug & Cardio", "day"),
+				doubleProgressionBlock("Seated Hip Abduction Machine", "15-20", 3, 30.0, 2.5, 30, "Sit upright or lean slightly forward; pause for 1 second at full open abduction."),
+				doubleProgressionBlock("Leg Extension Machine", "12-15", 3, 25.0, 2.5, 45, "Smooth extension, controlled descent without letting weight stack slam."),
+				doubleProgressionBlock("Dumbbell Lateral Raise", "12-15", 3, 4.0, 1.0, 30, "Raise arms slightly forward in the scapular plane, leading gently with elbows."),
+				doubleProgressionBlock("Cable Face Pull", "12-15", 3, 12.5, 1.25, 45, "Pull rope toward forehead while rotating knuckles backward for posture reinforcement."),
+				doubleProgressionBlock("Standing or Seated Calf Raise", "12-15", 3, 25.0, 2.5, 45, "Full stretch at bottom, strong pause at top extension."),
+				doubleProgressionBlock("Dead Bug (Controlled Bracing)", "10-12 per side", 3, 0.0, 0.0, 45, "Glue lower back flat to the floor with zero arch. Slowly extend opposite arm and leg while breathing out."),
+				cardioBlock("Stationary Bike or Incline Walk (Zone 2)", "10-15 min", "Gentle cooldown pace to finish the training session."),
+			},
+		},
 		{
 			Name:        "Powerbuilding LP & Supersets",
 			Description: "A structured 3-day split testing linear progression, standard supersets, timed mobility, and rest blocks.",

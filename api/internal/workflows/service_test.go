@@ -456,6 +456,65 @@ func TestServiceCreateWorkflow_AcceptsNumberWhenSchemaFieldIsNull(t *testing.T) 
 	}
 }
 
+func TestServiceCreateWorkflow_AcceptsProgressionMapInExercise(t *testing.T) {
+	ctx := context.Background()
+	tx := &fakeTx{}
+
+	repo := &fakeRepo{
+		getNodeTypeSchemaFunc: func(ctx context.Context, slug string) (map[string]any, error) {
+			return map[string]any{
+				"exercise_name": "",
+				"sets":          3,
+				"reps":          "",
+				"rest_seconds":  90,
+				"notes":         "",
+				"load_value":    nil,
+				"load_unit":     "kg",
+				"progression":   nil,
+			}, nil
+		},
+		beginTxFunc: func(ctx context.Context) (dbtx, error) {
+			return tx, nil
+		},
+		createWorkflowTxFunc: func(ctx context.Context, tx dbtx, in CreateWorkflowInput) (Workflow, error) {
+			return Workflow{ID: 1, UserID: in.UserID, Name: in.Name}, nil
+		},
+		insertBlocksTxFunc: func(ctx context.Context, tx dbtx, workflowID int, blocks []WorkflowBlock) ([]WorkflowBlock, error) {
+			return blocks, nil
+		},
+	}
+
+	service := NewService(repo)
+	_, err := service.CreateWorkflow(ctx, CreateWorkflowInput{
+		UserID: 1,
+		Name:   "Routine with progression",
+		Blocks: []WorkflowBlock{
+			{
+				NodeTypeSlug: "exercise",
+				Data: map[string]any{
+					"exercise_name": "Smith Machine Squat",
+					"sets":          3,
+					"reps":          "8-10",
+					"load_value":    50.0,
+					"load_unit":     "kg",
+					"rest_seconds":  90,
+					"notes":         "Full depth",
+					"progression": map[string]any{
+						"type":      "double",
+						"min_reps":  8,
+						"max_reps":  10,
+						"increment": 2.5,
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateWorkflow returned error: %v", err)
+	}
+}
+
+
 func TestServiceDeleteWorkflow_NotFound(t *testing.T) {
 	ctx := context.Background()
 

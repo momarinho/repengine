@@ -308,6 +308,10 @@ class WorkoutRepository {
     int? minReps,
     int? maxReps,
   }) async {
+    final effectiveTargetReps = (progressionType == 'double' && minReps != null && minReps > 0)
+        ? minReps
+        : fallbackReps;
+
     // 1. Check if sets were already completed in the current active session
     final activeSession = await (_db.select(_db.workoutSessionsTable)
           ..where((t) => t.status.equals('active'))
@@ -326,7 +330,7 @@ class WorkoutRepository {
       if (currentSessionSets.isNotEmpty) {
         final lastSet = currentSessionSets.first;
         final load = _parseLoadValue(lastSet.actualLoad, fallbackLoad);
-        final reps = int.tryParse(lastSet.actualReps) ?? fallbackReps;
+        final reps = int.tryParse(lastSet.actualReps) ?? effectiveTargetReps;
         return ProgressionSuggestion(
           load: load,
           reps: reps,
@@ -408,7 +412,7 @@ class WorkoutRepository {
         final syncedLoad = _parseLoadValue(progressionState.suggestedLoad, fallbackLoad);
         return ProgressionSuggestion(
           load: syncedLoad,
-          reps: fallbackReps,
+          reps: effectiveTargetReps,
           reasoning: progressionState.summary ?? 'Prescribed target load from coach',
           isProgressed: false,
         );
@@ -416,15 +420,17 @@ class WorkoutRepository {
 
       return ProgressionSuggestion(
         load: fallbackLoad,
-        reps: fallbackReps,
-        reasoning: 'Initial recommended load',
+        reps: effectiveTargetReps,
+        reasoning: progressionType == 'double'
+            ? 'Starting double progression at target minimum ($effectiveTargetReps reps)'
+            : 'Initial recommended load',
         isProgressed: false,
       );
     }
 
     // 4. Calculate progressive overload from previous session of THIS Day/Section
     double maxLoad = 0.0;
-    int targetReps = fallbackReps;
+    int targetReps = effectiveTargetReps;
     double? lastRpe;
     bool anyFailed = false;
 
@@ -432,7 +438,7 @@ class WorkoutRepository {
       final load = _parseLoadValue(log.actualLoad, 0.0);
       if (load > maxLoad) maxLoad = load;
       final reps = int.tryParse(log.actualReps) ?? 0;
-      final prescribed = int.tryParse(log.prescribedReps) ?? fallbackReps;
+      final prescribed = int.tryParse(log.prescribedReps) ?? effectiveTargetReps;
       targetReps = prescribed;
       if (log.actualRpe.isNotEmpty) {
         final rpe = double.tryParse(log.actualRpe);

@@ -641,6 +641,50 @@ void main() {
     expect(ex.progressionMinReps, equals(8));
     expect(ex.progressionMaxReps, equals(12));
   });
+
+  test('targetRepCount and double progression start at min reps (e.g. 6 for 6-8, never falling back to 5)', () async {
+    // 1. Explicit min/max reps
+    const pullUp = RoutineExercise(
+      blockClientId: 'blk_pullup',
+      nodeTypeSlug: 'exercise',
+      name: 'Bodyweight Pull-Up',
+      sets: 3,
+      reps: '6-8',
+      targetLoad: 0.0,
+      progressionType: 'double',
+      progressionIncrement: 2.5,
+      progressionMinReps: 6,
+      progressionMaxReps: 8,
+    );
+    expect(pullUp.targetRepCount, equals(6));
+
+    // 2. No explicit min/max reps, range parsed directly from reps: '6-8'
+    const pullUpNoProg = RoutineExercise(
+      blockClientId: 'blk_pullup_raw',
+      nodeTypeSlug: 'exercise',
+      name: 'Bodyweight Pull-Up',
+      sets: 3,
+      reps: '6-8',
+      targetLoad: 0.0,
+    );
+    expect(pullUpNoProg.targetRepCount, equals(6));
+
+    // 3. Initial progression suggestion for Day 2 Bodyweight Pull-Up returns 6 reps (never 5)
+    final suggestion = await repository.getSuggestedProgressionForBlock(
+      'blk_pullup',
+      sectionId: 'sec_day2',
+      sectionTitle: 'Day 2 - Overhead Press & Pull-Up',
+      fallbackLoad: pullUp.targetLoad,
+      fallbackReps: pullUp.targetRepCount,
+      progressionType: pullUp.progressionType,
+      minReps: pullUp.progressionMinReps,
+      maxReps: pullUp.progressionMaxReps,
+      loadIncrement: pullUp.progressionIncrement ?? 2.5,
+    );
+
+    expect(suggestion.reps, equals(6));
+    expect(suggestion.load, equals(0.0));
+  });
 }
 
 

@@ -113,7 +113,15 @@ export function exportWorkflowToCanonicalJson(
 
 			// Normalize progression
 			if (bData.progression && typeof bData.progression === 'object') {
-				blockJson.progression = bData.progression as CanonicalProgressionJson;
+				const prog = { ...(bData.progression as CanonicalProgressionJson) };
+				if (prog.type === 'double' && (!prog.min_reps || !prog.max_reps)) {
+					const rangeMatch = String(bData.reps || '').match(/(\d+)\s*[-–]\s*(\d+)/);
+					if (rangeMatch) {
+						prog.min_reps = Number(rangeMatch[1]);
+						prog.max_reps = Number(rangeMatch[2]);
+					}
+				}
+				blockJson.progression = prog;
 			} else if (block.node_type_slug === 'linear_progression') {
 				blockJson.progression = {
 					type: 'linear',
@@ -302,6 +310,15 @@ export function parseAndValidateRoutineJson(jsonInput: string): ParseRoutineResu
 					notes
 				};
 				if (prog && prog.type !== 'none') {
+					if (prog.type === 'double') {
+						if (!prog.min_reps || !prog.max_reps) {
+							const rangeMatch = String(reps).match(/(\d+)\s*[-–]\s*(\d+)/);
+							if (rangeMatch) {
+								prog.min_reps = Number(rangeMatch[1]);
+								prog.max_reps = Number(rangeMatch[2]);
+							}
+						}
+					}
 					cleanData.progression = prog;
 				}
 			} else if (slug === 'rest') {

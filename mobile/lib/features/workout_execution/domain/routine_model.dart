@@ -31,6 +31,19 @@ class RoutineExercise {
     this.progressionMaxReps,
     this.progressionRule,
   });
+
+  /// Resolves the concrete numeric target reps for set logging & progressive overload.
+  /// Correctly handles rep ranges (e.g. "6-8" -> 6), double progression minimums, and numeric strings.
+  int get targetRepCount {
+    if (progressionMinReps != null && progressionMinReps! > 0) {
+      return progressionMinReps!;
+    }
+    final match = RegExp(r'\d+').firstMatch(reps);
+    if (match != null) {
+      return int.tryParse(match.group(0)!) ?? 5;
+    }
+    return 5;
+  }
 }
 
 @immutable
@@ -306,11 +319,19 @@ class ParsedRoutine {
             (slug == 'linear_progression' || data['increment'] != null ? 'linear' : null);
         final progIncrement = double.tryParse(
             prog?['increment']?.toString() ?? data['increment']?.toString() ?? '');
-        final minReps = int.tryParse(prog?['min_reps']?.toString() ?? '');
-        final maxReps = int.tryParse(prog?['max_reps']?.toString() ?? '');
+        var minReps = int.tryParse(prog?['min_reps']?.toString() ?? '');
+        var maxReps = int.tryParse(prog?['max_reps']?.toString() ?? '');
         final progRule = prog?['rule']?.toString() ??
             prog?['progression_rule']?.toString() ??
             data['progression_rule']?.toString();
+
+        if (progType == 'double' || (minReps == null && reps.contains('-'))) {
+          final rangeMatch = RegExp(r'(\d+)\s*[-–]\s*(\d+)').firstMatch(reps);
+          if (rangeMatch != null) {
+            minReps ??= int.tryParse(rangeMatch.group(1)!);
+            maxReps ??= int.tryParse(rangeMatch.group(2)!);
+          }
+        }
 
         currentExercises.add(RoutineExercise(
           blockClientId: blockId,
@@ -433,9 +454,17 @@ class CanonicalRoutineImport {
             final prog = b['progression'] as Map<String, dynamic>?;
             final progType = prog?['type']?.toString();
             final progInc = double.tryParse(prog?['increment']?.toString() ?? '');
-            final minR = int.tryParse(prog?['min_reps']?.toString() ?? '');
-            final maxR = int.tryParse(prog?['max_reps']?.toString() ?? '');
+            var minR = int.tryParse(prog?['min_reps']?.toString() ?? '');
+            var maxR = int.tryParse(prog?['max_reps']?.toString() ?? '');
             final rule = prog?['rule']?.toString();
+
+            if (progType == 'double' || (minR == null && reps.contains('-'))) {
+              final rangeMatch = RegExp(r'(\d+)\s*[-–]\s*(\d+)').firstMatch(reps);
+              if (rangeMatch != null) {
+                minR ??= int.tryParse(rangeMatch.group(1)!);
+                maxR ??= int.tryParse(rangeMatch.group(2)!);
+              }
+            }
 
             exercises.add(RoutineExercise(
               blockClientId: 'blk_${sIdx}_$bIdx',

@@ -1302,7 +1302,20 @@
 												type="text"
 												class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
 												value={typeof selectedBlock.data.reps === 'string' ? selectedBlock.data.reps : typeof selectedBlock.data.reps === 'number' ? String(selectedBlock.data.reps) : ''}
-												oninput={(event) => updateBlockField(selectedBlock.client_id, 'reps', (event.currentTarget as HTMLInputElement).value)}
+												oninput={(event) => {
+													const val = (event.currentTarget as HTMLInputElement).value;
+													updateBlockField(selectedBlock.client_id, 'reps', val);
+													const currentProg = selectedBlock.data.progression && typeof selectedBlock.data.progression === 'object'
+														? (selectedBlock.data.progression as Record<string, any>)
+														: null;
+													const rangeMatch = val.match(/(\d+)\s*[-–]\s*(\d+)/);
+													if (rangeMatch && currentProg?.type === 'double') {
+														updateBlockProgression(selectedBlock.client_id, {
+															min_reps: Number(rangeMatch[1]),
+															max_reps: Number(rangeMatch[2])
+														});
+													}
+												}}
 												placeholder="10 or 8-12"
 											/>
 										</div>
@@ -1381,11 +1394,30 @@
 													value={prog.type || 'none'}
 													onchange={(event) => {
 														const val = (event.currentTarget as HTMLSelectElement).value;
+														let minR = prog.min_reps;
+														let maxR = prog.max_reps;
+														if (val === 'double' && (!minR || !maxR)) {
+															const rangeMatch = String(selectedBlock.data.reps || '').match(/(\d+)\s*[-–]\s*(\d+)/);
+															if (rangeMatch) {
+																minR = Number(rangeMatch[1]);
+																maxR = Number(rangeMatch[2]);
+															} else {
+																const singleNum = Number(selectedBlock.data.reps);
+																if (!isNaN(singleNum) && singleNum > 0) {
+																	minR = singleNum;
+																	maxR = singleNum + 4;
+																} else {
+																	minR = 8;
+																	maxR = 12;
+																}
+															}
+															updateBlockField(selectedBlock.client_id, 'reps', `${minR}-${maxR}`);
+														}
 														updateBlockProgression(selectedBlock.client_id, {
 															type: val,
 															increment: val === 'linear' || val === 'double' ? (prog.increment ?? 2.5) : undefined,
-															min_reps: val === 'double' ? (prog.min_reps ?? 8) : undefined,
-															max_reps: val === 'double' ? (prog.max_reps ?? 12) : undefined,
+															min_reps: val === 'double' ? (minR ?? 8) : undefined,
+															max_reps: val === 'double' ? (maxR ?? 12) : undefined,
 															target_rpe: val === 'rpe' ? (prog.target_rpe ?? 8) : undefined
 														});
 													}}
@@ -1437,7 +1469,12 @@
 																type="number"
 																class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-2 py-1.5 text-sm text-on-surface outline-none"
 																value={prog.min_reps ?? 8}
-																oninput={(event) => updateBlockProgression(selectedBlock.client_id, { min_reps: Number((event.currentTarget as HTMLInputElement).value) })}
+																oninput={(event) => {
+																	const minVal = Number((event.currentTarget as HTMLInputElement).value) || 8;
+																	const maxVal = prog.max_reps ?? 12;
+																	updateBlockProgression(selectedBlock.client_id, { min_reps: minVal });
+																	updateBlockField(selectedBlock.client_id, 'reps', `${minVal}-${maxVal}`);
+																}}
 															/>
 														</div>
 														<div class="space-y-1.5">
@@ -1447,7 +1484,12 @@
 																type="number"
 																class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-2 py-1.5 text-sm text-on-surface outline-none"
 																value={prog.max_reps ?? 12}
-																oninput={(event) => updateBlockProgression(selectedBlock.client_id, { max_reps: Number((event.currentTarget as HTMLInputElement).value) })}
+																oninput={(event) => {
+																	const minVal = prog.min_reps ?? 8;
+																	const maxVal = Number((event.currentTarget as HTMLInputElement).value) || 12;
+																	updateBlockProgression(selectedBlock.client_id, { max_reps: maxVal });
+																	updateBlockField(selectedBlock.client_id, 'reps', `${minVal}-${maxVal}`);
+																}}
 															/>
 														</div>
 														<div class="space-y-1.5">

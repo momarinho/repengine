@@ -264,13 +264,13 @@ class WorkoutExecutionScreen extends ConsumerWidget {
               sectionTitle: session.sectionTitle,
               logCount: logs.length,
               fallbackLoad: currentExercise.targetLoad,
-              fallbackReps: int.tryParse(currentExercise.reps) ?? 5,
+              fallbackReps: currentExercise.targetRepCount,
               loadIncrement: currentExercise.progressionIncrement,
               progressionType: currentExercise.progressionType,
               minReps: currentExercise.progressionMinReps,
               maxReps: currentExercise.progressionMaxReps,
             )),
-          ).value ?? ProgressionSuggestion(load: currentExercise.targetLoad, reps: int.tryParse(currentExercise.reps) ?? 5);
+          ).value ?? ProgressionSuggestion(load: currentExercise.targetLoad, reps: currentExercise.targetRepCount);
 
           return ThumbZonePad(
             key: ValueKey('pad_${session.clientId}_${currentExercise.blockClientId}_${logs.length}_${suggestion.load}'),
@@ -419,7 +419,7 @@ class _ActiveSessionContent extends ConsumerWidget {
         sectionTitle: session.sectionTitle,
         logCount: completedSetsCount,
         fallbackLoad: currentExercise.targetLoad,
-        fallbackReps: int.tryParse(currentExercise.reps) ?? 5,
+        fallbackReps: currentExercise.targetRepCount,
         loadIncrement: currentExercise.progressionIncrement,
         progressionType: currentExercise.progressionType,
         minReps: currentExercise.progressionMinReps,
@@ -642,7 +642,7 @@ class _ActiveSessionContent extends ConsumerWidget {
                               ),
                               child: Text(
                                 currentExercise.progressionType == 'double'
-                                    ? '${currentExercise.progressionMinReps ?? 8}-${currentExercise.progressionMaxReps ?? 12} reps'
+                                    ? '${currentExercise.progressionMinReps ?? currentExercise.targetRepCount}-${currentExercise.progressionMaxReps ?? currentExercise.targetRepCount} reps'
                                     : '+${currentExercise.progressionIncrement ?? 2.5}kg',
                                 style: AppTypography.labelSmall.copyWith(
                                   fontSize: 10,
@@ -735,7 +735,9 @@ class _ActiveSessionContent extends ConsumerWidget {
                         ),
                       ),
                       Text(
-                        '${suggestion?.reps ?? currentExercise.reps} reps',
+                        currentExercise.progressionType == 'double'
+                            ? '${suggestion?.reps ?? currentExercise.targetRepCount} reps (${currentExercise.reps})'
+                            : '${suggestion?.reps ?? currentExercise.reps} reps',
                         style: AppTypography.titleMedium.copyWith(
                           fontSize: 15,
                           color: AppColors.onBackground,

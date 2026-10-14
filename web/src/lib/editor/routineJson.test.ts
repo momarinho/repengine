@@ -206,3 +206,47 @@ test('parseAndValidateRoutineJson ensures linear_progression has start_load and 
 	assert.equal(exBlock.data.increment, 2.5);
 	assert.equal(exBlock.data.progression, undefined);
 });
+
+test('parseAndValidateRoutineJson and exportWorkflowToCanonicalJson preserve and extract min_reps and max_reps for double progression', () => {
+	const json = JSON.stringify({
+		name: 'Calisthenics Split',
+		sections: [
+			{
+				title: 'Day 2',
+				blocks: [
+					{
+						type: 'exercise',
+						exercise_name: 'Bodyweight Pull-Up',
+						sets: 3,
+						reps: '6-8',
+						target_load: 0,
+						progression: {
+							type: 'double',
+							increment: 2.5
+						}
+					}
+				]
+			}
+		]
+	});
+
+	const result = parseAndValidateRoutineJson(json);
+	assert.equal(result.success, true);
+	const pullUpBlock = result.draftBlocks?.[1];
+	assert.ok(pullUpBlock);
+	assert.equal(pullUpBlock.data.exercise_name, 'Bodyweight Pull-Up');
+	assert.equal(pullUpBlock.data.reps, '6-8');
+	assert.deepEqual(pullUpBlock.data.progression, {
+		type: 'double',
+		increment: 2.5,
+		min_reps: 6,
+		max_reps: 8
+	});
+
+	const exported = exportWorkflowToCanonicalJson({ name: 'Calisthenics Split' }, result.draftBlocks!);
+	const exportedBlock = exported.sections[0].blocks[0];
+	assert.equal(exportedBlock.exercise_name, 'Bodyweight Pull-Up');
+	assert.equal(exportedBlock.reps, '6-8');
+	assert.equal(exportedBlock.progression?.min_reps, 6);
+	assert.equal(exportedBlock.progression?.max_reps, 8);
+});
