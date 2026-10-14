@@ -42,17 +42,17 @@
 	);
 </script>
 
-<div class="space-y-3">
+<div class="space-y-3 min-w-0 break-words">
 	<div class="flex items-start justify-between gap-3">
-		<div>
-			<p class="text-sm font-semibold text-on-surface">{exercise}</p>
+		<div class="min-w-0 flex-1">
+			<p class="text-sm font-semibold text-on-surface break-words">{exercise}</p>
 			<p class="text-xs text-on-surface-variant">Wave progression for week {activeWeek}</p>
 		</div>
-		<span class="material-symbols-outlined text-primary">waterfall_chart</span>
+		<span class="material-symbols-outlined text-primary shrink-0">waterfall_chart</span>
 	</div>
-	<div class="flex flex-wrap gap-2 text-xs text-on-surface-variant">
-		<span>{reps} reps</span>
-		<span>{intensity}%</span>
-		<span>RPE {rpe}</span>
+	<div class="flex flex-wrap gap-1.5 text-xs text-on-surface-variant">
+		<span class="rounded bg-surface-container-high px-2 py-0.5 font-medium text-on-surface">{reps} reps</span>
+		<span class="rounded bg-secondary/10 text-secondary border border-secondary/20 px-2 py-0.5 font-semibold">{intensity}%</span>
+		<span class="rounded bg-surface-container-high px-2 py-0.5 font-medium text-on-surface">RPE {rpe}</span>
 	</div>
 </div>

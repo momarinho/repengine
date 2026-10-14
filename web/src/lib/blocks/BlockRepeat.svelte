@@ -26,13 +26,13 @@
 	);
 </script>
 
-<div class="space-y-3">
+<div class="space-y-3 min-w-0 break-words">
 	<div class="flex items-start justify-between gap-3">
-		<div>
-			<p class="text-sm font-semibold text-on-surface">{title}</p>
+		<div class="min-w-0 flex-1">
+			<p class="text-sm font-semibold text-on-surface break-words">{title}</p>
 			<p class="text-xs text-on-surface-variant">Cycle the preceding sequence</p>
 		</div>
-		<span class="material-symbols-outlined text-primary">repeat</span>
+		<span class="material-symbols-outlined text-primary shrink-0">repeat</span>
 	</div>
 	<div class="flex flex-wrap gap-2 text-xs text-on-surface-variant">
 		<span>Repeats {times} times</span>

@@ -10,13 +10,12 @@
 	const duration = $derived(typeof block.data.duration === 'number' ? block.data.duration : 0);
 </script>
 
-<div class="space-y-3">
-	<div class="flex items-start justify-between gap-3">
-		<div>
-			<p class="text-sm font-semibold text-on-surface">Rest</p>
-			<p class="text-xs text-on-surface-variant">Transition between efforts</p>
-		</div>
-		<span class="material-symbols-outlined text-primary">timer_pause</span>
+<div class="flex items-center justify-between gap-3 py-1 text-xs text-on-surface-variant min-w-0">
+	<div class="flex items-center gap-2 min-w-0">
+		<span class="material-symbols-outlined text-sm text-secondary shrink-0">timer_pause</span>
+		<span class="font-medium text-on-surface-variant">Rest interval</span>
 	</div>
-	<p class="text-xs text-on-surface-variant">{duration}s recovery</p>
+	<span class="font-mono text-[11px] font-bold text-on-surface shrink-0 bg-surface-container-high px-2 py-0.5 rounded-md border border-white/5">
+		{duration}s recovery
+	</span>
 </div>

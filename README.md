@@ -22,9 +22,7 @@ Designed around the **Dual-Workflow Architecture**, RepEngine bridges the gap be
 
 ---
 
-## 🏗️ System Architecture
-
-```mermaid
+## 🏗️ System Archite
 graph TD
     subgraph Client Tier
         Web[Web Studio - SvelteKit 5 Runes]

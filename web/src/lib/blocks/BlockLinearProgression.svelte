@@ -24,19 +24,19 @@
 	);
 </script>
 
-<div class="space-y-3">
+<div class="space-y-3 min-w-0 break-words">
 	<div class="flex items-start justify-between gap-3">
-		<div>
-			<p class="text-sm font-semibold text-on-surface">{exercise}</p>
+		<div class="min-w-0 flex-1">
+			<p class="text-sm font-semibold text-on-surface break-words">{exercise}</p>
 			<p class="text-xs text-on-surface-variant">Linear progression</p>
 		</div>
-		<span class="material-symbols-outlined text-primary">trending_up</span>
+		<span class="material-symbols-outlined text-primary shrink-0">trending_up</span>
 	</div>
-	<div class="flex flex-wrap gap-2 text-xs text-on-surface-variant">
-		<span>{sets} sets</span>
-		<span>{reps} reps</span>
-		{#if startLoad !== null}<span>{startLoad} {loadUnit}</span>{/if}
-		{#if increment !== null}<span>+{increment} {loadUnit}</span>{/if}
-		<span>{rule}</span>
+	<div class="flex flex-wrap gap-1.5 text-xs text-on-surface-variant">
+		<span class="rounded bg-surface-container-high px-2 py-0.5 font-medium text-on-surface">{sets} sets</span>
+		<span class="rounded bg-surface-container-high px-2 py-0.5 font-medium text-on-surface">{reps} reps</span>
+		{#if startLoad !== null}<span class="rounded bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 font-semibold">{startLoad} {loadUnit}</span>{/if}
+		{#if increment !== null}<span class="rounded bg-secondary/10 text-secondary border border-secondary/20 px-2 py-0.5 font-semibold">+{increment} {loadUnit}</span>{/if}
+		<span class="rounded bg-surface-container-high px-2 py-0.5 text-on-surface-variant capitalize">{rule}</span>
 	</div>
 </div>

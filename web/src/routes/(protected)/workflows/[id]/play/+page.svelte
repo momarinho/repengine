@@ -276,10 +276,15 @@
 	}
 
 	function adjustLoad(currentVal: string, amount: number): string {
-		const match = currentVal.trim().match(/^([\d.]+)\s*(.*)$/);
-		if (!match) return currentVal;
+		const trimmed = (currentVal || '').trim();
+		const match = trimmed.match(/^([\d.]+)\s*(.*)$/);
+		if (!match) {
+			const fallbackNum = Math.max(0, amount);
+			const rounded = Number.isInteger(fallbackNum) ? String(fallbackNum) : fallbackNum.toFixed(1);
+			return `${rounded} kg`;
+		}
 		const num = Number.parseFloat(match[1]);
-		const unit = match[2] || '';
+		const unit = match[2] || 'kg';
 		if (Number.isNaN(num)) return currentVal;
 		const newVal = Math.max(num + amount, 0);
 		const rounded = Number.isInteger(newVal) ? String(newVal) : newVal.toFixed(1);
@@ -1979,6 +1984,109 @@
 		}
 	}
 
+	function stepActiveBlockLoad(amount: number): void {
+		if (!currentBlock) return;
+		const current =
+			actualLoadByBlock[currentBlock.id] ||
+			getResolvedPrescribedLoad(currentBlock) ||
+			'0 kg';
+		actualLoadByBlock = {
+			...actualLoadByBlock,
+			[currentBlock.id]: adjustLoad(current, amount)
+		};
+	}
+
+	function fillTargetValues(): void {
+		if (!currentBlock) return;
+		if (currentBlockReps) {
+			actualRepsByBlock = {
+				...actualRepsByBlock,
+				[currentBlock.id]: String(currentBlockReps)
+			};
+		}
+		const targetLoad = getResolvedPrescribedLoad(currentBlock);
+		if (targetLoad) {
+			actualLoadByBlock = {
+				...actualLoadByBlock,
+				[currentBlock.id]: targetLoad
+			};
+		}
+	}
+
+	function stepWaveLoad(amount: number): void {
+		if (!currentBlock) return;
+		const current =
+			actualLoadByBlock[currentBlock.id] ||
+			calculateCalculatedLoad(currentBlock?.data?.exercise_name as string, currentWaveSet?.intensity) ||
+			'0 kg';
+		actualLoadByBlock = {
+			...actualLoadByBlock,
+			[currentBlock.id]: adjustLoad(current, amount)
+		};
+	}
+
+	function fillWaveTargetValues(): void {
+		if (!currentBlock) return;
+		if (currentWaveSet?.reps) {
+			actualRepsByBlock = {
+				...actualRepsByBlock,
+				[currentBlock.id]: String(currentWaveSet.reps)
+			};
+		}
+		const targetLoad = calculateCalculatedLoad(
+			currentBlock?.data?.exercise_name as string,
+			currentWaveSet?.intensity
+		);
+		if (targetLoad) {
+			actualLoadByBlock = {
+				...actualLoadByBlock,
+				[currentBlock.id]: targetLoad
+			};
+		}
+		if (currentWaveSet?.rpe) {
+			actualRPEByBlock = {
+				...actualRPEByBlock,
+				[currentBlock.id]: String(currentWaveSet.rpe)
+			};
+		}
+	}
+
+	function fillSupersetTargets(): void {
+		if (!currentBlock?.data) return;
+		if (currentBlock.data.reps_a) {
+			actualRepsAByBlock = {
+				...actualRepsAByBlock,
+				[currentBlock.id]: String(currentBlock.data.reps_a)
+			};
+		}
+		if (currentBlock.data.start_load_a !== null && currentBlock.data.start_load_a !== undefined) {
+			actualLoadAByBlock = {
+				...actualLoadAByBlock,
+				[currentBlock.id]: `${currentBlock.data.start_load_a} ${currentBlock.data.load_unit_a || 'kg'}`
+			};
+		}
+		if (currentBlock.data.reps_b) {
+			actualRepsBByBlock = {
+				...actualRepsBByBlock,
+				[currentBlock.id]: String(currentBlock.data.reps_b)
+			};
+		}
+		if (currentBlock.data.start_load_b !== null && currentBlock.data.start_load_b !== undefined) {
+			actualLoadBByBlock = {
+				...actualLoadBByBlock,
+				[currentBlock.id]: `${currentBlock.data.start_load_b} ${currentBlock.data.load_unit_b || 'kg'}`
+			};
+		}
+	}
+
+	function addIntraSetRestSeconds(seconds: number): void {
+		if (!intraSetRest) return;
+		intraSetRest = {
+			...intraSetRest,
+			remainingSeconds: Math.max(0, intraSetRest.remainingSeconds + seconds)
+		};
+	}
+
 	onMount(() => {
 		if (!browser || !routine || !localSessionKey) {
 			hasRestoredSession = true;
@@ -2774,31 +2882,31 @@
 			</div>
 		</div>
 	{:else if isSessionComplete}
-		<div class="min-h-screen px-6 py-16">
-			<div class="mx-auto max-w-3xl rounded-2xl border border-primary/20 bg-surface-container p-8 shadow-xl">
+		<div class="min-h-screen px-3 sm:px-6 py-8 sm:py-16">
+			<div class="mx-auto max-w-3xl rounded-2xl border border-primary/20 bg-surface-container p-4 sm:p-8 shadow-xl">
 				<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Session complete</p>
-				<h1 class="mt-3 text-3xl font-bold tracking-tight text-on-background text-center">
+				<h1 class="mt-3 text-2xl sm:text-3xl font-bold tracking-tight text-on-background text-center">
 					{activeSection?.title ?? routine.name} finished
 				</h1>
-				<p class="mt-3 text-sm text-on-surface-variant text-center">
+				<p class="mt-2 text-sm text-on-surface-variant text-center">
 					{activeSection?.subtitle || 'This selected section has been completed.'}
 				</p>
-				<div class="mt-8 grid gap-4 md:grid-cols-4">
-					<div class="rounded-xl border border-white/5 bg-surface-container-low p-4 text-center">
+				<div class="mt-6 sm:mt-8 grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
+					<div class="rounded-xl border border-white/5 bg-surface-container-low p-3.5 sm:p-4 text-center">
 						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Duration</p>
-						<p class="mt-2 text-2xl font-bold text-on-surface">{formatClock(sessionElapsedSeconds)}</p>
+						<p class="mt-1 sm:mt-2 text-xl sm:text-2xl font-bold text-on-surface">{formatClock(sessionElapsedSeconds)}</p>
 					</div>
-					<div class="rounded-xl border border-white/5 bg-surface-container-low p-4 text-center">
+					<div class="rounded-xl border border-white/5 bg-surface-container-low p-3.5 sm:p-4 text-center">
 						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Blocks</p>
-						<p class="mt-2 text-2xl font-bold text-on-surface">{completedBlockCount}</p>
+						<p class="mt-1 sm:mt-2 text-xl sm:text-2xl font-bold text-on-surface">{completedBlockCount}</p>
 					</div>
-					<div class="rounded-xl border border-white/5 bg-surface-container-low p-4 text-center">
+					<div class="rounded-xl border border-white/5 bg-surface-container-low p-3.5 sm:p-4 text-center">
 						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Sets</p>
-						<p class="mt-2 text-2xl font-bold text-on-surface">{summarySetCount}</p>
+						<p class="mt-1 sm:mt-2 text-xl sm:text-2xl font-bold text-on-surface">{summarySetCount}</p>
 					</div>
-					<div class="rounded-xl border border-white/5 bg-surface-container-low p-4 text-center">
+					<div class="rounded-xl border border-white/5 bg-surface-container-low p-3.5 sm:p-4 text-center">
 						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Notes</p>
-						<p class="mt-2 text-2xl font-bold text-on-surface">{noteCount}</p>
+						<p class="mt-1 sm:mt-2 text-xl sm:text-2xl font-bold text-on-surface">{noteCount}</p>
 					</div>
 				</div>
 				{#if recentActivity.length > 0}
@@ -2919,9 +3027,9 @@
 		</div>
 	{:else if currentBlock}
 	<header class="fixed top-0 z-40 flex w-full flex-col items-center border-b border-white/5 bg-background/80 backdrop-blur-xl">
-		<div class="flex h-14 w-full items-center justify-between px-6">
-			<div class="flex items-center gap-3 min-w-0">
-				<p class="truncate text-sm font-bold tracking-tight text-on-background">{routine.name}</p>
+		<div class="flex h-14 w-full items-center justify-between px-3 sm:px-6">
+			<div class="flex items-center gap-2 sm:gap-3 min-w-0">
+				<p class="truncate text-xs sm:text-sm font-bold tracking-tight text-on-background max-w-[120px] sm:max-w-xs">{routine.name}</p>
 				{#if routine.sections.length > 1}
 					<button
 						type="button"
@@ -2936,25 +3044,26 @@
 				{/if}
 			</div>
 
-			<div class="flex items-center gap-3">
-				<div class="flex items-center gap-1.5 text-sm font-bold text-primary">
-					<span class="material-symbols-outlined text-sm">schedule</span>
+			<div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
+				<div class="flex items-center gap-1 text-xs sm:text-sm font-bold text-primary font-mono tabular-nums">
+					<span class="material-symbols-outlined text-xs sm:text-sm">schedule</span>
 					{formatClock(sessionElapsedSeconds)}
 				</div>
 				<button
 					type="button"
-					class="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 hover:border-primary/50 transition-all cursor-pointer"
+					class="flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-2 sm:px-3 py-1 sm:py-1.5 text-xs font-bold text-primary hover:bg-primary/20 hover:border-primary/50 transition-all cursor-pointer"
 					onclick={() => (showFinishConfirmModal = true)}
 					title="Finish workout and record progress"
 				>
-					<span class="material-symbols-outlined text-sm">flag</span>
+					<span class="material-symbols-outlined text-xs sm:text-sm">flag</span>
 					<span class="hidden sm:inline">Finish Workout</span>
 				</button>
 				<a
 					href={`/workflows/${routine.id}/edit`}
-					class="flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-variant/40 hover:text-on-surface"
+					class="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-variant/40 hover:text-on-surface"
+					title="Edit routine"
 				>
-					<span class="material-symbols-outlined">edit</span>
+					<span class="material-symbols-outlined text-base sm:text-lg">edit</span>
 				</a>
 			</div>
 		</div>
@@ -2964,17 +3073,17 @@
 		</div>
 
 		{#if syncQueue.length > 0}
-			<div class="w-full bg-amber-400/10 border-t border-white/5 text-amber-400 px-6 py-2 text-center text-xs font-semibold flex items-center justify-center gap-2">
+			<div class="w-full bg-amber-400/10 border-t border-white/5 text-amber-400 px-3 sm:px-6 py-2 text-center text-xs font-semibold flex items-center justify-center gap-2">
 				<span class="material-symbols-outlined text-sm">cloud_off</span>
 				Offline: {syncQueue.length} set(s) pending sync. Saving automatically.
 			</div>
 		{/if}
 	</header>
 
-	<main class="flex h-screen overflow-hidden pt-[3.75rem] pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
-		<section class="custom-scrollbar flex-1 overflow-y-auto px-4 md:px-8">
-			<div class="mx-auto max-w-3xl py-6">
-				<div class="mb-6">
+	<main class="flex h-screen overflow-hidden pt-[3.75rem] pb-[calc(5rem+env(safe-area-inset-bottom))]">
+		<section class="custom-scrollbar flex-1 overflow-y-auto px-3 sm:px-6 md:px-8">
+			<div class="mx-auto max-w-3xl py-4 sm:py-6">
+				<div class="mb-4 sm:mb-6">
 					<div class="flex flex-wrap items-center gap-2">
 						<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-tertiary">Active block</p>
 						{#if currentBlock.sectionTitle}
@@ -2983,8 +3092,8 @@
 							</span>
 						{/if}
 					</div>
-					<h1 class="mt-2 text-3xl font-bold tracking-tight text-on-background md:text-4xl">{currentBlock.title}</h1>
-					<p class="mt-2 text-sm text-on-surface-variant">
+					<h1 class="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-on-background md:text-4xl">{currentBlock.title}</h1>
+					<p class="mt-1.5 sm:mt-2 text-xs sm:text-sm text-on-surface-variant">
 						{currentBlock.subtitle}
 						{#if currentBlock.node_type_slug === 'exercise' || currentBlock.node_type_slug === 'linear_progression'}
 							• {routine.focus} • {routine.totalMinutes} min session
@@ -3008,13 +3117,13 @@
 					</div>
 				{/if}
 
-				<div class="rounded-2xl border border-white/5 bg-surface-container p-6 shadow-xl md:p-8">
-					<div class="mb-8 flex items-start justify-between gap-4">
+				<div class="rounded-2xl border border-white/5 bg-surface-container p-3.5 sm:p-6 md:p-8 shadow-xl">
+					<div class="mb-5 sm:mb-8 flex items-start justify-between gap-3 sm:gap-4">
 						<div>
 							<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant">
 								{currentBlock.eyebrow ?? typeLabel(currentBlock)}
 							</p>
-							<h2 class="mt-2 text-2xl font-bold">{currentBlock.title}</h2>
+							<h2 class="mt-1 sm:mt-2 text-xl sm:text-2xl font-bold">{currentBlock.title}</h2>
 							<p class="mt-1 text-sm text-on-surface-variant">{currentBlock.subtitle}</p>
 						</div>
 
@@ -3047,24 +3156,24 @@
 					{/if}
 
 					{#if currentBlock.node_type_slug === 'exercise' || currentBlock.node_type_slug === 'linear_progression'}
-						<div class="mb-10 grid grid-cols-2 gap-6 md:grid-cols-3">
+						<div class="mb-6 sm:mb-10 grid grid-cols-2 gap-3 sm:gap-6 md:grid-cols-3">
 							<div class="space-y-1">
 								<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Current set</span>
 								<div class="flex items-baseline gap-1">
-									<span class="font-display text-5xl font-bold text-primary">{currentExerciseSet}</span>
-									<span class="text-xl font-light text-on-surface-variant">/ {currentBlockSets}</span>
+									<span class="font-display text-3xl sm:text-4xl md:text-5xl font-bold text-primary">{currentExerciseSet}</span>
+									<span class="text-base sm:text-xl font-light text-on-surface-variant">/ {currentBlockSets}</span>
 								</div>
 							</div>
 
 							<div class="space-y-1">
 								<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Target reps</span>
-								<div class="font-display text-5xl font-bold">{currentBlockReps}</div>
+								<div class="font-display text-3xl sm:text-4xl md:text-5xl font-bold truncate">{currentBlockReps}</div>
 							</div>
 
 							<div class="col-span-2 space-y-1 md:col-span-1">
 								<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Load</span>
 								<div class="flex items-baseline gap-1">
-									<span class="font-display text-5xl font-bold">{getResolvedPrescribedLoad(currentBlock) || '-'}</span>
+									<span class="font-display text-3xl sm:text-4xl md:text-5xl font-bold truncate">{getResolvedPrescribedLoad(currentBlock) || '-'}</span>
 								</div>
 							</div>
 						</div>
@@ -3178,114 +3287,172 @@
 						{/if}
 
 						{#if isRestingBetweenSets && intraSetRest}
-							<div class="mt-4 rounded-xl border border-primary/20 bg-primary/10 p-5">
-								<div class="flex flex-wrap items-center justify-between gap-4">
+							<div class="mt-4 rounded-xl border border-primary/30 bg-primary/10 p-4 sm:p-5 shadow-lg">
+								<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 									<div>
-										<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Rest between sets</p>
-										<p class="mt-2 text-sm text-on-surface-variant">Next: {intraSetRest.nextLabel}</p>
+										<div class="flex items-center gap-2">
+											<span class="flex h-2 w-2 rounded-full bg-primary animate-ping"></span>
+											<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Resting Between Sets</p>
+										</div>
+										<p class="mt-1 text-xs sm:text-sm font-medium text-on-surface-variant">Next: {intraSetRest.nextLabel}</p>
 									</div>
-									<p class="font-display text-4xl font-bold text-on-surface">{formatClock(intraSetRest.remainingSeconds)}</p>
+									<div class="flex items-center justify-between sm:justify-end gap-3">
+										<p class="font-display text-3xl sm:text-4xl font-bold text-primary font-mono tabular-nums">{formatClock(intraSetRest.remainingSeconds)}</p>
+										<div class="flex items-center gap-1.5">
+											<button
+												type="button"
+												class="rounded-lg border border-primary/30 bg-primary/20 px-2.5 py-1.5 text-xs font-bold text-primary hover:bg-primary/30 active:scale-95 transition-all cursor-pointer"
+												onclick={() => addIntraSetRestSeconds(30)}
+												title="Add 30 seconds to rest"
+											>
+												+30s
+											</button>
+											<button
+												type="button"
+												class="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-on-primary-fixed shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+												onclick={() => clearIntraSetRest(true)}
+												title="Skip rest and start next set"
+											>
+												Skip Rest
+											</button>
+										</div>
+									</div>
 								</div>
 							</div>
 						{/if}
 
-						<div class="mt-4 grid gap-4 rounded-xl border border-white/5 bg-surface-container-low p-5 md:grid-cols-4">
-							<div>
-								<label for="actual-reps" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
-								<input
-									id="actual-reps"
-									type="text"
-									inputmode="numeric"
-									autocomplete="off"
-									enterkeyhint="next"
-									class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-									placeholder={currentBlockReps ?? 'e.g. 8'}
-									value={actualRepsByBlock[currentBlock.id] ?? ''}
-									oninput={(event) => {
-										actualRepsByBlock = {
-											...actualRepsByBlock,
-											[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-										};
-									}}
-								/>
+						<div class="mt-4 rounded-xl border border-white/5 bg-surface-container-low p-3.5 sm:p-5">
+							<div class="mb-3 flex items-center justify-between">
+								<span class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Log Set {currentExerciseSet} Results</span>
+								<button
+									type="button"
+									class="flex items-center gap-1 rounded-md border border-outline-variant/30 bg-surface-container px-2 py-1 text-[11px] font-semibold text-primary hover:bg-surface-container-high transition-colors cursor-pointer"
+									onclick={fillTargetValues}
+									title="Fill with target reps and prescribed load"
+								>
+									<span class="material-symbols-outlined text-xs">bolt</span>
+									<span>Match Target</span>
+								</button>
 							</div>
-							<div>
-								<label for="actual-load" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual load</label>
-								<input
-									id="actual-load"
-									type="text"
-									inputmode="decimal"
-									autocomplete="off"
-									enterkeyhint="next"
-									class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-									placeholder={getResolvedPrescribedLoad(currentBlock) || 'e.g. 80 kg'}
-									value={actualLoadByBlock[currentBlock.id] ?? ''}
-									oninput={(event) => {
-										actualLoadByBlock = {
-											...actualLoadByBlock,
-											[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-										};
-									}}
-								/>
-							</div>
-							<div>
-								<label for="actual-rpe" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RPE</label>
-								<input
-									id="actual-rpe"
-									type="text"
-									inputmode="decimal"
-									autocomplete="off"
-									enterkeyhint="next"
-									class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-									placeholder="e.g. 8.5"
-									value={actualRPEByBlock[currentBlock.id] ?? ''}
-									oninput={(event) => {
-										actualRPEByBlock = {
-											...actualRPEByBlock,
-											[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-										};
-									}}
-								/>
-							</div>
-							<div>
-								<label for="actual-rir" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RIR</label>
-								<input
-									id="actual-rir"
-									type="text"
-									inputmode="decimal"
-									autocomplete="off"
-									enterkeyhint="done"
-									class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-									placeholder="e.g. 2"
-									value={actualRIRByBlock[currentBlock.id] ?? ''}
-									oninput={(event) => {
-										actualRIRByBlock = {
-											...actualRIRByBlock,
-											[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-										};
-									}}
-								/>
+
+							<div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
+								<div>
+									<label for="actual-reps" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
+									<input
+										id="actual-reps"
+										type="text"
+										inputmode="numeric"
+										autocomplete="off"
+										enterkeyhint="next"
+										class="mt-1.5 w-full rounded-lg border-0 bg-surface-container-lowest p-2.5 sm:p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+										placeholder={currentBlockReps ?? 'e.g. 8'}
+										value={actualRepsByBlock[currentBlock.id] ?? ''}
+										oninput={(event) => {
+											actualRepsByBlock = {
+												...actualRepsByBlock,
+												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+											};
+										}}
+									/>
+								</div>
+								<div>
+									<div class="flex items-center justify-between">
+										<label for="actual-load" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual load</label>
+										<div class="flex items-center gap-1">
+											<button
+												type="button"
+												class="rounded bg-surface-container px-1.5 py-0.5 text-[10px] font-bold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high active:scale-95 cursor-pointer"
+												onclick={() => stepActiveBlockLoad(-2.5)}
+												title="Subtract 2.5 kg"
+											>
+												-2.5
+											</button>
+											<button
+												type="button"
+												class="rounded bg-surface-container px-1.5 py-0.5 text-[10px] font-bold text-primary hover:bg-surface-container-high active:scale-95 cursor-pointer"
+												onclick={() => stepActiveBlockLoad(2.5)}
+												title="Add 2.5 kg"
+											>
+												+2.5
+											</button>
+										</div>
+									</div>
+									<input
+										id="actual-load"
+										type="text"
+										inputmode="decimal"
+										autocomplete="off"
+										enterkeyhint="next"
+										class="mt-1.5 w-full rounded-lg border-0 bg-surface-container-lowest p-2.5 sm:p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+										placeholder={getResolvedPrescribedLoad(currentBlock) || 'e.g. 80 kg'}
+										value={actualLoadByBlock[currentBlock.id] ?? ''}
+										oninput={(event) => {
+											actualLoadByBlock = {
+												...actualLoadByBlock,
+												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+											};
+										}}
+									/>
+								</div>
+								<div>
+									<label for="actual-rpe" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RPE</label>
+									<input
+										id="actual-rpe"
+										type="text"
+										inputmode="decimal"
+										autocomplete="off"
+										enterkeyhint="next"
+										class="mt-1.5 w-full rounded-lg border-0 bg-surface-container-lowest p-2.5 sm:p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+										placeholder="e.g. 8.5"
+										value={actualRPEByBlock[currentBlock.id] ?? ''}
+										oninput={(event) => {
+											actualRPEByBlock = {
+												...actualRPEByBlock,
+												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+											};
+										}}
+									/>
+								</div>
+								<div>
+									<label for="actual-rir" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RIR</label>
+									<input
+										id="actual-rir"
+										type="text"
+										inputmode="decimal"
+										autocomplete="off"
+										enterkeyhint="done"
+										class="mt-1.5 w-full rounded-lg border-0 bg-surface-container-lowest p-2.5 sm:p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+										placeholder="e.g. 2"
+										value={actualRIRByBlock[currentBlock.id] ?? ''}
+										oninput={(event) => {
+											actualRIRByBlock = {
+												...actualRIRByBlock,
+												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+											};
+										}}
+									/>
+								</div>
 							</div>
 						</div>
 					{:else if currentBlock.node_type_slug === 'superset'}
 						<!-- Current Set & Rest Summary -->
-						<div class="mb-10 grid grid-cols-2 gap-6 md:grid-cols-3">
+						<div class="mb-6 sm:mb-10 grid grid-cols-2 gap-3 sm:gap-6 md:grid-cols-3">
 							<div class="space-y-1">
 								<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Current set</span>
 								<div class="flex items-baseline gap-1">
-									<span class="font-display text-5xl font-bold text-primary">{currentExerciseSet}</span>
-									<span class="text-xl font-light text-on-surface-variant">/ {currentBlock.data?.sets || 3}</span>
+									<span class="font-display text-3xl sm:text-4xl md:text-5xl font-bold text-primary">{currentExerciseSet}</span>
+									<span class="text-base sm:text-xl font-light text-on-surface-variant">/ {currentBlock.data?.sets || 3}</span>
 								</div>
 							</div>
 
 							<div class="space-y-1 col-span-1">
 								<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Suggested rest</span>
-								<div class="font-display text-5xl font-bold">{formatClock(Number(currentBlock.data?.rest_seconds ?? 120))}</div>
+								<div class="font-display text-3xl sm:text-4xl md:text-5xl font-bold">{formatClock(Number(currentBlock.data?.rest_seconds ?? 120))}</div>
 							</div>
 
 							<div class="col-span-2 space-y-1 md:col-span-1">
 								<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Set completion</span>
-								<div class="mt-4 flex gap-2">
+								<div class="mt-3 sm:mt-4 flex gap-2">
 									{#each Array(Number(currentBlock.data?.sets ?? 3)) as _, index}
 										<div class={`h-2 flex-1 rounded-full ${index < currentExerciseSet - 1 ? 'bg-primary' : 'bg-surface-variant'}`}></div>
 									{/each}
@@ -3294,19 +3461,19 @@
 						</div>
 
 						<!-- Two Exercises Side by Side -->
-						<div class="mb-8 grid gap-6 md:grid-cols-2">
+						<div class="mb-6 sm:mb-8 grid gap-4 sm:gap-6 md:grid-cols-2">
 							<!-- Exercise A -->
-							<div class="rounded-xl border border-primary/20 bg-primary/5 p-5">
+							<div class="rounded-xl border border-primary/20 bg-primary/5 p-4 sm:p-5">
 								<p class="text-[10px] font-bold uppercase tracking-widest text-primary">Exercise A (First)</p>
-								<h3 class="mt-2 text-xl font-bold">{currentBlock.data?.exercise_a_name || 'Exercise A'}</h3>
-								<div class="mt-4 grid grid-cols-2 gap-4">
+								<h3 class="mt-1.5 sm:mt-2 text-lg sm:text-xl font-bold">{currentBlock.data?.exercise_a_name || 'Exercise A'}</h3>
+								<div class="mt-3 sm:mt-4 grid grid-cols-2 gap-3 sm:gap-4">
 									<div>
 										<p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Target Reps</p>
-										<p class="text-2xl font-bold mt-1">{currentBlock.data?.reps_a || '5'}</p>
+										<p class="text-xl sm:text-2xl font-bold mt-1">{currentBlock.data?.reps_a || '5'}</p>
 									</div>
 									<div>
 										<p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Prescribed Load</p>
-										<p class="text-2xl font-bold mt-1">
+										<p class="text-xl sm:text-2xl font-bold mt-1">
 											{currentBlock.data?.start_load_a !== null && currentBlock.data?.start_load_a !== undefined ? `${currentBlock.data.start_load_a} ${currentBlock.data.load_unit_a || 'kg'}` : '-'}
 										</p>
 									</div>
@@ -3319,17 +3486,17 @@
 							</div>
 
 							<!-- Exercise B -->
-							<div class="rounded-xl border border-secondary/20 bg-secondary/5 p-5">
+							<div class="rounded-xl border border-secondary/20 bg-secondary/5 p-4 sm:p-5">
 								<p class="text-[10px] font-bold uppercase tracking-widest text-secondary">Exercise B (Second)</p>
-								<h3 class="mt-2 text-xl font-bold">{currentBlock.data?.exercise_b_name || 'Exercise B'}</h3>
-								<div class="mt-4 grid grid-cols-2 gap-4">
+								<h3 class="mt-1.5 sm:mt-2 text-lg sm:text-xl font-bold">{currentBlock.data?.exercise_b_name || 'Exercise B'}</h3>
+								<div class="mt-3 sm:mt-4 grid grid-cols-2 gap-3 sm:gap-4">
 									<div>
 										<p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Target Reps</p>
-										<p class="text-2xl font-bold mt-1">{currentBlock.data?.reps_b || '10'}</p>
+										<p class="text-xl sm:text-2xl font-bold mt-1">{currentBlock.data?.reps_b || '10'}</p>
 									</div>
 									<div>
 										<p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Prescribed Load</p>
-										<p class="text-2xl font-bold mt-1">
+										<p class="text-xl sm:text-2xl font-bold mt-1">
 											{currentBlock.data?.start_load_b !== null && currentBlock.data?.start_load_b !== undefined ? `${currentBlock.data.start_load_b} ${currentBlock.data.load_unit_b || 'kg'}` : '-'}
 										</p>
 									</div>
@@ -3343,20 +3510,54 @@
 						</div>
 
 						{#if isRestingBetweenSets && intraSetRest}
-							<div class="mb-6 rounded-xl border border-primary/20 bg-primary/10 p-5">
-								<div class="flex flex-wrap items-center justify-between gap-4">
+							<div class="mb-6 rounded-xl border border-primary/30 bg-primary/10 p-4 sm:p-5 shadow-lg">
+								<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 									<div>
-										<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-primary font-headline">Rest between sets</p>
-										<p class="mt-2 text-sm text-on-surface-variant">Next: {intraSetRest.nextLabel}</p>
+										<div class="flex items-center gap-2">
+											<span class="flex h-2 w-2 rounded-full bg-primary animate-ping"></span>
+											<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Resting Between Sets</p>
+										</div>
+										<p class="mt-1 text-xs sm:text-sm font-medium text-on-surface-variant">Next: {intraSetRest.nextLabel}</p>
 									</div>
-									<p class="font-display text-4xl font-bold text-on-surface">{formatClock(intraSetRest.remainingSeconds)}</p>
+									<div class="flex items-center justify-between sm:justify-end gap-3">
+										<p class="font-display text-3xl sm:text-4xl font-bold text-primary font-mono tabular-nums">{formatClock(intraSetRest.remainingSeconds)}</p>
+										<div class="flex items-center gap-1.5">
+											<button
+												type="button"
+												class="rounded-lg border border-primary/30 bg-primary/20 px-2.5 py-1.5 text-xs font-bold text-primary hover:bg-primary/30 active:scale-95 transition-all cursor-pointer"
+												onclick={() => addIntraSetRestSeconds(30)}
+												title="Add 30 seconds"
+											>
+												+30s
+											</button>
+											<button
+												type="button"
+												class="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-on-primary-fixed shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+												onclick={() => clearIntraSetRest(true)}
+												title="Skip rest"
+											>
+												Skip Rest
+											</button>
+										</div>
+									</div>
 								</div>
 							</div>
 						{/if}
 
 						<!-- Superset Inputs -->
-						<div class="rounded-xl border border-white/5 bg-surface-container-low p-5 space-y-5">
-							<p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-headline">Log Set {currentExerciseSet} Results</p>
+						<div class="rounded-xl border border-white/5 bg-surface-container-low p-3.5 sm:p-5 space-y-4 sm:space-y-5">
+							<div class="flex items-center justify-between">
+								<p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-headline">Log Set {currentExerciseSet} Results</p>
+								<button
+									type="button"
+									class="flex items-center gap-1 rounded-md border border-outline-variant/30 bg-surface-container px-2 py-1 text-[11px] font-semibold text-primary hover:bg-surface-container-high transition-colors cursor-pointer"
+									onclick={fillSupersetTargets}
+									title="Fill with target reps and loads"
+								>
+									<span class="material-symbols-outlined text-xs">bolt</span>
+									<span>Match Target</span>
+								</button>
+							</div>
 							
 							<div class="grid gap-4 md:grid-cols-2 border-b border-outline-variant/10 pb-4">
 								<!-- Inputs for A -->
@@ -3584,18 +3785,18 @@
 						</div>
 					{:else if currentBlock.node_type_slug === 'wave'}
 						<div class="space-y-6">
-							<div class="grid gap-4 md:grid-cols-3">
-								<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
+							<div class="grid grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-4">
+								<div class="rounded-xl border border-white/5 bg-surface-container-low p-3.5 sm:p-5">
 									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Current step</p>
-									<p class="mt-2 text-2xl font-bold text-on-surface">{currentWaveWeek?.label}</p>
+									<p class="mt-1 sm:mt-2 text-xl sm:text-2xl font-bold text-on-surface">{currentWaveWeek?.label}</p>
 								</div>
-								<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
+								<div class="rounded-xl border border-white/5 bg-surface-container-low p-3.5 sm:p-5">
 									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Current set</p>
-									<p class="mt-2 text-2xl font-bold text-on-surface">{currentWaveSetIndex + 1} / {currentWaveWeek?.prescriptions.length ?? 1}</p>
+									<p class="mt-1 sm:mt-2 text-xl sm:text-2xl font-bold text-on-surface">{currentWaveSetIndex + 1} / {currentWaveWeek?.prescriptions.length ?? 1}</p>
 								</div>
-								<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
+								<div class="col-span-2 md:col-span-1 rounded-xl border border-white/5 bg-surface-container-low p-3.5 sm:p-5">
 									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Set prescription</p>
-									<p class="mt-2 text-lg font-semibold text-on-surface">
+									<p class="mt-1 sm:mt-2 text-base sm:text-lg font-semibold text-on-surface">
 										{currentWaveSet?.reps} reps • {currentWaveSet?.intensity}%
 										{#if calculateCalculatedLoad(currentBlock?.data?.exercise_name as string, currentWaveSet?.intensity)}
 											<span class="text-secondary font-bold">({calculateCalculatedLoad(currentBlock?.data?.exercise_name as string, currentWaveSet?.intensity)})</span>
@@ -3605,10 +3806,10 @@
 								</div>
 							</div>
 
-							<div class="grid gap-4 rounded-xl border border-white/5 bg-surface-container-low p-5 md:grid-cols-2">
+							<div class="grid gap-3 sm:gap-4 rounded-xl border border-white/5 bg-surface-container-low p-3.5 sm:p-5 md:grid-cols-2">
 								<div>
 									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Suggested rest</p>
-									<p class="mt-2 text-2xl font-bold text-on-surface">{formatClock(currentBlock.restSeconds ?? 120)}</p>
+									<p class="mt-1 sm:mt-2 text-xl sm:text-2xl font-bold text-on-surface">{formatClock(currentBlock.restSeconds ?? 120)}</p>
 								</div>
 								<div>
 									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Set completion</p>
@@ -3621,93 +3822,151 @@
 							</div>
 
 							{#if isRestingBetweenSets && intraSetRest}
-								<div class="rounded-xl border border-secondary/20 bg-secondary/10 p-5">
-									<div class="flex flex-wrap items-center justify-between gap-4">
+								<div class="rounded-xl border border-secondary/30 bg-secondary/10 p-4 sm:p-5 shadow-lg">
+									<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 										<div>
-											<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-secondary">Rest between wave sets</p>
-											<p class="mt-2 text-sm text-on-surface-variant">Next: {intraSetRest.nextLabel}</p>
+											<div class="flex items-center gap-2">
+												<span class="flex h-2 w-2 rounded-full bg-secondary animate-ping"></span>
+												<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-secondary">Rest between wave sets</p>
+											</div>
+											<p class="mt-1 text-xs sm:text-sm font-medium text-on-surface-variant">Next: {intraSetRest.nextLabel}</p>
 										</div>
-										<p class="font-display text-4xl font-bold text-on-surface">{formatClock(intraSetRest.remainingSeconds)}</p>
+										<div class="flex items-center justify-between sm:justify-end gap-3">
+											<p class="font-display text-3xl sm:text-4xl font-bold text-secondary font-mono tabular-nums">{formatClock(intraSetRest.remainingSeconds)}</p>
+											<div class="flex items-center gap-1.5">
+												<button
+													type="button"
+													class="rounded-lg border border-secondary/30 bg-secondary/20 px-2.5 py-1.5 text-xs font-bold text-secondary hover:bg-secondary/30 active:scale-95 transition-all cursor-pointer"
+													onclick={() => addIntraSetRestSeconds(30)}
+													title="Add 30 seconds"
+												>
+													+30s
+												</button>
+												<button
+													type="button"
+													class="rounded-lg bg-secondary px-3 py-1.5 text-xs font-bold text-on-secondary-fixed shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+													onclick={() => clearIntraSetRest(true)}
+													title="Skip rest"
+												>
+													Skip Rest
+												</button>
+											</div>
+										</div>
 									</div>
 								</div>
 							{/if}
 
-							<div class="grid gap-4 rounded-xl border border-white/5 bg-surface-container-low p-5 md:grid-cols-4">
-								<div>
-									<label for="wave-actual-reps" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
-									<input
-										id="wave-actual-reps"
-										type="text"
-										inputmode="numeric"
-										autocomplete="off"
-										enterkeyhint="next"
-										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-										placeholder={currentWaveSet?.reps ?? 'e.g. 5'}
-										value={actualRepsByBlock[currentBlock.id] ?? ''}
-										oninput={(event) => {
-											actualRepsByBlock = {
-												...actualRepsByBlock,
-												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-											};
+							<div class="rounded-xl border border-white/5 bg-surface-container-low p-3.5 sm:p-5">
+								<div class="mb-3 flex items-center justify-between">
+									<span class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Log Wave Set Results</span>
+									<button
+										type="button"
+										class="flex items-center gap-1 rounded-md border border-outline-variant/30 bg-surface-container px-2 py-1 text-[11px] font-semibold text-secondary hover:bg-surface-container-high transition-colors cursor-pointer"
+										onclick={fillWaveTargetValues}
+										title="Fill with wave prescription"
+									>
+										<span class="material-symbols-outlined text-xs">bolt</span>
+										<span>Match Target</span>
+									</button>
+								</div>
+
+								<div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
+									<div>
+										<label for="wave-actual-reps" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
+										<input
+											id="wave-actual-reps"
+											type="text"
+											inputmode="numeric"
+											autocomplete="off"
+											enterkeyhint="next"
+											class="mt-1.5 w-full rounded-lg border-0 bg-surface-container-lowest p-2.5 sm:p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+											placeholder={currentWaveSet?.reps ?? 'e.g. 5'}
+											value={actualRepsByBlock[currentBlock.id] ?? ''}
+											oninput={(event) => {
+												actualRepsByBlock = {
+													...actualRepsByBlock,
+													[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+												};
+											}}
+										/>
+									</div>
+									<div>
+										<div class="flex items-center justify-between">
+											<label for="wave-actual-load" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual load</label>
+											<div class="flex items-center gap-1">
+												<button
+													type="button"
+													class="rounded bg-surface-container px-1.5 py-0.5 text-[10px] font-bold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high active:scale-95 cursor-pointer"
+													onclick={() => stepWaveLoad(-2.5)}
+													title="Subtract 2.5 kg"
+												>
+													-2.5
+												</button>
+												<button
+													type="button"
+													class="rounded bg-surface-container px-1.5 py-0.5 text-[10px] font-bold text-secondary hover:bg-surface-container-high active:scale-95 cursor-pointer"
+													onclick={() => stepWaveLoad(2.5)}
+													title="Add 2.5 kg"
+												>
+													+2.5
+												</button>
+											</div>
+										</div>
+										<input
+											id="wave-actual-load"
+											type="text"
+											inputmode="decimal"
+											autocomplete="off"
+											enterkeyhint="next"
+											class="mt-1.5 w-full rounded-lg border-0 bg-surface-container-lowest p-2.5 sm:p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+											placeholder={calculateCalculatedLoad(currentBlock?.data?.exercise_name as string, currentWaveSet?.intensity) || 'e.g. 140 kg'}
+											value={actualLoadByBlock[currentBlock.id] ?? ''}
+											oninput={(event) => {
+												actualLoadByBlock = {
+													...actualLoadByBlock,
+													[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+												};
+											}}
+										/>
+									</div>
+									<div>
+										<label for="wave-actual-rpe" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RPE</label>
+										<input
+											id="wave-actual-rpe"
+											type="text"
+											inputmode="decimal"
+											autocomplete="off"
+											enterkeyhint="next"
+											class="mt-1.5 w-full rounded-lg border-0 bg-surface-container-lowest p-2.5 sm:p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+											placeholder={currentWaveSet?.rpe ?? 'e.g. 9'}
+											value={actualRPEByBlock[currentBlock.id] ?? ''}
+											oninput={(event) => {
+												actualRPEByBlock = {
+													...actualRPEByBlock,
+													[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+												};
 										}}
 									/>
 								</div>
-								<div>
-									<label for="wave-actual-load" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual load</label>
-									<input
-										id="wave-actual-load"
-										type="text"
-										inputmode="decimal"
-										autocomplete="off"
-										enterkeyhint="next"
-										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-										placeholder={calculateCalculatedLoad(currentBlock?.data?.exercise_name as string, currentWaveSet?.intensity) || 'e.g. 140 kg'}
-										value={actualLoadByBlock[currentBlock.id] ?? ''}
-										oninput={(event) => {
-											actualLoadByBlock = {
-												...actualLoadByBlock,
-												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-											};
-										}}
-									/>
-								</div>
-								<div>
-									<label for="wave-actual-rpe" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RPE</label>
-									<input
-										id="wave-actual-rpe"
-										type="text"
-										inputmode="decimal"
-										autocomplete="off"
-										enterkeyhint="next"
-										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-										placeholder={currentWaveSet?.rpe ?? 'e.g. 9'}
-										value={actualRPEByBlock[currentBlock.id] ?? ''}
-										oninput={(event) => {
-											actualRPEByBlock = {
-												...actualRPEByBlock,
-												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-											};
-									}}
-								/>
-							</div>
-								<div>
-									<label for="wave-actual-rir" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RIR</label>
-									<input
-										id="wave-actual-rir"
-										type="text"
-										inputmode="decimal"
-										autocomplete="off"
-										enterkeyhint="done"
-										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-										placeholder="e.g. 1"
-										value={actualRIRByBlock[currentBlock.id] ?? ''}
-										oninput={(event) => {
-											actualRIRByBlock = {
-												...actualRIRByBlock,
-												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-											};
-										}}
-									/>
+									<div>
+										<label for="wave-actual-rir" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RIR</label>
+										<input
+											id="wave-actual-rir"
+											type="text"
+											inputmode="decimal"
+											autocomplete="off"
+											enterkeyhint="done"
+											class="mt-1.5 w-full rounded-lg border-0 bg-surface-container-lowest p-2.5 sm:p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+											placeholder="e.g. 1"
+											value={actualRIRByBlock[currentBlock.id] ?? ''}
+											oninput={(event) => {
+												actualRIRByBlock = {
+													...actualRIRByBlock,
+													[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+												};
+											}}
+										/>
+									</div>
 								</div>
 							</div>
 
@@ -4049,7 +4308,7 @@
 									</button>
 
 									{#if showIntervalManualInputs}
-										<div class="mt-4 grid gap-4 border-t border-white/5 pt-4 md:grid-cols-4">
+										<div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 border-t border-white/5 pt-4">
 											<div>
 												<label for="repeat-actual-reps" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps/jumps</label>
 												<input
@@ -4162,31 +4421,31 @@
 						{:else}
 							<!-- STANDARD REPEAT BLOCK (NON-INTERVAL) -->
 							<div class="space-y-6">
-								<div class="grid gap-4 md:grid-cols-3">
-									<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
+								<div class="grid grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-4">
+									<div class="rounded-xl border border-white/5 bg-surface-container-low p-3.5 sm:p-5">
 										<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Current round</p>
-										<p class="mt-2 text-5xl font-bold text-primary">{currentRepeatRound}<span class="ml-1 text-xl font-light text-on-surface-variant">/ {currentBlock.rounds}</span></p>
+										<p class="mt-1 sm:mt-2 text-3xl sm:text-4xl md:text-5xl font-bold text-primary">{currentRepeatRound}<span class="ml-1 text-base sm:text-xl font-light text-on-surface-variant">/ {currentBlock.rounds}</span></p>
 									</div>
-									<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
+									<div class="rounded-xl border border-white/5 bg-surface-container-low p-3.5 sm:p-5">
 										<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Prescription</p>
-										<p class="mt-2 text-2xl font-bold text-on-surface">{currentBlock.reps}</p>
+										<p class="mt-1 sm:mt-2 text-xl sm:text-2xl font-bold text-on-surface truncate">{currentBlock.reps}</p>
 									</div>
-									<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
+									<div class="col-span-2 md:col-span-1 rounded-xl border border-white/5 bg-surface-container-low p-3.5 sm:p-5">
 										<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Flow</p>
-										<p class="mt-2 text-lg font-semibold text-on-surface">Stay moving, short transitions</p>
+										<p class="mt-1 sm:mt-2 text-sm sm:text-lg font-semibold text-on-surface">Stay moving, short transitions</p>
 									</div>
 								</div>
 
-								<div class="rounded-xl border border-white/5 bg-surface-container-low p-5">
+								<div class="rounded-xl border border-white/5 bg-surface-container-low p-3.5 sm:p-5">
 									<p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Round completion</p>
-									<div class="mt-4 flex gap-2">
+									<div class="mt-3 sm:mt-4 flex gap-2">
 										{#each Array(currentBlock.rounds ?? 0) as _, index}
 											<div class={`h-2 flex-1 rounded-full ${index < currentRepeatRound - 1 ? 'bg-primary' : 'bg-surface-variant'}`}></div>
 										{/each}
 									</div>
 								</div>
 
-								<div class="grid gap-4 rounded-xl border border-white/5 bg-surface-container-low p-5 md:grid-cols-4">
+								<div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 rounded-xl border border-white/5 bg-surface-container-low p-3.5 sm:p-5">
 									<div>
 										<label for="repeat-actual-reps" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
 										<input
@@ -4480,30 +4739,32 @@
 		</aside>
 	</main>
 
-	<footer class="fixed bottom-0 left-0 z-50 flex h-[calc(5rem+env(safe-area-inset-bottom))] w-full items-center justify-between border-t border-white/5 bg-background/95 px-6 pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_30px_rgba(0,0,0,0.3)] backdrop-blur-2xl">
-		<div class="flex gap-2">
+	<footer class="fixed bottom-0 left-0 z-50 flex h-[calc(4.75rem+env(safe-area-inset-bottom))] sm:h-[calc(5rem+env(safe-area-inset-bottom))] w-full items-center justify-between border-t border-white/5 bg-background/95 px-2 sm:px-6 pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_30px_rgba(0,0,0,0.3)] backdrop-blur-2xl">
+		<div class="flex gap-1.5 sm:gap-2 shrink-0">
 			<button
 				type="button"
-				class="flex h-12 w-12 items-center justify-center rounded-xl bg-surface-variant/20 text-on-surface-variant transition-all hover:bg-surface-variant/40 disabled:opacity-40"
+				class="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-surface-variant/20 text-on-surface-variant transition-all hover:bg-surface-variant/40 disabled:opacity-40 cursor-pointer"
 				onclick={goToPreviousBlock}
 				disabled={isFirstBlock || isSyncingSession}
+				title="Previous block"
 			>
-				<span class="material-symbols-outlined">skip_previous</span>
+				<span class="material-symbols-outlined text-xl sm:text-2xl">skip_previous</span>
 			</button>
 			<button
 				type="button"
-				class="flex h-12 w-12 items-center justify-center rounded-xl bg-surface-variant/20 text-on-surface-variant transition-all hover:bg-surface-variant/40 lg:hidden"
+				class="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-surface-variant/20 text-on-surface-variant transition-all hover:bg-surface-variant/40 lg:hidden cursor-pointer"
 				onclick={() => (mobileQueueOpen = !mobileQueueOpen)}
+				title="View queue"
 			>
-				<span class="material-symbols-outlined">format_list_bulleted</span>
+				<span class="material-symbols-outlined text-xl sm:text-2xl">format_list_bulleted</span>
 			</button>
 		</div>
 
-		<div class="flex max-w-lg flex-1 gap-3 px-4">
+		<div class="flex max-w-lg flex-1 gap-2 sm:gap-3 px-1.5 sm:px-4 min-w-0">
 			{#if secondaryActionLabel}
 				<button
 					type="button"
-					class="h-14 flex-1 rounded-2xl border border-white/10 bg-surface-bright/20 px-4 text-sm font-bold text-on-background transition-all hover:bg-surface-bright/40"
+					class="h-11 sm:h-14 flex-1 min-w-0 rounded-xl sm:rounded-2xl border border-white/10 bg-surface-bright/20 px-2 sm:px-4 text-xs sm:text-sm font-bold text-on-background transition-all hover:bg-surface-bright/40 truncate cursor-pointer active:scale-[0.98]"
 					onclick={runSecondaryAction}
 					disabled={isSyncingSession}
 				>
@@ -4512,7 +4773,7 @@
 			{/if}
 			<button
 				type="button"
-				class="h-14 flex-[1.35] rounded-2xl bg-primary px-4 text-sm font-bold text-on-primary-fixed shadow-lg shadow-primary/10 transition-all hover:brightness-110 active:scale-[0.99]"
+				class="h-11 sm:h-14 flex-[1.4] min-w-0 rounded-xl sm:rounded-2xl bg-primary px-2 sm:px-4 text-xs sm:text-sm font-bold text-on-primary-fixed shadow-lg shadow-primary/20 transition-all hover:brightness-110 active:scale-[0.98] truncate cursor-pointer"
 				onclick={runPrimaryAction}
 				disabled={isSyncingSession}
 			>
@@ -4520,14 +4781,15 @@
 			</button>
 		</div>
 
-		<div class="flex gap-2">
+		<div class="flex gap-1.5 sm:gap-2 shrink-0">
 			<button
 				type="button"
-				class="flex h-12 w-12 items-center justify-center rounded-xl bg-surface-variant/20 text-on-surface-variant transition-all hover:bg-surface-variant/40 disabled:opacity-40"
+				class="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-surface-variant/20 text-on-surface-variant transition-all hover:bg-surface-variant/40 disabled:opacity-40 cursor-pointer"
 				onclick={goToNextBlock}
 				disabled={isSyncingSession}
+				title="Next block"
 			>
-				<span class="material-symbols-outlined">skip_next</span>
+				<span class="material-symbols-outlined text-xl sm:text-2xl">skip_next</span>
 			</button>
 		</div>
 	</footer>
