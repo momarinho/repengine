@@ -36,6 +36,7 @@ services:
   # Go Fiber API
   # ------------------------------------------------------------------
   api:
+    build: ./api
     image: ${REGISTRY:-ghcr.io/momarinho}/repengine-api:${VERSION:-latest}
     environment:
       DATABASE_URL: ${DATABASE_URL}
@@ -67,6 +68,7 @@ services:
   # SvelteKit frontend
   # ------------------------------------------------------------------
   web:
+    build: ./web
     image: ${REGISTRY:-ghcr.io/momarinho}/repengine-web:${VERSION:-latest}
     environment:
       API_URL:        http://api:8080   # server-side fetch (container→container)
