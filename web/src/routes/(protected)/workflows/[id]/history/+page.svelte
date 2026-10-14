@@ -151,26 +151,30 @@
 		</div>
 	</div>
 {:else}
-	<div class="min-h-screen bg-background px-6 py-10 text-on-background">
+	<div class="min-h-screen bg-background px-4 sm:px-6 py-6 sm:py-10 text-on-background">
 		<div class="mx-auto max-w-6xl">
-			<div class="mb-8 flex flex-wrap items-start justify-between gap-4">
+			<div class="mb-6 sm:mb-8 flex flex-wrap items-start justify-between gap-4">
 				<div>
-					<a href={`/workflows/${data.workflow.id}/edit`} class="text-xs font-bold uppercase tracking-[0.2em] text-tertiary">Back to editor</a>
-					<h1 class="mt-3 text-3xl font-bold tracking-tight text-on-background">{data.workflow.name} history</h1>
-					<p class="mt-2 text-sm text-on-surface-variant">
+					<a href={`/workflows/${data.workflow.id}/edit`} class="text-xs font-bold uppercase tracking-[0.2em] text-tertiary hover:underline inline-flex items-center gap-1">
+						<span class="material-symbols-outlined text-sm">arrow_back</span>
+						Back to editor
+					</a>
+					<h1 class="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-on-background">{data.workflow.name} history</h1>
+					<p class="mt-1 text-xs sm:text-sm text-on-surface-variant">
 						Review completed sessions, abandoned runs, and edit saved set logs.
 					</p>
 				</div>
-				<div class="flex flex-wrap gap-3">
+				<div class="flex flex-wrap gap-2.5 sm:gap-3">
 					<a
 						href={`/workflows/${data.workflow.id}/play`}
-						class="rounded-md border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/20"
+						class="btn-primary-gradient rounded-xl px-4 py-2 text-xs sm:text-sm font-bold text-on-primary-fixed shadow-md hover:brightness-110 active:scale-95 transition-all inline-flex items-center gap-1.5"
 					>
+						<span class="material-symbols-outlined text-base">play_arrow</span>
 						Open player
 					</a>
 					<a
 						href={`/workflows/${data.workflow.id}/edit`}
-						class="rounded-md border border-outline-variant/20 px-4 py-2 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+						class="rounded-xl border border-outline-variant/20 bg-surface-container-high px-4 py-2 text-xs sm:text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-highest"
 					>
 						Edit routine
 					</a>
@@ -184,30 +188,30 @@
 			{/if}
 
 			{#if data.analytics}
-				<div class="mb-8 grid gap-4 md:grid-cols-5">
-					<div class="rounded-xl border border-white/5 bg-surface-container p-5">
+				<div class="mb-8 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 sm:gap-4">
+					<div class="rounded-xl border border-white/5 bg-surface-container p-3.5 sm:p-5">
 						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Completed</p>
-						<p class="mt-2 text-3xl font-bold text-on-surface">{data.analytics.completed_sessions}</p>
+						<p class="mt-1.5 text-2xl sm:text-3xl font-bold text-on-surface">{data.analytics.completed_sessions}</p>
 					</div>
-					<div class="rounded-xl border border-white/5 bg-surface-container p-5">
+					<div class="rounded-xl border border-white/5 bg-surface-container p-3.5 sm:p-5">
 						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Abandoned</p>
-						<p class="mt-2 text-3xl font-bold text-on-surface">{data.analytics.abandoned_sessions}</p>
+						<p class="mt-1.5 text-2xl sm:text-3xl font-bold text-on-surface">{data.analytics.abandoned_sessions}</p>
 					</div>
-					<div class="rounded-xl border border-white/5 bg-surface-container p-5">
+					<div class="rounded-xl border border-white/5 bg-surface-container p-3.5 sm:p-5">
 						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Logged sets</p>
-						<p class="mt-2 text-3xl font-bold text-on-surface">{data.analytics.total_logged_sets}</p>
+						<p class="mt-1.5 text-2xl sm:text-3xl font-bold text-on-surface">{data.analytics.total_logged_sets}</p>
 					</div>
-					<div class="rounded-xl border border-white/5 bg-surface-container p-5">
+					<div class="rounded-xl border border-white/5 bg-surface-container p-3.5 sm:p-5">
 						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Volume</p>
-						<p class="mt-2 text-3xl font-bold text-on-surface">{data.analytics.total_volume.toFixed(1)}</p>
+						<p class="mt-1.5 text-2xl sm:text-3xl font-bold text-on-surface">{data.analytics.total_volume.toFixed(1)}</p>
 					</div>
-					<div class="rounded-xl border border-white/5 bg-surface-container p-5">
+					<div class="col-span-2 sm:col-span-1 rounded-xl border border-white/5 bg-surface-container p-3.5 sm:p-5">
 						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Avg RPE / RIR</p>
-						<p class="mt-2 text-xl font-bold text-on-surface">
+						<p class="mt-1.5 text-xl sm:text-2xl font-bold text-on-surface">
 							{data.analytics.average_rpe?.toFixed(1) ?? '-'} / {data.analytics.average_rir?.toFixed(1) ?? '-'}
 						</p>
 						{#if data.analytics.last_completed_at}
-							<p class="mt-2 text-xs text-on-surface-variant">{formatDate(data.analytics.last_completed_at)}</p>
+							<p class="mt-1 text-[11px] text-on-surface-variant">{formatDate(data.analytics.last_completed_at)}</p>
 						{/if}
 					</div>
 				</div>

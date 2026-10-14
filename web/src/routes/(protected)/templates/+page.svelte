@@ -113,7 +113,7 @@
 									{metadataValue(template.metadata, 'level')}
 								</span>
 							{/if}
-							<span class="rounded-full bg-[#26233a] px-3 py-1 text-xs font-medium text-[#c4a7e7]">
+							<span class="rounded-full bg-secondary-container/40 text-secondary border border-secondary/20 px-3 py-1 text-xs font-medium">
 								{template.blocks?.length ?? 0} blocks
 							</span>
 						</div>

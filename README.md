@@ -104,6 +104,12 @@ graph TD
 * **ACWR Fatigue & Injury Prevention**: Calculates Acute:Chronic Workload Ratios via coupled rolling windows and EWMA models to detect non-functional overreaching and optimal training sweet-spots (0.8–1.3).
 * **Autoregulation Engine**: Shared core package (`packages/repengine_core`) and Python FastAPI engine evaluating chronological workout sessions to recommend progressive overload (+increment), load maintenance, or periodization cycle resets (-15%).
 
+### 📱 9. Mobile-First Responsive Web Studio & Preview Hub
+* **Fluid Routine Previewing**: The Template Preview screen (`/templates/[id]`) and Studio preview tabs feature responsive 2x2 metadata metrics grids and nested block hierarchies, eliminating awkward horizontal scrolling and excessive vertical spacing on mobile screens.
+* **Thumb-Calibrated Steppers**: The workout load override screen (`/play`) features auto-scaling stepper controls (`-5`, `-2.5`, `+2.5`, `+5`) that fit seamlessly into compact mobile viewports (320px–430px) alongside single-tap gym controls.
+* **Crystal-Clear Auth Modes**: Distinct, dedicated Sign In (`/login`) and Register (`/register`) experiences with segmented navigation, explicit mode headers, and accessible password helpers.
+* **High-Contrast Theming & Autofill Resilience**: Atelier Kanagawa palette optimized with standardized `.btn-primary-gradient` tokens, dark/light contrast integrity, and styled `-webkit-autofill` states preventing browser text-color clashes.
+
 ---
 
 ## 🛠️ Tech Stack
@@ -182,6 +188,12 @@ dart test
 ```bash
 cd mobile
 flutter test
+```
+
+### Frontend Unit Tests (Node native runner)
+```bash
+cd web
+npm test
 ```
 
 ### Frontend Syntax & Type Checks (SvelteKit)

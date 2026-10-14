@@ -2,96 +2,114 @@
 	import { enhance } from '$app/forms';
 
 	let { form } = $props();
-
-	let isLogin = $state(false);
 </script>
 
 <svelte:head>
-	<title>RepEngine - Register</title>
+	<title>Register - RepEngine</title>
 </svelte:head>
 
-<div class="absolute top-0 right-0 w-full h-full overflow-hidden pointer-events-none z-0">
-	<div class="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] rounded-full bg-primary-container opacity-5 blur-[120px]"></div>
-</div>
-
-<main class="relative z-10 w-full max-w-md px-4 sm:px-0">
-	<div class="bg-surface-container-high/80 backdrop-blur-md rounded-xl p-8 shadow-[0_32px_64px_rgba(14,13,25,0.08)] ring-1 ring-outline-variant/20">
-		<!-- Logo / Brand -->
-		<div class="text-center mb-8">
-			<h1 class="font-headline text-3xl font-bold text-on-surface tracking-tight">
-				RepEngine <span class="text-primary-container">V2</span>
-			</h1>
-			<p class="text-on-surface-variant text-sm mt-2 font-label tracking-wide">THE KINETIC ATELIER</p>
-		</div>
-
-		<!-- Tabs -->
-		<div class="flex mb-8 border-b border-outline-variant/20">
-			<button
-				type="button"
-				class="flex-1 pb-3 text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors"
-				onclick={() => (isLogin = true)}
-			>
-				Login
-			</button>
-			<button
-				type="button"
-				class="flex-1 pb-3 text-sm font-medium text-primary-container border-b-2 border-primary-container relative"
-			>
-				Register
-			</button>
-		</div>
-
-		<!-- Form -->
-		<form method="POST" action="?/register" class="space-y-6" use:enhance>
-			<!-- Email Input -->
-			<div>
-				<label class="block text-xs font-label text-on-surface-variant uppercase tracking-widest mb-2" for="email">Email Address</label>
-				<div class="relative">
-					<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">mail</span>
-					<input
-						class="w-full bg-surface-container-highest border-0 ring-1 ring-outline-variant/20 rounded-lg py-3 pl-12 pr-4 text-on-surface placeholder-on-surface-variant/50 focus:ring-2 focus:ring-primary-container focus:outline-none transition-all"
-						id="email"
-						name="email"
-						type="email"
-						placeholder="name@atelier.com"
-						required
-					/>
-				</div>
-			</div>
-
-			<!-- Password Input -->
-			<div>
-				<label class="block text-xs font-label text-on-surface-variant uppercase tracking-widest mb-2" for="password">Password</label>
-				<div class="relative">
-					<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">lock</span>
-					<input
-						class="w-full bg-surface-container-highest border-0 ring-1 ring-outline-variant/20 rounded-lg py-3 pl-12 pr-4 text-on-surface placeholder-on-surface-variant/50 focus:ring-2 focus:ring-primary-container focus:outline-none transition-all"
-						id="password"
-						name="password"
-						type="password"
-						placeholder="••••••••"
-						required
-					/>
-				</div>
-			</div>
-
-			{#if form?.message}
-				<p class="text-error text-sm text-center">{form.message}</p>
-			{/if}
-
-			<!-- Primary Button -->
-			<button
-				class="w-full bg-primary-container text-on-primary-fixed font-headline font-semibold py-3 rounded-full hover:bg-primary transition-colors mt-8 shadow-lg shadow-primary-container/20 flex justify-center items-center gap-2"
-				type="submit"
-			>
-				Create Account
-				<span class="material-symbols-outlined text-[20px]">arrow_forward</span>
-			</button>
-		</form>
-
-		<!-- Footer -->
-		<div class="mt-8 text-center text-sm text-on-surface-variant">
-			<p>Already have an account? <a class="text-primary-container hover:text-primary transition-colors font-medium" href="/login">Login here</a></p>
-		</div>
+<div class="min-h-screen bg-background flex items-center justify-center relative overflow-hidden px-4 py-8 sm:px-0">
+	<!-- Background Ambient Glow -->
+	<div class="absolute top-0 right-0 w-full h-full overflow-hidden pointer-events-none z-0">
+		<div class="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] rounded-full bg-primary-container opacity-5 blur-[120px]"></div>
 	</div>
-</main>
+
+	<!-- Register Card -->
+	<main class="relative z-10 w-full max-w-md">
+		<div class="bg-surface-container-high/90 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-[0_32px_64px_rgba(14,13,25,0.12)] ring-1 ring-outline-variant/20">
+			<!-- Logo / Brand Header -->
+			<div class="text-center mb-6">
+				<h1 class="font-headline text-3xl font-bold text-on-surface tracking-tight">
+					RepEngine <span class="text-primary font-black">V2</span>
+				</h1>
+				<p class="text-on-surface-variant text-xs mt-1.5 font-label tracking-widest uppercase">The Kinetic Routine Studio</p>
+			</div>
+
+			<!-- Mode Switcher Tabs (Distinct Navigation) -->
+			<div class="flex p-1 mb-6 rounded-xl bg-surface-container-lowest/80 border border-outline-variant/15 text-center text-xs sm:text-sm font-semibold">
+				<a
+					href="/login"
+					class="flex-1 py-2 rounded-lg text-on-surface-variant hover:text-on-surface transition-colors"
+				>
+					Sign In
+				</a>
+				<div class="flex-1 py-2 rounded-lg bg-surface-container-highest text-on-surface shadow-sm border border-outline-variant/20">
+					Register
+				</div>
+			</div>
+
+			<div class="mb-5">
+				<h2 class="text-lg font-bold text-on-surface">Create an account</h2>
+				<p class="text-xs text-on-surface-variant mt-0.5">Start organizing routines, tracking progression, and syncing offline.</p>
+			</div>
+
+			<!-- Registration Form -->
+			<form method="POST" action="?/register" class="space-y-4" use:enhance>
+				<!-- Email Input -->
+				<div>
+					<label class="block text-xs font-label text-on-surface-variant uppercase tracking-widest mb-1.5" for="email">
+						Email Address
+					</label>
+					<div class="relative">
+						<span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">mail</span>
+						<input
+							class="w-full bg-surface-container-highest border border-outline-variant/20 rounded-xl py-3 pl-11 pr-4 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+							id="email"
+							name="email"
+							type="email"
+							autocomplete="email"
+							placeholder="athlete@repengine.app"
+							required
+						/>
+					</div>
+				</div>
+
+				<!-- Password Input -->
+				<div>
+					<label class="block text-xs font-label text-on-surface-variant uppercase tracking-widest mb-1.5" for="password">
+						Password
+					</label>
+					<div class="relative">
+						<span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">lock</span>
+						<input
+							class="w-full bg-surface-container-highest border border-outline-variant/20 rounded-xl py-3 pl-11 pr-4 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+							id="password"
+							name="password"
+							type="password"
+							autocomplete="new-password"
+							placeholder="••••••••"
+							minlength="8"
+							required
+						/>
+					</div>
+					<p class="text-[11px] text-on-surface-variant/70 mt-1">Must be at least 8 characters.</p>
+				</div>
+
+				{#if form?.message}
+					<div class="rounded-xl border border-error/30 bg-error/10 p-3 text-center text-xs text-error font-medium">
+						{form.message}
+					</div>
+				{/if}
+
+				<!-- Primary Register Button -->
+				<button
+					class="btn-primary-gradient w-full font-headline font-bold text-sm py-3.5 px-6 rounded-xl shadow-lg shadow-primary/20 hover:brightness-110 active:scale-[0.98] transition-all flex justify-center items-center gap-2 cursor-pointer mt-6"
+					type="submit"
+				>
+					<span class="material-symbols-outlined text-[20px]">person_add</span>
+					Create Your Account
+				</button>
+			</form>
+
+			<!-- Switch to Login Link -->
+			<div class="mt-6 pt-5 border-t border-outline-variant/15 text-center text-xs text-on-surface-variant">
+				<p>
+					Already have an account?
+					<a class="text-primary font-bold hover:underline ml-1" href="/login">
+						Sign in here
+					</a>
+				</p>
+			</div>
+		</div>
+	</main>
+</div>

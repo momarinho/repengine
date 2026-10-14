@@ -70,6 +70,34 @@ body {
   color: var(--color-on-background);
 }
 
+input, select, textarea, button {
+  color: inherit;
+}
+
+select option {
+  background-color: var(--color-surface-container-high);
+  color: var(--color-on-surface);
+}
+
+::placeholder {
+  color: var(--color-on-surface-variant);
+  opacity: 0.6;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-on-surface);
+  -webkit-box-shadow: 0 0 0px 1000px var(--color-surface-container-highest) inset;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
 html:not(.dark) {
   --color-background: #fcfbfe;
   --color-on-background: #1c1a27;
@@ -125,5 +153,15 @@ html:not(.dark) {
 html:not(.dark) .glass-panel {
   background-color: rgba(243, 239, 250, 0.6);
   border-color: rgba(0, 0, 0, 0.05);
+}
+
+.btn-primary-gradient {
+  background: linear-gradient(135deg, #ffb1c3, #eb6f92);
+  color: #3f0019;
+}
+
+html:not(.dark) .btn-primary-gradient {
+  background: linear-gradient(135deg, #eb6f92, #d15177);
+  color: #ffffff;
 }
 

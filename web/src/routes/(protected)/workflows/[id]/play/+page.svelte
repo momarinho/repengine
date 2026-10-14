@@ -2617,51 +2617,52 @@
 			</div>
 		</div>
 	{:else if isPreviewingLoads}
-		<div class="min-h-screen px-6 py-10 bg-background text-on-background">
+		<div class="min-h-screen px-4 sm:px-6 py-6 sm:py-10 bg-background text-on-background">
 			<div class="mx-auto max-w-3xl">
-				<div class="mb-8">
+				<div class="mb-6 sm:mb-8">
 					<button
 						type="button"
-						class="text-xs font-bold uppercase tracking-[0.2em] text-tertiary hover:underline bg-transparent border-0 cursor-pointer"
+						class="text-xs font-bold uppercase tracking-[0.2em] text-tertiary hover:underline bg-transparent border-0 cursor-pointer inline-flex items-center gap-1"
 						onclick={() => {
 							isPreviewingLoads = false;
 							isChoosingSection = true;
 						}}
 					>
-						← Back to sections
+						<span class="material-symbols-outlined text-sm">arrow_back</span>
+						Back to sections
 					</button>
-					<div class="mt-3 flex items-center gap-2">
+					<div class="mt-2.5 flex items-center gap-2">
 						{#if previewSection}
 							<span class="rounded bg-surface-container-high px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-tertiary">
 								{previewSection.kind} · {previewSection.title}
 							</span>
 						{/if}
 					</div>
-					<h1 class="mt-2 text-3xl font-bold tracking-tight text-on-background">Adjust Load Overrides</h1>
-					<p class="mt-2 text-sm text-on-surface-variant">
+					<h1 class="mt-1.5 text-2xl sm:text-3xl font-bold tracking-tight text-on-background">Adjust Load Overrides</h1>
+					<p class="mt-1.5 text-xs sm:text-sm text-on-surface-variant">
 						Customize starting loads for weighted progression exercises. Remaining exercises (supersets, bodyweight, timed intervals) will execute as scheduled.
 					</p>
 				</div>
 
-				<div class="space-y-6">
+				<div class="space-y-4 sm:space-y-6">
 					{#each previewBlocks as block}
 						{@const prevLogs = getLastSessionLogs(block)}
 						{@const suggested = getResolvedPrescribedLoad(block)}
-						<div class="rounded-2xl border border-white/5 bg-surface-container p-6 shadow-md">
-							<div class="flex flex-wrap items-start justify-between gap-4">
-								<div>
+						<div class="rounded-2xl border border-white/5 bg-surface-container p-4 sm:p-6 shadow-md">
+							<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+								<div class="min-w-0">
 									<p class="text-[10px] font-bold uppercase tracking-wider text-secondary">{block.node_type_slug.replaceAll('_', ' ')}</p>
-									<h3 class="mt-1 text-xl font-bold text-on-surface">{block.title}</h3>
-									<p class="mt-1 text-xs text-on-surface-variant">
-										Prescribed: {getResolvedPrescribedSets(block)}x{getResolvedPrescribedReps(block)}
+									<h3 class="mt-0.5 text-lg sm:text-xl font-bold text-on-surface truncate">{block.title}</h3>
+									<p class="mt-0.5 text-xs text-on-surface-variant">
+										Prescribed: {getResolvedPrescribedSets(block)} × {getResolvedPrescribedReps(block)}
 									</p>
 								</div>
 								
 								<div class="w-full sm:w-auto">
-									<div class="flex items-center gap-2">
+									<div class="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
 										<button
 											type="button"
-											class="flex h-10 w-12 items-center justify-center rounded-lg bg-surface-container-high text-sm font-bold text-on-surface hover:bg-surface-container-highest cursor-pointer border-0"
+											class="flex-1 sm:w-11 h-10 flex items-center justify-center rounded-lg bg-surface-container-high text-xs sm:text-sm font-bold text-on-surface hover:bg-surface-container-highest active:scale-95 cursor-pointer border-0"
 											onclick={() => {
 												overrideLoads = {
 													...overrideLoads,
@@ -2673,7 +2674,7 @@
 										</button>
 										<button
 											type="button"
-											class="flex h-10 w-12 items-center justify-center rounded-lg bg-surface-container-high text-sm font-bold text-on-surface hover:bg-surface-container-highest cursor-pointer border-0"
+											class="flex-1 sm:w-11 h-10 flex items-center justify-center rounded-lg bg-surface-container-high text-xs sm:text-sm font-bold text-on-surface hover:bg-surface-container-highest active:scale-95 cursor-pointer border-0"
 											onclick={() => {
 												overrideLoads = {
 													...overrideLoads,
@@ -2689,7 +2690,7 @@
 											inputmode="decimal"
 											autocomplete="off"
 											enterkeyhint="done"
-											class="h-10 w-28 rounded-lg border border-white/10 bg-surface-container-lowest text-center text-sm font-bold text-on-surface focus:ring-1 focus:ring-primary/50 outline-none"
+											class="h-10 w-20 sm:w-28 rounded-lg border border-white/10 bg-surface-container-lowest text-center text-xs sm:text-sm font-bold text-on-surface focus:ring-1 focus:ring-primary/50 outline-none"
 											value={overrideLoads[block.id] ?? ''}
 											oninput={(event) => {
 												overrideLoads = {
@@ -2701,7 +2702,7 @@
 
 										<button
 											type="button"
-											class="flex h-10 w-12 items-center justify-center rounded-lg bg-surface-container-high text-sm font-bold text-on-surface hover:bg-surface-container-highest cursor-pointer border-0"
+											class="flex-1 sm:w-11 h-10 flex items-center justify-center rounded-lg bg-surface-container-high text-xs sm:text-sm font-bold text-on-surface hover:bg-surface-container-highest active:scale-95 cursor-pointer border-0"
 											onclick={() => {
 												overrideLoads = {
 													...overrideLoads,
@@ -2713,7 +2714,7 @@
 										</button>
 										<button
 											type="button"
-											class="flex h-10 w-12 items-center justify-center rounded-lg bg-surface-container-high text-sm font-bold text-on-surface hover:bg-surface-container-highest cursor-pointer border-0"
+											class="flex-1 sm:w-11 h-10 flex items-center justify-center rounded-lg bg-surface-container-high text-xs sm:text-sm font-bold text-on-surface hover:bg-surface-container-highest active:scale-95 cursor-pointer border-0"
 											onclick={() => {
 												overrideLoads = {
 													...overrideLoads,
@@ -2759,13 +2760,14 @@
 				<div class="mt-8 flex justify-end">
 					<button
 						type="button"
-						class="rounded-xl bg-primary px-8 py-4 text-base font-bold text-on-primary shadow-lg transition-transform hover:scale-[1.02] focus:outline-none disabled:opacity-50 cursor-pointer border-0"
+						class="btn-primary-gradient w-full sm:w-auto rounded-xl px-8 py-3.5 text-sm sm:text-base font-bold text-on-primary-fixed shadow-lg hover:brightness-110 active:scale-[0.98] transition-all focus:outline-none disabled:opacity-50 cursor-pointer border-0 flex items-center justify-center gap-2"
 						onclick={() => {
 							isPreviewingLoads = false;
 							void startSection(previewSection);
 						}}
 						disabled={isSyncingSession}
 					>
+						<span class="material-symbols-outlined text-xl">play_arrow</span>
 						{isSyncingSession ? 'Starting Session...' : 'Confirm & Start Workout'}
 					</button>
 				</div>

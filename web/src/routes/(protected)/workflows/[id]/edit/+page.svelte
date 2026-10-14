@@ -653,21 +653,21 @@
 {:else}
 	<div class="min-h-screen bg-background text-on-surface">
 		<header class="sticky top-0 z-30 border-b border-outline-variant/15 bg-background/92 backdrop-blur">
-			<div class="mx-auto flex max-w-[1600px] items-center justify-between gap-6 px-6 py-4">
+			<div class="mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4 max-w-[1600px]">
 				<div class="min-w-0 flex-1">
-					<div class="flex items-center gap-3">
-						<a href="/dashboard" class="flex h-10 w-10 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface">
+					<div class="flex items-center gap-2.5 sm:gap-3">
+						<a href="/dashboard" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-container text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface">
 							<span class="material-symbols-outlined">arrow_back</span>
 						</a>
-						<div class="min-w-0">
+						<div class="min-w-0 flex-1">
 							<input
-								class="w-full min-w-0 border-0 bg-transparent px-0 text-2xl font-semibold text-on-surface outline-none"
+								class="w-full min-w-0 border-0 bg-transparent px-0 text-xl sm:text-2xl font-semibold text-on-surface outline-none"
 								bind:value={title}
 								placeholder="Untitled Routine"
 								onfocus={() => recordHistory()}
 							/>
 							<input
-								class="mt-1 w-full min-w-0 border-0 bg-transparent px-0 text-sm text-on-surface-variant outline-none"
+								class="mt-0.5 w-full min-w-0 border-0 bg-transparent px-0 text-xs sm:text-sm text-on-surface-variant outline-none"
 								bind:value={description}
 								placeholder="Add a routine description"
 								onfocus={() => recordHistory()}
@@ -676,75 +676,75 @@
 					</div>
 				</div>
 
-				<div class="flex items-center gap-3">
+				<div class="flex flex-wrap items-center gap-2 sm:gap-3">
 					<a
 						href={`/workflows/${workflow!.id}/play`}
-						class="inline-flex h-11 items-center gap-2 rounded-md border border-outline-variant/20 bg-surface-container-low px-4 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
+						class="btn-primary-gradient inline-flex h-10 sm:h-11 items-center gap-1.5 sm:gap-2 rounded-xl px-3.5 sm:px-4 text-xs sm:text-sm font-bold text-on-primary-fixed shadow-md hover:brightness-110 active:scale-95 transition-all"
 					>
-						<span class="material-symbols-outlined text-base">play_circle</span>
+						<span class="material-symbols-outlined text-base sm:text-lg">play_circle</span>
 						Play
 					</a>
 					<button
 						type="button"
 						onclick={() => (showQrModal = true)}
-						class="inline-flex h-11 items-center gap-2 rounded-md border border-outline-variant/20 bg-surface-container-low px-3.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
+						class="inline-flex h-10 sm:h-11 items-center gap-1.5 rounded-xl border border-outline-variant/20 bg-surface-container-low px-3 sm:px-3.5 text-xs sm:text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
 						title="Open on Mobile via QR code"
 					>
 						<span class="material-symbols-outlined text-base">qr_code_2</span>
-						<span class="hidden xl:inline">Mobile QR</span>
+						<span class="hidden sm:inline">QR</span>
 					</button>
 					<button
 						type="button"
 						onclick={() => { jsonModalInitialTab = 'export'; showJsonModal = true; }}
-						class="inline-flex h-11 items-center gap-2 rounded-md border border-outline-variant/20 bg-surface-container-low px-3.5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
+						class="inline-flex h-10 sm:h-11 items-center gap-1.5 rounded-xl border border-outline-variant/20 bg-surface-container-low px-3 sm:px-3.5 text-xs sm:text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
 						title="Export or Import Routine as JSON"
 					>
 						<span class="material-symbols-outlined text-base">data_object</span>
-						<span class="hidden xl:inline">JSON</span>
+						<span class="hidden sm:inline">JSON</span>
 					</button>
-					<div class="inline-flex h-11 items-center rounded-md border border-outline-variant/20 bg-surface-container-low p-1">
+					<div class="inline-flex h-10 sm:h-11 items-center rounded-xl border border-outline-variant/20 bg-surface-container-low p-1">
 						<button
 							type="button"
-							class="flex h-9 w-9 items-center justify-center rounded text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface disabled:opacity-40"
+							class="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface disabled:opacity-40"
 							onclick={undo}
 							disabled={undoStack.length === 0}
 							title="Undo (Ctrl+Z)"
 						>
-							<span class="material-symbols-outlined text-[20px]">undo</span>
+							<span class="material-symbols-outlined text-[18px] sm:text-[20px]">undo</span>
 						</button>
 						<button
 							type="button"
-							class="flex h-9 w-9 items-center justify-center rounded text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface disabled:opacity-40"
+							class="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface disabled:opacity-40"
 							onclick={redo}
 							disabled={redoStack.length === 0}
 							title="Redo (Ctrl+Y)"
 						>
-							<span class="material-symbols-outlined text-[20px]">redo</span>
+							<span class="material-symbols-outlined text-[18px] sm:text-[20px]">redo</span>
 						</button>
 					</div>
-					<div class={`rounded-md border border-outline-variant/20 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] ${statusTone(saveState)}`}>
+					<div class={`rounded-xl border border-outline-variant/20 px-2.5 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs font-semibold uppercase tracking-[0.16em] ${statusTone(saveState)}`}>
 						{saveState === 'idle' ? 'Ready' : saveState}
 					</div>
 					<button
 						type="button"
-						class="inline-flex h-11 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-on-primary-fixed transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+						class="inline-flex h-10 sm:h-11 items-center gap-1.5 sm:gap-2 rounded-xl bg-primary px-3 sm:px-4 text-xs sm:text-sm font-bold text-on-primary-fixed transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
 						onclick={() => persist('manual', true)}
 						disabled={saveInFlight}
 					>
 						<span class="material-symbols-outlined text-base">save</span>
-						Save Routine
+						<span>Save</span>
 					</button>
 				</div>
 			</div>
 
-			<div class="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-6 pb-4">
-				<div class="inline-flex rounded-md border border-outline-variant/20 bg-surface-container-low p-1">
+			<div class="mx-auto flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 pb-3 sm:pb-4 max-w-[1600px]">
+				<div class="inline-flex w-full sm:w-auto rounded-xl border border-outline-variant/20 bg-surface-container-low p-1">
 					{#each ['editor', 'preview', 'history'] as tab}
 						<button
 							type="button"
-							class={`rounded-md px-4 py-2 text-sm font-semibold capitalize transition-colors ${
+							class={`flex-1 sm:flex-initial rounded-lg px-3.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold capitalize transition-colors text-center ${
 								activeTab === tab
-									? 'bg-surface-container-high text-on-surface'
+									? 'bg-surface-container-high text-on-surface shadow-sm'
 									: 'text-on-surface-variant hover:text-on-surface'
 							}`}
 							onclick={() => (activeTab = tab as typeof activeTab)}
@@ -754,9 +754,9 @@
 					{/each}
 				</div>
 
-				<label class="flex items-center gap-3 rounded-md border border-outline-variant/20 bg-surface-container-low px-3 py-2 text-sm text-on-surface-variant">
+				<label class="flex items-center gap-2 rounded-xl border border-outline-variant/20 bg-surface-container-low px-3 py-1.5 text-xs text-on-surface-variant cursor-pointer">
 					<input type="checkbox" bind:checked={isPublic} class="rounded border-outline-variant/50 bg-surface-container-high" />
-					Public routine
+					<span>Public routine</span>
 				</label>
 			</div>
 		</header>
@@ -1105,43 +1105,65 @@
 						</div>
 					{/if}
 				{:else if activeTab === 'preview'}
-					<div class="space-y-3">
-						<div class="rounded-md border border-outline-variant/20 bg-surface-container-low px-4 py-3">
-							<p class="text-sm font-semibold text-on-surface">Preview</p>
-							<p class="text-xs text-on-surface-variant">Read-only outline of the routine in its current local state.</p>
+					<div class="space-y-3 sm:space-y-4">
+						<div class="rounded-xl border border-outline-variant/20 bg-surface-container-low px-4 py-3">
+							<p class="text-sm font-semibold text-on-surface">Preview Routine</p>
+							<p class="text-xs text-on-surface-variant">Read-only overview of your routine sequence as structured on the canvas.</p>
 						</div>
-						{#each blockGroups as group (group.id)}
-							<div class="rounded-md border border-outline-variant/20 bg-surface-container-low p-3">
-								<div class="flex items-center justify-between gap-4 px-1 py-2">
-									<div>
-										<p class="text-sm font-semibold text-on-surface">{group.title}</p>
-										<p class="text-xs text-on-surface-variant">{group.subtitle || `${group.blocks.length} blocks`}</p>
-									</div>
-									<button
-										type="button"
-										class="flex h-9 w-9 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
-										aria-label={isSectionCollapsed(group) ? 'Expand section' : 'Collapse section'}
-										onclick={() => toggleSection(group)}
-									>
-										<span class="material-symbols-outlined">{isSectionCollapsed(group) ? 'unfold_more' : 'unfold_less'}</span>
-									</button>
-								</div>
-								{#if !isSectionCollapsed(group)}
-									<div class="mt-3 space-y-3">
-										{#each group.blocks as block (block.client_id)}
-											{@const index = blocks.findIndex((candidate) => candidate.client_id === block.client_id)}
-											<div class="rounded-md border border-outline-variant/20 bg-surface-container p-4">
-												<div class="mb-2 flex items-center gap-3 text-xs uppercase tracking-[0.18em] text-on-surface-variant">
-													<span>{index + 1}</span>
-													<span>{nodeTypeMap.get(block.node_type_slug)?.name ?? blockLabel(block.node_type_slug)}</span>
-												</div>
-												<BlockRenderer block={block} nodeType={nodeTypeMap.get(block.node_type_slug)} />
-											</div>
-										{/each}
-									</div>
-								{/if}
+
+						{#if blocks.length === 0}
+							<div class="rounded-xl border border-dashed border-outline-variant/30 bg-surface-container-low px-6 py-12 text-center">
+								<p class="text-sm font-semibold text-on-surface">No blocks to preview</p>
+								<p class="mt-1 text-xs text-on-surface-variant">Switch to the Editor tab to add exercises, sections, or progression blocks.</p>
+								<button
+									type="button"
+									class="mt-4 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-on-primary-fixed shadow-sm hover:opacity-90"
+									onclick={() => (activeTab = 'editor')}
+								>
+									Open Editor
+								</button>
 							</div>
-						{/each}
+						{:else}
+							{#each blockGroups as group (group.id)}
+								<div class="rounded-xl border border-outline-variant/20 bg-surface-container-low p-3 sm:p-4">
+									<div class="flex items-center justify-between gap-3 px-1 py-1">
+										<div class="min-w-0">
+											<div class="flex flex-wrap items-center gap-2">
+												<p class="text-sm sm:text-base font-bold text-on-surface">{group.title}</p>
+												<span class="rounded bg-surface-container-high px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-tertiary">{group.kind}</span>
+											</div>
+											<p class="mt-0.5 text-xs text-on-surface-variant truncate">{group.subtitle || `${group.blocks.length} blocks`}</p>
+										</div>
+										<button
+											type="button"
+											class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-container text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+											aria-label={isSectionCollapsed(group) ? 'Expand section' : 'Collapse section'}
+											onclick={() => toggleSection(group)}
+										>
+											<span class="material-symbols-outlined text-base">{isSectionCollapsed(group) ? 'unfold_more' : 'unfold_less'}</span>
+										</button>
+									</div>
+									{#if !isSectionCollapsed(group)}
+										<div class="mt-3 space-y-2.5 sm:space-y-3 border-l-2 border-outline-variant/30 pl-2 sm:pl-3">
+											{#each group.blocks as block (block.client_id)}
+												{@const index = blocks.findIndex((candidate) => candidate.client_id === block.client_id)}
+												<div class="rounded-xl border border-white/5 bg-surface-container p-3 sm:p-4">
+													<div class="mb-2 flex items-center gap-2.5 text-xs uppercase tracking-[0.16em] text-on-surface-variant">
+														<span class="font-bold text-primary">#{index + 1}</span>
+														<span>{nodeTypeMap.get(block.node_type_slug)?.name ?? blockLabel(block.node_type_slug)}</span>
+													</div>
+													<BlockRenderer block={block} nodeType={nodeTypeMap.get(block.node_type_slug)} />
+												</div>
+											{/each}
+										</div>
+									{:else}
+										<div class="mt-2.5 rounded-lg border border-dashed border-outline-variant/20 px-3 py-2 text-xs text-on-surface-variant">
+											{group.blocks.length} blocks hidden in this section.
+										</div>
+									{/if}
+								</div>
+							{/each}
+						{/if}
 					</div>
 				{:else}
 					<div class="space-y-3">

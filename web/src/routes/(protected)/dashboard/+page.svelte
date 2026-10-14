@@ -194,7 +194,7 @@
 							</p>
 						{/if}
 						<div class="flex items-center gap-3 pt-1">
-							<span class="px-2.5 py-1 rounded-md bg-[#26233a] text-[#c4a7e7] font-label text-xs tracking-wider uppercase font-semibold">
+							<span class="px-2.5 py-1 rounded-md bg-secondary-container/40 text-secondary border border-secondary/20 font-label text-xs tracking-wider uppercase font-semibold">
 								{(mostRecentWorkflow.block_count ?? mostRecentWorkflow.blocks?.length) || 0} Blocks
 							</span>
 							<span class="text-xs text-on-surface-variant">
@@ -290,7 +290,7 @@
 							<p class="font-body text-sm text-on-surface-variant">{workflow.description || 'No description'}</p>
 						</a>
 						<div class="flex flex-wrap gap-2 mb-6">
-							<span class="px-2 py-1 rounded-md bg-[#26233a] text-[#c4a7e7] font-label text-xs tracking-wider uppercase">{(workflow.block_count ?? workflow.blocks?.length) || 0} Blocks</span>
+							<span class="px-2 py-1 rounded-md bg-secondary-container/40 text-secondary border border-secondary/20 font-label text-xs tracking-wider uppercase font-medium">{(workflow.block_count ?? workflow.blocks?.length) || 0} Blocks</span>
 						</div>
 						<div class="mb-5 flex flex-col gap-2.5">
 							<a
