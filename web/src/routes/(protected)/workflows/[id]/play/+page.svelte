@@ -75,6 +75,7 @@
 			advanceValue?: number;
 		} | null;
 		isIntraSetRestRunning: boolean;
+		currentSessionSetLogs?: WorkoutSetLog[];
 	};
 
 	export interface IntervalPhase {
@@ -137,6 +138,7 @@
 	let activeSection = $state<PlayerSection | null>(initialSection);
 	let isSessionComplete = $state(false);
 	let activityEntries = $state<SessionActivity[]>([]);
+	let currentSessionSetLogs = $state<WorkoutSetLog[]>([]);
 	let hasRestoredSession = $state(false);
 	let hasActiveSavedRun = $state(false);
 	let sessionHistory = $state<WorkoutSession[]>(initialData.sessionHistory ?? []);
@@ -434,6 +436,11 @@
 	const currentWaveWeek = $derived(currentBlock?.node_type_slug === 'wave' ? resolveWaveWeek(currentBlock) : null);
 	const currentWaveSet = $derived(currentWaveWeek ? currentWaveWeek.prescriptions[currentWaveSetIndex] : null);
 	const isRestingBetweenSets = $derived(Boolean(intraSetRest && currentBlock && intraSetRest.blockID === currentBlock.id));
+	const currentBlockCompletedLogs = $derived(
+		currentSessionSetLogs
+			.filter((entry) => entry.block_client_id === currentBlock?.id)
+			.sort((a, b) => a.set_index - b.set_index)
+	);
 	const primaryActionLabel = $derived(currentBlock ? getPrimaryActionLabel(currentBlock) : 'Continue');
 	const secondaryActionLabel = $derived(currentBlock ? getSecondaryActionLabel(currentBlock) : null);
 	const loggedSetCount = $derived(activityEntries.filter((entry) => entry.kind === 'set').length);
@@ -1083,7 +1090,7 @@
 
 	function getPrimaryActionLabel(block: PlayerBlock): string {
 		if (isRestingBetweenSets) {
-			return isIntraSetRestRunning ? 'Pause Rest' : 'Resume Rest';
+			return intraSetRest?.nextLabel ? `Start ${intraSetRest.nextLabel}` : 'Skip Rest';
 		}
 
 		switch (block.node_type_slug) {
@@ -1124,7 +1131,7 @@
 
 	function getSecondaryActionLabel(block: PlayerBlock): string | null {
 		if (isRestingBetweenSets) {
-			return 'Skip Rest';
+			return '+30s';
 		}
 
 		switch (block.node_type_slug) {
@@ -1192,6 +1199,9 @@
 		}
 
 		activePersistedSession = session;
+		if (Array.isArray(session.logs) && session.logs.length > 0) {
+			currentSessionSetLogs = session.logs;
+		}
 		activeSection = restoredSection ?? activeSection;
 	}
 
@@ -1267,6 +1277,7 @@
 		}
 
 		const setIndex = typeof payload.set_index === 'number' ? payload.set_index : 1;
+		let resultLog: WorkoutSetLog;
 
 		if (typeof navigator !== 'undefined' && !navigator.onLine) {
 			syncQueue = [
@@ -1282,7 +1293,7 @@
 				...activePersistedSession,
 				log_count: activePersistedSession.log_count + 1
 			};
-			return {
+			resultLog = {
 				id: -1,
 				session_id: activePersistedSession.id,
 				workflow_block_id: block.workflowBlockID,
@@ -1295,60 +1306,71 @@
 				actual_reps: String(payload.actual_reps ?? ''),
 				actual_load: String(payload.actual_load ?? ''),
 				actual_rpe: String(payload.actual_rpe ?? ''),
+				actual_rir: String(payload.actual_rir ?? ''),
 				completed: true,
+				notes: String(payload.notes ?? ''),
 				created_at: new Date().toISOString()
 			} as unknown as WorkoutSetLog;
-		}
-
-		try {
-			const response = await fetch(`/api/workout-sessions/${activePersistedSession.id}/logs`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(payload)
-			});
-			const log = await parseApiResponse<WorkoutSetLog>(response);
-			if (!response.ok || !log) {
-				throw new Error('Unable to save set log.');
-			}
-
-			activePersistedSession = {
-				...activePersistedSession,
-				log_count: activePersistedSession.log_count + 1
-			};
-
-			return log;
-		} catch (error: unknown) {
-			console.warn('Network request failed, enqueuing log entry offline:', error);
-			syncQueue = [
-				...syncQueue,
-				{
-					sessionID: activePersistedSession.id,
-					blockID: block.id,
-					setIndex,
-					payload
+		} else {
+			try {
+				const response = await fetch(`/api/workout-sessions/${activePersistedSession.id}/logs`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(payload)
+				});
+				const log = await parseApiResponse<WorkoutSetLog>(response);
+				if (!response.ok || !log) {
+					throw new Error('Unable to save set log.');
 				}
-			];
-			activePersistedSession = {
-				...activePersistedSession,
-				log_count: activePersistedSession.log_count + 1
-			};
-			return {
-				id: -1,
-				session_id: activePersistedSession.id,
-				workflow_block_id: block.workflowBlockID,
-				block_client_id: block.id,
-				set_index: setIndex,
-				prescribed_reps: String(payload.prescribed_reps ?? ''),
-				prescribed_load: String(payload.prescribed_load ?? ''),
-				prescribed_intensity: String(payload.prescribed_intensity ?? ''),
-				prescribed_rpe: String(payload.prescribed_rpe ?? ''),
-				actual_reps: String(payload.actual_reps ?? ''),
-				actual_load: String(payload.actual_load ?? ''),
-				actual_rpe: String(payload.actual_rpe ?? ''),
-				completed: true,
-				created_at: new Date().toISOString()
-			} as unknown as WorkoutSetLog;
+
+				activePersistedSession = {
+					...activePersistedSession,
+					log_count: activePersistedSession.log_count + 1
+				};
+
+				resultLog = log;
+			} catch (error: unknown) {
+				console.warn('Network request failed, enqueuing log entry offline:', error);
+				syncQueue = [
+					...syncQueue,
+					{
+						sessionID: activePersistedSession.id,
+						blockID: block.id,
+						setIndex,
+						payload
+					}
+				];
+				activePersistedSession = {
+					...activePersistedSession,
+					log_count: activePersistedSession.log_count + 1
+				};
+				resultLog = {
+					id: -1,
+					session_id: activePersistedSession.id,
+					workflow_block_id: block.workflowBlockID,
+					block_client_id: block.id,
+					set_index: setIndex,
+					prescribed_reps: String(payload.prescribed_reps ?? ''),
+					prescribed_load: String(payload.prescribed_load ?? ''),
+					prescribed_intensity: String(payload.prescribed_intensity ?? ''),
+					prescribed_rpe: String(payload.prescribed_rpe ?? ''),
+					actual_reps: String(payload.actual_reps ?? ''),
+					actual_load: String(payload.actual_load ?? ''),
+					actual_rpe: String(payload.actual_rpe ?? ''),
+					actual_rir: String(payload.actual_rir ?? ''),
+					completed: true,
+					notes: String(payload.notes ?? ''),
+					created_at: new Date().toISOString()
+				} as unknown as WorkoutSetLog;
+			}
 		}
+
+		currentSessionSetLogs = [
+			...currentSessionSetLogs.filter((l) => !(l.block_client_id === block.id && l.set_index === setIndex)),
+			resultLog
+		];
+
+		return resultLog;
 	}
 
 	async function completePersistedSession(): Promise<void> {
@@ -1446,6 +1468,7 @@
 		actualRPEByBlock = {};
 		actualRIRByBlock = {};
 		activityEntries = [];
+		currentSessionSetLogs = [];
 		overrideLoads = {};
 		sessionElapsedSeconds = 0;
 		isTimerRunning = false;
@@ -1737,7 +1760,7 @@
 		const block = currentBlock;
 
 		if (isRestingBetweenSets) {
-			isIntraSetRestRunning = !isIntraSetRestRunning;
+			clearIntraSetRest(true);
 			return;
 		}
 
@@ -1749,8 +1772,9 @@
 				const actual = readActualInputs(block.id);
 				isSyncingSession = true;
 				sessionError = null;
+				let loggedSet: WorkoutSetLog | null = null;
 				try {
-					await persistSetLog(
+					loggedSet = await persistSetLog(
 						block,
 						buildSetLogPayload(block, currentSet, '', '', actual)
 					);
@@ -1794,6 +1818,35 @@
 				if (currentSet >= targetSets) {
 					completeCurrentBlock(block, `${targetSets} sets logged`);
 					return;
+				}
+
+				// Auto-carry forward logged values to next set so user only taps 1 button
+				if (loggedSet) {
+					if (block.node_type_slug === 'superset') {
+						if (loggedSet.actual_reps) {
+							const parts = loggedSet.actual_reps.split('/');
+							if (parts[0]) actualRepsAByBlock = { ...actualRepsAByBlock, [block.id]: parts[0] };
+							if (parts[1]) actualRepsBByBlock = { ...actualRepsBByBlock, [block.id]: parts[1] };
+						}
+						if (loggedSet.actual_load) {
+							const parts = loggedSet.actual_load.split('/');
+							if (parts[0]) actualLoadAByBlock = { ...actualLoadAByBlock, [block.id]: parts[0] };
+							if (parts[1]) actualLoadBByBlock = { ...actualLoadBByBlock, [block.id]: parts[1] };
+						}
+					} else {
+						if (loggedSet.actual_reps) {
+							actualRepsByBlock = {
+								...actualRepsByBlock,
+								[block.id]: loggedSet.actual_reps
+							};
+						}
+						if (loggedSet.actual_load) {
+							actualLoadByBlock = {
+								...actualLoadByBlock,
+								[block.id]: loggedSet.actual_load
+							};
+						}
+					}
 				}
 
 				const nextSet = currentSet + 1;
@@ -1947,7 +2000,7 @@
 		const block = currentBlock;
 
 		if (isRestingBetweenSets) {
-			clearIntraSetRest(true);
+			addIntraSetRestSeconds(30);
 			return;
 		}
 
@@ -1984,6 +2037,31 @@
 		}
 	}
 
+	function adjustReps(currentVal: string, amount: number): string {
+		const trimmed = (currentVal || '').trim();
+		let baseNum = 0;
+		if (trimmed.includes('-')) {
+			const parts = trimmed.split('-');
+			baseNum = Number.parseInt(parts[1], 10) || Number.parseInt(parts[0], 10) || 0;
+		} else {
+			const match = trimmed.match(/^(\d+)/);
+			baseNum = match ? Number.parseInt(match[1], 10) : 0;
+		}
+		const newVal = Math.max(0, baseNum + amount);
+		return String(newVal);
+	}
+
+	function stepActiveBlockReps(amount: number): void {
+		if (!currentBlock) return;
+		const current =
+			actualRepsByBlock[currentBlock.id] ||
+			(currentBlockReps ? String(currentBlockReps) : '0');
+		actualRepsByBlock = {
+			...actualRepsByBlock,
+			[currentBlock.id]: adjustReps(current, amount)
+		};
+	}
+
 	function stepActiveBlockLoad(amount: number): void {
 		if (!currentBlock) return;
 		const current =
@@ -1992,6 +2070,54 @@
 			'0 kg';
 		actualLoadByBlock = {
 			...actualLoadByBlock,
+			[currentBlock.id]: adjustLoad(current, amount)
+		};
+	}
+
+	function stepActiveBlockRepsA(amount: number): void {
+		if (!currentBlock) return;
+		const current =
+			actualRepsAByBlock[currentBlock.id] ||
+			(currentBlock.data?.reps_a ? String(currentBlock.data.reps_a) : '0');
+		actualRepsAByBlock = {
+			...actualRepsAByBlock,
+			[currentBlock.id]: adjustReps(current, amount)
+		};
+	}
+
+	function stepActiveBlockRepsB(amount: number): void {
+		if (!currentBlock) return;
+		const current =
+			actualRepsBByBlock[currentBlock.id] ||
+			(currentBlock.data?.reps_b ? String(currentBlock.data.reps_b) : '0');
+		actualRepsBByBlock = {
+			...actualRepsBByBlock,
+			[currentBlock.id]: adjustReps(current, amount)
+		};
+	}
+
+	function stepActiveBlockLoadA(amount: number): void {
+		if (!currentBlock) return;
+		const current =
+			actualLoadAByBlock[currentBlock.id] ||
+			(currentBlock.data?.start_load_a !== null && currentBlock.data?.start_load_a !== undefined
+				? `${currentBlock.data.start_load_a} ${currentBlock.data.load_unit_a || 'kg'}`
+				: '0 kg');
+		actualLoadAByBlock = {
+			...actualLoadAByBlock,
+			[currentBlock.id]: adjustLoad(current, amount)
+		};
+	}
+
+	function stepActiveBlockLoadB(amount: number): void {
+		if (!currentBlock) return;
+		const current =
+			actualLoadBByBlock[currentBlock.id] ||
+			(currentBlock.data?.start_load_b !== null && currentBlock.data?.start_load_b !== undefined
+				? `${currentBlock.data.start_load_b} ${currentBlock.data.load_unit_b || 'kg'}`
+				: '0 kg');
+		actualLoadBByBlock = {
+			...actualLoadBByBlock,
 			[currentBlock.id]: adjustLoad(current, amount)
 		};
 	}
@@ -2134,6 +2260,7 @@
 						sessionElapsedSeconds = Math.max(savedState.sessionElapsedSeconds ?? 0, 0);
 						activeSection = initialSection;
 						activityEntries = (savedState.activityEntries ?? []).filter((entry) => blockIDs.has(entry.blockID));
+						currentSessionSetLogs = Array.isArray(savedState.currentSessionSetLogs) ? savedState.currentSessionSetLogs : [];
 						timerRemainingSeconds =
 							typeof savedState.timerRemainingSeconds === 'number'
 								? Math.max(savedState.timerRemainingSeconds, 0)
@@ -2262,6 +2389,7 @@
 				}
 			}
 			activityEntries = (savedState.activityEntries ?? []).filter((entry) => blockIDs.has(entry.blockID));
+			currentSessionSetLogs = Array.isArray(savedState.currentSessionSetLogs) ? savedState.currentSessionSetLogs : [];
 			timerRemainingSeconds =
 				typeof savedState.timerRemainingSeconds === 'number'
 					? Math.max(savedState.timerRemainingSeconds, 0)
@@ -2471,7 +2599,8 @@
 			intervalPhaseSecondsLeft,
 			intervalSoundEnabled,
 			intraSetRest,
-			isIntraSetRestRunning
+			isIntraSetRestRunning,
+			currentSessionSetLogs
 		};
 
 		localStorage.setItem(localSessionKey, JSON.stringify(state));
@@ -3051,6 +3180,18 @@
 				</div>
 				<button
 					type="button"
+					class={`flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg transition-colors cursor-pointer ${
+						intervalSoundEnabled ? 'text-primary bg-primary/10 hover:bg-primary/20' : 'text-on-surface-variant/50 hover:bg-surface-variant/40'
+					}`}
+					onclick={() => (intervalSoundEnabled = !intervalSoundEnabled)}
+					title={intervalSoundEnabled ? 'Sound cues ON' : 'Sound cues MUTED'}
+				>
+					<span class="material-symbols-outlined text-base sm:text-lg">
+						{intervalSoundEnabled ? 'volume_up' : 'volume_off'}
+					</span>
+				</button>
+				<button
+					type="button"
 					class="flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-2 sm:px-3 py-1 sm:py-1.5 text-xs font-bold text-primary hover:bg-primary/20 hover:border-primary/50 transition-all cursor-pointer"
 					onclick={() => (showFinishConfirmModal = true)}
 					title="Finish workout and record progress"
@@ -3328,91 +3469,165 @@
 							</div>
 						{/if}
 
-						<div class="grid gap-4 rounded-xl border border-white/5 bg-surface-container-low p-5 md:grid-cols-2">
-							<div>
-								<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Suggested rest</p>
-								<p class="mt-2 text-2xl font-bold text-on-surface">{formatClock(currentBlock.restSeconds ?? (currentBlock.node_type_slug === 'exercise' ? 90 : 120))}</p>
-							</div>
-							<div>
-								<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Set completion</p>
-								<div class="mt-3 flex gap-2">
-									{#each Array(currentBlockSets ?? 0) as _, index}
-										<div class={`h-2 flex-1 rounded-full ${index < currentExerciseSet - 1 ? 'bg-primary' : 'bg-surface-variant'}`}></div>
-									{/each}
+						{#if isRestingBetweenSets && intraSetRest}
+							<!-- High-Impact Mobile-Optimized Rest HUD Card -->
+							<div class="mb-5 rounded-2xl border-2 border-primary/40 bg-gradient-to-b from-primary/15 via-surface-container-high/90 to-surface-container-low p-5 sm:p-7 shadow-2xl backdrop-blur-xl relative overflow-hidden">
+								<div class="absolute -top-12 -right-12 h-44 w-44 rounded-full bg-primary/10 blur-3xl pointer-events-none"></div>
+
+								<div class="flex flex-col items-center text-center">
+									<div class="flex items-center gap-2 rounded-full bg-primary/20 border border-primary/30 px-3 py-1">
+										<span class={`flex h-2 w-2 rounded-full bg-primary ${intraSetRest.remainingSeconds <= 5 ? 'animate-ping' : ''}`}></span>
+										<span class="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Rest in Progress</span>
+									</div>
+
+									<div class="mt-3 my-1">
+										<span class={`font-display font-mono text-5xl sm:text-6xl md:text-7xl font-black tabular-nums tracking-tight transition-colors ${
+											intraSetRest.remainingSeconds <= 5 ? 'text-amber-400 animate-pulse' : 'text-primary'
+										}`}>
+											{formatClock(intraSetRest.remainingSeconds)}
+										</span>
+									</div>
+
+									<div class="mt-2 w-full max-w-sm rounded-xl border border-white/10 bg-surface-container-lowest/80 p-3 text-center">
+										<span class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Up Next</span>
+										<p class="mt-0.5 text-sm sm:text-base font-bold text-on-surface truncate">
+											{intraSetRest.nextLabel} • {currentBlock.title}
+										</p>
+										<p class="text-xs font-semibold text-primary mt-0.5">
+											Target: {actualRepsByBlock[currentBlock.id] || currentBlockReps} reps {getResolvedPrescribedLoad(currentBlock) ? `@ ${actualLoadByBlock[currentBlock.id] || getResolvedPrescribedLoad(currentBlock)}` : ''}
+										</p>
+									</div>
+
+									<div class="mt-4 flex flex-wrap items-center justify-center gap-2.5 w-full max-w-md">
+										<button
+											type="button"
+											class="flex-1 min-w-[80px] h-11 flex items-center justify-center gap-1 rounded-xl border border-white/10 bg-surface-container hover:bg-surface-container-high active:scale-95 text-xs font-bold text-on-surface transition-all cursor-pointer"
+											onclick={() => addIntraSetRestSeconds(-15)}
+											title="Subtract 15 seconds"
+										>
+											<span class="material-symbols-outlined text-sm">remove</span>
+											<span>-15s</span>
+										</button>
+										<button
+											type="button"
+											class="flex-1 min-w-[80px] h-11 flex items-center justify-center gap-1 rounded-xl border border-primary/30 bg-primary/15 hover:bg-primary/25 active:scale-95 text-xs font-bold text-primary transition-all cursor-pointer"
+											onclick={() => addIntraSetRestSeconds(30)}
+											title="Add 30 seconds"
+										>
+											<span class="material-symbols-outlined text-sm">add</span>
+											<span>+30s</span>
+										</button>
+										<button
+											type="button"
+											class="flex-[1.4] min-w-[130px] h-11 flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 text-xs sm:text-sm font-black text-on-primary-fixed shadow-lg shadow-primary/25 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+											onclick={() => clearIntraSetRest(true)}
+											title="Skip rest and start next set"
+										>
+											<span class="material-symbols-outlined text-base">play_arrow</span>
+											<span>Start Now</span>
+										</button>
+									</div>
 								</div>
+							</div>
+						{/if}
+
+						<!-- Set Matrix: Current Session Progress & Last Session Comparison -->
+						<div class="rounded-2xl border border-white/5 bg-surface-container-low p-4 sm:p-5 shadow-md">
+							<div class="mb-3 flex items-center justify-between">
+								<span class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Set Progress</span>
+								<span class="text-[10px] font-semibold text-on-surface-variant flex items-center gap-1">
+									<span class="material-symbols-outlined text-xs">timer</span>
+									Rest: {formatClock(currentBlock.restSeconds ?? (currentBlock.node_type_slug === 'exercise' ? 90 : 120))}
+								</span>
+							</div>
+
+							<div class="space-y-2">
+								{#each Array(currentBlockSets ?? 0) as _, index}
+									{@const setNum = index + 1}
+									{@const isPast = setNum < currentExerciseSet}
+									{@const isCurrent = setNum === currentExerciseSet}
+									{@const isUpcoming = setNum > currentExerciseSet}
+									{@const loggedSet = currentBlockCompletedLogs.find((l) => l.set_index === setNum)}
+									{@const prevLog = getLastSessionLogs(currentBlock).find((l) => l.set_index === setNum)}
+
+									<div class={`flex items-center justify-between rounded-xl p-2.5 sm:p-3 transition-all ${
+										isCurrent
+											? 'border-2 border-primary/50 bg-primary/10 shadow-md ring-1 ring-primary/20'
+											: isPast
+												? 'border border-white/5 bg-surface-container-lowest/70'
+												: 'border border-dashed border-white/10 bg-transparent opacity-60'
+									}`}>
+										<!-- Set Indicator -->
+										<div class="flex items-center gap-2.5 min-w-[75px]">
+											<div class={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
+												isPast
+													? 'bg-primary text-on-primary-fixed'
+													: isCurrent
+														? 'bg-primary/20 text-primary ring-2 ring-primary animate-pulse'
+														: 'bg-surface-variant/40 text-on-surface-variant'
+											}`}>
+												{#if isPast}
+													<span class="material-symbols-outlined text-xs font-bold">check</span>
+												{:else}
+													{setNum}
+												{/if}
+											</div>
+											<span class={`text-xs font-bold ${isCurrent ? 'text-primary' : 'text-on-surface'}`}>
+												Set {setNum}
+											</span>
+										</div>
+
+										<!-- Previous Session History (if exists) -->
+										<div class="hidden sm:flex flex-col text-right min-w-[90px]">
+											<span class="text-[9px] uppercase tracking-wider text-on-surface-variant/70">Previous</span>
+											<span class="text-xs font-medium text-on-surface-variant">
+												{prevLog ? `${prevLog.actual_reps || prevLog.prescribed_reps} reps @ ${prevLog.actual_load || prevLog.prescribed_load || '-'}` : '—'}
+											</span>
+										</div>
+
+										<!-- Target -->
+										<div class="flex flex-col text-center">
+											<span class="text-[9px] uppercase tracking-wider text-on-surface-variant/70">Target</span>
+											<span class="text-xs font-bold text-on-surface">
+												{currentBlockReps} reps {getResolvedPrescribedLoad(currentBlock) ? `@ ${getResolvedPrescribedLoad(currentBlock)}` : ''}
+											</span>
+										</div>
+
+										<!-- Actual / Status -->
+										<div class="flex items-center gap-2 min-w-[90px] justify-end">
+											{#if isPast && loggedSet}
+												<div class="text-right">
+													<span class="text-xs font-bold text-primary">{loggedSet.actual_reps} reps</span>
+													{#if loggedSet.actual_load}
+														<span class="block text-[10px] font-semibold text-secondary">{loggedSet.actual_load}</span>
+													{/if}
+												</div>
+												<span class="material-symbols-outlined text-primary text-base">check_circle</span>
+											{:else if isCurrent}
+												<span class="rounded-full bg-primary/20 border border-primary/40 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-primary">
+													Now
+												</span>
+											{:else}
+												<span class="text-[11px] text-on-surface-variant/50 font-medium">Pending</span>
+											{/if}
+										</div>
+									</div>
+								{/each}
 							</div>
 						</div>
 
-						{#if getLastSessionLogs(currentBlock).length > 0}
-							<div class="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-5">
-								<div class="mb-3 flex items-center justify-between">
-									<span class="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Previous performance</span>
-									<span class="text-[10px] font-medium text-on-surface-variant">Last session</span>
+						<!-- Zero-Keyboard Tactile Stepper Controls for Active Set -->
+						<div class="mt-4 rounded-2xl border border-white/10 bg-surface-container-low/90 p-4 sm:p-6 shadow-xl backdrop-blur-md">
+							<div class="mb-4 flex items-center justify-between">
+								<div class="flex items-center gap-2">
+									<span class="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/20 text-primary">
+										<span class="material-symbols-outlined text-sm font-bold">fitness_center</span>
+									</span>
+									<span class="text-xs font-bold uppercase tracking-wider text-on-surface">Log Set {currentExerciseSet} of {currentBlockSets}</span>
 								</div>
-								<div class="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
-									{#each getLastSessionLogs(currentBlock) as log}
-										<div class="rounded-lg border border-white/5 bg-surface-container-lowest p-3 text-center">
-											<p class="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">Set {log.set_index}</p>
-											<p class="mt-1 text-base font-bold text-on-surface">
-												{log.actual_reps || log.prescribed_reps || '-'} <span class="text-xs font-normal text-on-surface-variant">reps</span>
-											</p>
-											{#if log.actual_load || log.prescribed_load}
-												<p class="mt-0.5 text-xs font-semibold text-secondary">{log.actual_load || log.prescribed_load}</p>
-											{/if}
-											{#if log.actual_rpe || log.actual_rir}
-												<p class="mt-0.5 text-[10px] text-on-surface-variant/70">
-													{log.actual_rpe ? `RPE ${log.actual_rpe}` : ''}
-													{log.actual_rpe && log.actual_rir ? ' • ' : ''}
-													{log.actual_rir ? `RIR ${log.actual_rir}` : ''}
-												</p>
-											{/if}
-										</div>
-									{/each}
-								</div>
-							</div>
-						{/if}
-
-						{#if isRestingBetweenSets && intraSetRest}
-							<div class="mt-4 rounded-xl border border-primary/30 bg-primary/10 p-4 sm:p-5 shadow-lg">
-								<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-									<div>
-										<div class="flex items-center gap-2">
-											<span class="flex h-2 w-2 rounded-full bg-primary animate-ping"></span>
-											<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Resting Between Sets</p>
-										</div>
-										<p class="mt-1 text-xs sm:text-sm font-medium text-on-surface-variant">Next: {intraSetRest.nextLabel}</p>
-									</div>
-									<div class="flex items-center justify-between sm:justify-end gap-3">
-										<p class="font-display text-3xl sm:text-4xl font-bold text-primary font-mono tabular-nums">{formatClock(intraSetRest.remainingSeconds)}</p>
-										<div class="flex items-center gap-1.5">
-											<button
-												type="button"
-												class="rounded-lg border border-primary/30 bg-primary/20 px-2.5 py-1.5 text-xs font-bold text-primary hover:bg-primary/30 active:scale-95 transition-all cursor-pointer"
-												onclick={() => addIntraSetRestSeconds(30)}
-												title="Add 30 seconds to rest"
-											>
-												+30s
-											</button>
-											<button
-												type="button"
-												class="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-on-primary-fixed shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-												onclick={() => clearIntraSetRest(true)}
-												title="Skip rest and start next set"
-											>
-												Skip Rest
-											</button>
-										</div>
-									</div>
-								</div>
-							</div>
-						{/if}
-
-						<div class="mt-4 rounded-xl border border-white/5 bg-surface-container-low p-3.5 sm:p-5">
-							<div class="mb-3 flex items-center justify-between">
-								<span class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Log Set {currentExerciseSet} Results</span>
 								<button
 									type="button"
-									class="flex items-center gap-1 rounded-md border border-outline-variant/30 bg-surface-container px-2 py-1 text-[11px] font-semibold text-primary hover:bg-surface-container-high transition-colors cursor-pointer"
+									class="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary hover:bg-primary/20 active:scale-95 transition-all cursor-pointer"
 									onclick={fillTargetValues}
 									title="Fill with target reps and prescribed load"
 								>
@@ -3421,75 +3636,158 @@
 								</button>
 							</div>
 
-							<div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
-								<div>
-									<label for="actual-reps" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
-									<input
-										id="actual-reps"
-										type="text"
-										inputmode="numeric"
-										autocomplete="off"
-										enterkeyhint="next"
-										class="mt-1.5 w-full rounded-lg border-0 bg-surface-container-lowest p-2.5 sm:p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-										placeholder={currentBlockReps ?? 'e.g. 8'}
-										value={actualRepsByBlock[currentBlock.id] ?? ''}
-										oninput={(event) => {
-											actualRepsByBlock = {
-												...actualRepsByBlock,
-												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-											};
-										}}
-									/>
-								</div>
-								<div>
-									<div class="flex items-center justify-between">
-										<label for="actual-load" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual load</label>
-										<div class="flex items-center gap-1">
-											<button
-												type="button"
-												class="rounded bg-surface-container px-1.5 py-0.5 text-[10px] font-bold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high active:scale-95 cursor-pointer"
-												onclick={() => stepActiveBlockLoad(-2.5)}
-												title="Subtract 2.5 kg"
-											>
-												-2.5
-											</button>
-											<button
-												type="button"
-												class="rounded bg-surface-container px-1.5 py-0.5 text-[10px] font-bold text-primary hover:bg-surface-container-high active:scale-95 cursor-pointer"
-												onclick={() => stepActiveBlockLoad(2.5)}
-												title="Add 2.5 kg"
-											>
-												+2.5
-											</button>
-										</div>
+							<!-- Steppers Grid -->
+							<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+								<!-- REPS STEPPER -->
+								<div class="rounded-xl border border-white/5 bg-surface-container-lowest p-3.5 flex flex-col justify-between">
+									<div class="flex items-center justify-between mb-2">
+										<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Reps</span>
+										<span class="text-[11px] font-semibold text-primary">Target: {currentBlockReps}</span>
 									</div>
-									<input
-										id="actual-load"
-										type="text"
-										inputmode="decimal"
-										autocomplete="off"
-										enterkeyhint="next"
-										class="mt-1.5 w-full rounded-lg border-0 bg-surface-container-lowest p-2.5 sm:p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-										placeholder={getResolvedPrescribedLoad(currentBlock) || 'e.g. 80 kg'}
-										value={actualLoadByBlock[currentBlock.id] ?? ''}
-										oninput={(event) => {
-											actualLoadByBlock = {
-												...actualLoadByBlock,
-												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-											};
-										}}
-									/>
+									<div class="flex items-center gap-2">
+										<button
+											type="button"
+											class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high active:scale-90 transition-transform cursor-pointer border border-white/5"
+											onclick={() => stepActiveBlockReps(-1)}
+											aria-label="Decrease reps"
+										>
+											<span class="material-symbols-outlined text-xl">remove</span>
+										</button>
+										<input
+											id="actual-reps"
+											type="text"
+											inputmode="numeric"
+											autocomplete="off"
+											enterkeyhint="next"
+											class="w-full h-12 rounded-xl border border-white/10 bg-surface-container/60 px-2 text-center text-[16px] sm:text-lg font-black text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-1 focus:ring-primary/50"
+											placeholder={currentBlockReps ?? '10'}
+											value={actualRepsByBlock[currentBlock.id] ?? ''}
+											oninput={(event) => {
+												actualRepsByBlock = {
+													...actualRepsByBlock,
+													[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+												};
+											}}
+										/>
+										<button
+											type="button"
+											class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/20 text-primary hover:bg-primary/30 active:scale-90 transition-transform cursor-pointer border border-primary/25"
+											onclick={() => stepActiveBlockReps(1)}
+											aria-label="Increase reps"
+										>
+											<span class="material-symbols-outlined text-xl">add</span>
+										</button>
+									</div>
 								</div>
-								<div>
-									<label for="actual-rpe" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RPE</label>
+
+								<!-- LOAD STEPPER -->
+								<div class="rounded-xl border border-white/5 bg-surface-container-lowest p-3.5 flex flex-col justify-between">
+									<div class="flex items-center justify-between mb-2">
+										<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Load ({currentBlock.loadUnit || 'kg'})</span>
+										<span class="text-[11px] font-semibold text-secondary">Target: {getResolvedPrescribedLoad(currentBlock) || '-'}</span>
+									</div>
+									<div class="flex items-center gap-2">
+										<button
+											type="button"
+											class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high active:scale-90 transition-transform cursor-pointer border border-white/5"
+											onclick={() => stepActiveBlockLoad(-2.5)}
+											aria-label="Decrease load by 2.5 kg"
+										>
+											<span class="material-symbols-outlined text-xl">remove</span>
+										</button>
+										<input
+											id="actual-load"
+											type="text"
+											inputmode="decimal"
+											autocomplete="off"
+											enterkeyhint="next"
+											class="w-full h-12 rounded-xl border border-white/10 bg-surface-container/60 px-2 text-center text-[16px] sm:text-lg font-black text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-1 focus:ring-primary/50"
+											placeholder={getResolvedPrescribedLoad(currentBlock) || '0 kg'}
+											value={actualLoadByBlock[currentBlock.id] ?? ''}
+											oninput={(event) => {
+												actualLoadByBlock = {
+													...actualLoadByBlock,
+													[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+												};
+											}}
+										/>
+										<button
+											type="button"
+											class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-secondary/20 text-secondary hover:bg-secondary/30 active:scale-90 transition-transform cursor-pointer border border-secondary/25"
+											onclick={() => stepActiveBlockLoad(2.5)}
+											aria-label="Increase load by 2.5 kg"
+										>
+											<span class="material-symbols-outlined text-xl">add</span>
+										</button>
+									</div>
+
+									<!-- Quick Load Stepper Pills -->
+									<div class="mt-2.5 flex items-center justify-center gap-1.5">
+										<button
+											type="button"
+											class="flex-1 py-1 px-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-[11px] font-bold text-on-surface-variant active:scale-95 transition-all text-center cursor-pointer border border-white/5"
+											onclick={() => stepActiveBlockLoad(-5)}
+										>
+											-5
+										</button>
+										<button
+											type="button"
+											class="flex-1 py-1 px-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-[11px] font-bold text-on-surface-variant active:scale-95 transition-all text-center cursor-pointer border border-white/5"
+											onclick={() => stepActiveBlockLoad(-2.5)}
+										>
+											-2.5
+										</button>
+										<button
+											type="button"
+											class="flex-1 py-1 px-1 rounded-lg bg-secondary/15 hover:bg-secondary/25 text-[11px] font-bold text-secondary active:scale-95 transition-all text-center cursor-pointer border border-secondary/20"
+											onclick={() => stepActiveBlockLoad(2.5)}
+										>
+											+2.5
+										</button>
+										<button
+											type="button"
+											class="flex-1 py-1 px-1 rounded-lg bg-secondary/15 hover:bg-secondary/25 text-[11px] font-bold text-secondary active:scale-95 transition-all text-center cursor-pointer border border-secondary/20"
+											onclick={() => stepActiveBlockLoad(5)}
+										>
+											+5
+										</button>
+									</div>
+								</div>
+							</div>
+
+							<!-- Optional RIR Quick Chips, RPE & Notes Section -->
+							<div class="mt-4 pt-3.5 border-t border-white/5 flex flex-wrap items-center justify-between gap-3">
+								<div class="flex items-center gap-1.5">
+									<span class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">RIR:</span>
+									{#each ['0', '1', '2', '3+'] as rirOpt}
+										<button
+											type="button"
+											class={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+												(actualRIRByBlock[currentBlock.id] ?? '') === rirOpt
+													? 'bg-primary text-on-primary-fixed shadow-md shadow-primary/20'
+													: 'bg-surface-container hover:bg-surface-container-high text-on-surface-variant'
+											}`}
+											onclick={() => {
+												actualRIRByBlock = {
+													...actualRIRByBlock,
+													[currentBlock.id]: (actualRIRByBlock[currentBlock.id] ?? '') === rirOpt ? '' : rirOpt
+												};
+											}}
+										>
+											{rirOpt}
+										</button>
+									{/each}
+								</div>
+
+								<!-- Manual RPE & Notes Inputs -->
+								<div class="flex items-center gap-2">
 									<input
 										id="actual-rpe"
 										type="text"
 										inputmode="decimal"
 										autocomplete="off"
-										enterkeyhint="next"
-										class="mt-1.5 w-full rounded-lg border-0 bg-surface-container-lowest p-2.5 sm:p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-										placeholder="e.g. 8.5"
+										class="h-8 w-20 rounded-lg border border-white/10 bg-surface-container/60 px-2 text-center text-[16px] sm:text-xs font-bold text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-1 focus:ring-primary/50"
+										placeholder="RPE"
 										value={actualRPEByBlock[currentBlock.id] ?? ''}
 										oninput={(event) => {
 											actualRPEByBlock = {
@@ -3498,21 +3796,16 @@
 											};
 										}}
 									/>
-								</div>
-								<div>
-									<label for="actual-rir" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RIR</label>
 									<input
-										id="actual-rir"
+										id="actual-notes"
 										type="text"
-										inputmode="decimal"
 										autocomplete="off"
-										enterkeyhint="done"
-										class="mt-1.5 w-full rounded-lg border-0 bg-surface-container-lowest p-2.5 sm:p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-										placeholder="e.g. 2"
-										value={actualRIRByBlock[currentBlock.id] ?? ''}
+										class="h-8 w-32 sm:w-44 rounded-lg border border-white/10 bg-surface-container/60 px-2 text-[16px] sm:text-xs text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-1 focus:ring-primary/50 truncate"
+										placeholder="Note (optional)"
+										value={notesByBlock[currentBlock.id] ?? ''}
 										oninput={(event) => {
-											actualRIRByBlock = {
-												...actualRIRByBlock,
+											notesByBlock = {
+												...notesByBlock,
 												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
 											};
 										}}
@@ -3647,91 +3940,175 @@
 							
 							<div class="grid gap-4 md:grid-cols-2 border-b border-outline-variant/10 pb-4">
 								<!-- Inputs for A -->
-								<div class="space-y-4">
-									<p class="text-xs font-bold text-primary font-headline">Exercise A Performance</p>
+								<div class="space-y-3 rounded-xl border border-white/5 bg-surface-container-lowest p-3.5">
+									<p class="text-xs font-bold text-primary font-headline">Exercise A: {currentBlock.data?.exercise_a_name || 'A'}</p>
 									<div class="grid grid-cols-2 gap-3">
 										<div>
-											<label for="superset-actual-reps-a" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
-											<input
-												id="superset-actual-reps-a"
-												type="text"
-												inputmode="numeric"
-												autocomplete="off"
-												enterkeyhint="next"
-												class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
-												placeholder={`${currentBlock.data?.reps_a ?? '5'}`}
-												value={actualRepsAByBlock[currentBlock.id] ?? ''}
-												oninput={(event) => {
-													actualRepsAByBlock = {
-														...actualRepsAByBlock,
-														[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-													};
-												}}
-											/>
+											<div class="flex items-center justify-between mb-1">
+												<label for="superset-actual-reps-a" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Reps A</label>
+												<span class="text-[10px] font-semibold text-primary">Target: {currentBlock.data?.reps_a ?? '5'}</span>
+											</div>
+											<div class="flex items-center gap-1">
+												<button
+													type="button"
+													class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high active:scale-90 transition-transform cursor-pointer border border-white/5"
+													onclick={() => stepActiveBlockRepsA(-1)}
+													aria-label="Decrease reps A"
+												>
+													<span class="material-symbols-outlined text-lg">remove</span>
+												</button>
+												<input
+													id="superset-actual-reps-a"
+													type="text"
+													inputmode="numeric"
+													autocomplete="off"
+													enterkeyhint="next"
+													class="w-full h-10 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[16px] font-black text-on-surface focus:border-primary focus:ring-1 focus:ring-primary/50"
+													placeholder={`${currentBlock.data?.reps_a ?? '5'}`}
+													value={actualRepsAByBlock[currentBlock.id] ?? ''}
+													oninput={(event) => {
+														actualRepsAByBlock = {
+															...actualRepsAByBlock,
+															[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+														};
+													}}
+												/>
+												<button
+													type="button"
+													class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/20 text-primary hover:bg-primary/30 active:scale-90 transition-transform cursor-pointer border border-primary/25"
+													onclick={() => stepActiveBlockRepsA(1)}
+													aria-label="Increase reps A"
+												>
+													<span class="material-symbols-outlined text-lg">add</span>
+												</button>
+											</div>
 										</div>
 										<div>
-											<label for="superset-actual-load-a" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual load</label>
-											<input
-												id="superset-actual-load-a"
-												type="text"
-												inputmode="decimal"
-												autocomplete="off"
-												enterkeyhint="next"
-												class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
-												placeholder={currentBlock.data?.start_load_a !== null && currentBlock.data?.start_load_a !== undefined ? `${currentBlock.data.start_load_a}` : 'kg'}
-												value={actualLoadAByBlock[currentBlock.id] ?? ''}
-												oninput={(event) => {
-													actualLoadAByBlock = {
-														...actualLoadAByBlock,
-														[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-													};
-												}}
-											/>
+											<div class="flex items-center justify-between mb-1">
+												<label for="superset-actual-load-a" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Load A</label>
+												<span class="text-[10px] font-semibold text-primary">{currentBlock.data?.start_load_a ? `${currentBlock.data.start_load_a}kg` : '-'}</span>
+											</div>
+											<div class="flex items-center gap-1">
+												<button
+													type="button"
+													class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high active:scale-90 transition-transform cursor-pointer border border-white/5"
+													onclick={() => stepActiveBlockLoadA(-2.5)}
+													aria-label="Decrease load A"
+												>
+													<span class="material-symbols-outlined text-lg">remove</span>
+												</button>
+												<input
+													id="superset-actual-load-a"
+													type="text"
+													inputmode="decimal"
+													autocomplete="off"
+													enterkeyhint="next"
+													class="w-full h-10 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[16px] font-black text-on-surface focus:border-primary focus:ring-1 focus:ring-primary/50"
+													placeholder={currentBlock.data?.start_load_a !== null && currentBlock.data?.start_load_a !== undefined ? `${currentBlock.data.start_load_a}` : 'kg'}
+													value={actualLoadAByBlock[currentBlock.id] ?? ''}
+													oninput={(event) => {
+														actualLoadAByBlock = {
+															...actualLoadAByBlock,
+															[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+														};
+													}}
+												/>
+												<button
+													type="button"
+													class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/20 text-primary hover:bg-primary/30 active:scale-90 transition-transform cursor-pointer border border-primary/25"
+													onclick={() => stepActiveBlockLoadA(2.5)}
+													aria-label="Increase load A"
+												>
+													<span class="material-symbols-outlined text-lg">add</span>
+												</button>
+											</div>
 										</div>
 									</div>
 								</div>
 
 								<!-- Inputs for B -->
-								<div class="space-y-4">
-									<p class="text-xs font-bold text-secondary font-headline">Exercise B Performance</p>
+								<div class="space-y-3 rounded-xl border border-white/5 bg-surface-container-lowest p-3.5">
+									<p class="text-xs font-bold text-secondary font-headline">Exercise B: {currentBlock.data?.exercise_b_name || 'B'}</p>
 									<div class="grid grid-cols-2 gap-3">
 										<div>
-											<label for="superset-actual-reps-b" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual reps</label>
-											<input
-												id="superset-actual-reps-b"
-												type="text"
-												inputmode="numeric"
-												autocomplete="off"
-												enterkeyhint="next"
-												class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
-												placeholder={`${currentBlock.data?.reps_b ?? '10'}`}
-												value={actualRepsBByBlock[currentBlock.id] ?? ''}
-												oninput={(event) => {
-													actualRepsBByBlock = {
-														...actualRepsBByBlock,
-														[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-													};
-												}}
-											/>
+											<div class="flex items-center justify-between mb-1">
+												<label for="superset-actual-reps-b" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Reps B</label>
+												<span class="text-[10px] font-semibold text-secondary">Target: {currentBlock.data?.reps_b ?? '10'}</span>
+											</div>
+											<div class="flex items-center gap-1">
+												<button
+													type="button"
+													class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high active:scale-90 transition-transform cursor-pointer border border-white/5"
+													onclick={() => stepActiveBlockRepsB(-1)}
+													aria-label="Decrease reps B"
+												>
+													<span class="material-symbols-outlined text-lg">remove</span>
+												</button>
+												<input
+													id="superset-actual-reps-b"
+													type="text"
+													inputmode="numeric"
+													autocomplete="off"
+													enterkeyhint="next"
+													class="w-full h-10 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[16px] font-black text-on-surface focus:border-secondary focus:ring-1 focus:ring-secondary/50"
+													placeholder={`${currentBlock.data?.reps_b ?? '10'}`}
+													value={actualRepsBByBlock[currentBlock.id] ?? ''}
+													oninput={(event) => {
+														actualRepsBByBlock = {
+															...actualRepsBByBlock,
+															[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+														};
+													}}
+												/>
+												<button
+													type="button"
+													class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary/20 text-secondary hover:bg-secondary/30 active:scale-90 transition-transform cursor-pointer border border-secondary/25"
+													onclick={() => stepActiveBlockRepsB(1)}
+													aria-label="Increase reps B"
+												>
+													<span class="material-symbols-outlined text-lg">add</span>
+												</button>
+											</div>
 										</div>
 										<div>
-											<label for="superset-actual-load-b" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual load</label>
-											<input
-												id="superset-actual-load-b"
-												type="text"
-												inputmode="decimal"
-												autocomplete="off"
-												enterkeyhint="next"
-												class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
-												placeholder={currentBlock.data?.start_load_b !== null && currentBlock.data?.start_load_b !== undefined ? `${currentBlock.data.start_load_b}` : 'kg'}
-												value={actualLoadBByBlock[currentBlock.id] ?? ''}
-												oninput={(event) => {
-													actualLoadBByBlock = {
-														...actualLoadBByBlock,
-														[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-													};
-												}}
-											/>
+											<div class="flex items-center justify-between mb-1">
+												<label for="superset-actual-load-b" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Load B</label>
+												<span class="text-[10px] font-semibold text-secondary">{currentBlock.data?.start_load_b ? `${currentBlock.data.start_load_b}kg` : '-'}</span>
+											</div>
+											<div class="flex items-center gap-1">
+												<button
+													type="button"
+													class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high active:scale-90 transition-transform cursor-pointer border border-white/5"
+													onclick={() => stepActiveBlockLoadB(-2.5)}
+													aria-label="Decrease load B"
+												>
+													<span class="material-symbols-outlined text-lg">remove</span>
+												</button>
+												<input
+													id="superset-actual-load-b"
+													type="text"
+													inputmode="decimal"
+													autocomplete="off"
+													enterkeyhint="next"
+													class="w-full h-10 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[16px] font-black text-on-surface focus:border-secondary focus:ring-1 focus:ring-secondary/50"
+													placeholder={currentBlock.data?.start_load_b !== null && currentBlock.data?.start_load_b !== undefined ? `${currentBlock.data.start_load_b}` : 'kg'}
+													value={actualLoadBByBlock[currentBlock.id] ?? ''}
+													oninput={(event) => {
+														actualLoadBByBlock = {
+															...actualLoadBByBlock,
+															[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+														};
+													}}
+												/>
+												<button
+													type="button"
+													class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary/20 text-secondary hover:bg-secondary/30 active:scale-90 transition-transform cursor-pointer border border-secondary/25"
+													onclick={() => stepActiveBlockLoadB(2.5)}
+													aria-label="Increase load B"
+												>
+													<span class="material-symbols-outlined text-lg">add</span>
+												</button>
+											</div>
 										</div>
 									</div>
 								</div>
@@ -3747,7 +4124,7 @@
 										inputmode="decimal"
 										autocomplete="off"
 										enterkeyhint="next"
-										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
+										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-[16px] sm:text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
 										placeholder="e.g. 8"
 										value={actualRPEByBlock[currentBlock.id] ?? ''}
 										oninput={(event) => {
@@ -3766,7 +4143,7 @@
 										inputmode="decimal"
 										autocomplete="off"
 										enterkeyhint="done"
-										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
+										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-[16px] sm:text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
 										placeholder="e.g. 2"
 										value={actualRIRByBlock[currentBlock.id] ?? ''}
 										oninput={(event) => {
@@ -3965,7 +4342,7 @@
 											inputmode="numeric"
 											autocomplete="off"
 											enterkeyhint="next"
-											class="mt-1.5 w-full rounded-lg border-0 bg-surface-container-lowest p-2.5 sm:p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+											class="mt-1.5 w-full rounded-lg border-0 bg-surface-container-lowest p-2.5 sm:p-3 text-[16px] sm:text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 											placeholder={currentWaveSet?.reps ?? 'e.g. 5'}
 											value={actualRepsByBlock[currentBlock.id] ?? ''}
 											oninput={(event) => {
@@ -4004,7 +4381,7 @@
 											inputmode="decimal"
 											autocomplete="off"
 											enterkeyhint="next"
-											class="mt-1.5 w-full rounded-lg border-0 bg-surface-container-lowest p-2.5 sm:p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+											class="mt-1.5 w-full rounded-lg border-0 bg-surface-container-lowest p-2.5 sm:p-3 text-[16px] sm:text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 											placeholder={calculateCalculatedLoad(currentBlock?.data?.exercise_name as string, currentWaveSet?.intensity) || 'e.g. 140 kg'}
 											value={actualLoadByBlock[currentBlock.id] ?? ''}
 											oninput={(event) => {
@@ -4023,7 +4400,7 @@
 											inputmode="decimal"
 											autocomplete="off"
 											enterkeyhint="next"
-											class="mt-1.5 w-full rounded-lg border-0 bg-surface-container-lowest p-2.5 sm:p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+											class="mt-1.5 w-full rounded-lg border-0 bg-surface-container-lowest p-2.5 sm:p-3 text-[16px] sm:text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 											placeholder={currentWaveSet?.rpe ?? 'e.g. 9'}
 											value={actualRPEByBlock[currentBlock.id] ?? ''}
 											oninput={(event) => {
@@ -4042,7 +4419,7 @@
 											inputmode="decimal"
 											autocomplete="off"
 											enterkeyhint="done"
-											class="mt-1.5 w-full rounded-lg border-0 bg-surface-container-lowest p-2.5 sm:p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+											class="mt-1.5 w-full rounded-lg border-0 bg-surface-container-lowest p-2.5 sm:p-3 text-[16px] sm:text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 											placeholder="e.g. 1"
 											value={actualRIRByBlock[currentBlock.id] ?? ''}
 											oninput={(event) => {
@@ -4403,7 +4780,7 @@
 													inputmode="numeric"
 													autocomplete="off"
 													enterkeyhint="next"
-													class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+													class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-[16px] sm:text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 													placeholder={currentBlock.reps ?? 'e.g. 120 jumps'}
 													value={actualRepsByBlock[currentBlock.id] ?? ''}
 													oninput={(event) => {
@@ -4422,7 +4799,7 @@
 													inputmode="decimal"
 													autocomplete="off"
 													enterkeyhint="next"
-													class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+													class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-[16px] sm:text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 													placeholder="e.g. weighted rope / vest"
 													value={actualLoadByBlock[currentBlock.id] ?? ''}
 													oninput={(event) => {
@@ -4441,7 +4818,7 @@
 													inputmode="decimal"
 													autocomplete="off"
 													enterkeyhint="next"
-													class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+													class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-[16px] sm:text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 													placeholder="1-10"
 													value={actualRPEByBlock[currentBlock.id] ?? ''}
 													oninput={(event) => {
@@ -4460,7 +4837,7 @@
 													inputmode="decimal"
 													autocomplete="off"
 													enterkeyhint="done"
-													class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+													class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-[16px] sm:text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 													placeholder="0-4"
 													value={actualRIRByBlock[currentBlock.id] ?? ''}
 													oninput={(event) => {
@@ -4540,7 +4917,7 @@
 											inputmode="numeric"
 											autocomplete="off"
 											enterkeyhint="next"
-											class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+											class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-[16px] sm:text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 											placeholder={currentBlock.reps ?? 'e.g. 12/12/10'}
 											value={actualRepsByBlock[currentBlock.id] ?? ''}
 											oninput={(event) => {
@@ -4559,7 +4936,7 @@
 											inputmode="decimal"
 											autocomplete="off"
 											enterkeyhint="next"
-											class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+											class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-[16px] sm:text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 											placeholder="Optional"
 											value={actualLoadByBlock[currentBlock.id] ?? ''}
 											oninput={(event) => {
@@ -4578,7 +4955,7 @@
 											inputmode="decimal"
 											autocomplete="off"
 											enterkeyhint="next"
-											class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+											class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-[16px] sm:text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 											placeholder="Optional"
 											value={actualRPEByBlock[currentBlock.id] ?? ''}
 											oninput={(event) => {
@@ -4597,7 +4974,7 @@
 											inputmode="decimal"
 											autocomplete="off"
 											enterkeyhint="done"
-											class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+											class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-[16px] sm:text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 											placeholder="Optional"
 											value={actualRIRByBlock[currentBlock.id] ?? ''}
 											oninput={(event) => {
@@ -4656,7 +5033,7 @@
 						</label>
 						<input
 							id="session-notes"
-							class="w-full rounded-lg border-0 bg-surface-container-lowest p-4 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+							class="w-full rounded-lg border-0 bg-surface-container-lowest p-4 text-[16px] sm:text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 							placeholder={currentBlock.notePlaceholder ?? 'Add execution notes, cues, or fatigue markers...'}
 							value={notesByBlock[currentBlock.id] ?? ''}
 							oninput={(event) => {
