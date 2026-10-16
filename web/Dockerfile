@@ -14,8 +14,8 @@ COPY . .
 RUN npm run build
 
 # Prune to production-only node_modules so the runner stage
-# gets the smallest possible closure
-RUN npm ci --omit=dev
+# gets the smallest possible closure (in-place, no re-downloading)
+RUN npm prune --omit=dev
 
 # ============================================================
 # Stage 2 — Runner (lean production image)
