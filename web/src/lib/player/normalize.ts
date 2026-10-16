@@ -24,7 +24,7 @@ function asRecord(value: unknown): Record<string, unknown> {
 function asNumber(value: unknown): number | undefined {
 	if (typeof value === 'number' && Number.isFinite(value)) return value;
 	if (typeof value === 'string' && value.trim() !== '') {
-		const parsed = Number(value);
+		const parsed = parseFloat(value.trim());
 		return Number.isFinite(parsed) ? parsed : undefined;
 	}
 	return undefined;
@@ -249,7 +249,12 @@ function mapPlayerBlock(block: WorkflowBlockApi, index: number, section: Section
 
 	const data = asRecord(block.data);
 	const exerciseName = asString(data.exercise_name);
-	const load = asNumber(data.load) ?? asNumber(data.load_value) ?? asNumber(data.start_load);
+	const load =
+		asNumber(data.load) ??
+		asNumber(data.load_value) ??
+		asNumber(data.start_load) ??
+		asNumber(data.target_load) ??
+		asNumber(data.prescribed_load);
 	const loadUnit = asString(data.load_unit) ?? (load !== undefined ? 'kg' : undefined);
 	const durationSeconds = asNumber(data.duration);
 	const restSeconds = asNumber(data.rest_seconds) ?? asNumber(data.rest) ?? defaultRestSecondsForType(type);

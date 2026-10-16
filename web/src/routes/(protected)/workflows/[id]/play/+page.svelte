@@ -55,6 +55,7 @@
 		actualLoadByBlock: Record<string, string>;
 		actualRPEByBlock: Record<string, string>;
 		actualRIRByBlock: Record<string, string>;
+		overrideLoads?: Record<string, string>;
 		sessionElapsedSeconds: number;
 		activeSectionID: string | null;
 		backendSessionID: number | null;
@@ -261,11 +262,8 @@
 		}
 
 		for (const block of blocksToInitialize) {
-			const progression = getBlockProgressionState(block);
-			let suggested = '';
-			if (progression?.state_type === 'linear' && progression.suggested_load) {
-				suggested = progression.suggested_load;
-			} else if (block.load !== undefined) {
+			let suggested = overrideLoads[block.id] || getResolvedPrescribedLoad(block);
+			if (!suggested && block.load !== undefined) {
 				suggested = `${block.load}${block.loadUnit ? ` ${block.loadUnit}` : ''}`;
 			}
 			if (suggested) {
@@ -938,11 +936,25 @@
 		if (block.load !== undefined && block.load > 0) {
 			return `${block.load}${block.loadUnit ? ` ${block.loadUnit}` : ''}`;
 		}
+		const rawDataLoad =
+			block.data?.load ??
+			block.data?.load_value ??
+			block.data?.start_load ??
+			block.data?.target_load ??
+			block.data?.prescribed_load;
+		if (rawDataLoad !== undefined && rawDataLoad !== null && rawDataLoad !== '' && rawDataLoad !== 0 && rawDataLoad !== '0') {
+			const unit = (block.data?.load_unit as string) || block.loadUnit || 'kg';
+			return `${rawDataLoad}${unit ? ` ${unit}` : ''}`;
+		}
 		if (progression?.suggested_load) {
 			return progression.suggested_load;
 		}
 		if (block.load !== undefined) {
 			return `${block.load}${block.loadUnit ? ` ${block.loadUnit}` : ''}`;
+		}
+		if (rawDataLoad !== undefined && rawDataLoad !== null && rawDataLoad !== '') {
+			const unit = (block.data?.load_unit as string) || block.loadUnit || 'kg';
+			return `${rawDataLoad}${unit ? ` ${unit}` : ''}`;
 		}
 		return '';
 	}
@@ -1455,7 +1467,12 @@
 		goToNextBlock();
 	}
 
-	function resetRuntimeState(index: number, section: PlayerSection | null, chooserOpen: boolean): void {
+	function resetRuntimeState(
+		index: number,
+		section: PlayerSection | null,
+		chooserOpen: boolean,
+		initialOverrides?: Record<string, string>
+	): void {
 		activeSection = section;
 		currentBlockIndex = index;
 		completedBlockIds = [];
@@ -1463,13 +1480,11 @@
 		roundByBlock = {};
 		waveSetByBlock = {};
 		notesByBlock = {};
-		actualRepsByBlock = {};
-		actualLoadByBlock = {};
 		actualRPEByBlock = {};
 		actualRIRByBlock = {};
 		activityEntries = [];
 		currentSessionSetLogs = [];
-		overrideLoads = {};
+		overrideLoads = initialOverrides !== undefined ? initialOverrides : overrideLoads;
 		sessionElapsedSeconds = 0;
 		isTimerRunning = false;
 		timerRemainingSeconds = routine ? getInitialTimerSeconds(routine.blocks[index]) : 0;
@@ -1484,6 +1499,31 @@
 		isSessionComplete = false;
 		completedSessionSummary = null;
 		sessionError = null;
+
+		const newActualLoads: Record<string, string> = {};
+		const newActualReps: Record<string, string> = {};
+		const targetBlocks =
+			routine && section
+				? routine.blocks.slice(section.startBlockIndex, section.startBlockIndex + section.blockCount)
+				: routine?.blocks[index]
+					? [routine.blocks[index]]
+					: [];
+
+		for (const b of targetBlocks) {
+			const load = overrideLoads[b.id] || getResolvedPrescribedLoad(b);
+			if (load) {
+				newActualLoads[b.id] = load;
+				if (!overrideLoads[b.id]) {
+					overrideLoads = { ...overrideLoads, [b.id]: load };
+				}
+			}
+			const reps = getResolvedPrescribedReps(b);
+			if (reps) {
+				newActualReps[b.id] = reps.replace(/\+$/, '');
+			}
+		}
+		actualLoadByBlock = newActualLoads;
+		actualRepsByBlock = newActualReps;
 	}
 
 	function clearLocalSession(options?: { autoStart?: boolean; chooserOpen?: boolean }): void {
@@ -1496,7 +1536,7 @@
 		sessionError = null;
 		const chooserOpen = options?.chooserOpen ?? (Boolean(routine?.sections.length) && !hasSectionQuery);
 		const nextSection = activeSection ?? initialSection;
-		resetRuntimeState(initialBlockIndex, initialSection, chooserOpen);
+		resetRuntimeState(initialBlockIndex, initialSection, chooserOpen, {});
 		if (!chooserOpen && options?.autoStart !== false) {
 			void startSection(nextSection);
 		}
@@ -1555,6 +1595,22 @@
 		activeIntervalPhaseIdx = 0;
 		const nextPhases = resolveIntervalPhases(routine.blocks[index]);
 		intervalPhaseSecondsLeft = nextPhases && nextPhases.length > 0 ? nextPhases[0].durationSeconds : 0;
+
+		const block = routine.blocks[index];
+		if (block) {
+			if (!actualLoadByBlock[block.id]) {
+				const load = overrideLoads[block.id] || getResolvedPrescribedLoad(block);
+				if (load) {
+					actualLoadByBlock = { ...actualLoadByBlock, [block.id]: load };
+				}
+			}
+			if (!actualRepsByBlock[block.id]) {
+				const reps = getResolvedPrescribedReps(block);
+				if (reps) {
+					actualRepsByBlock = { ...actualRepsByBlock, [block.id]: reps.replace(/\+$/, '') };
+				}
+			}
+		}
 	}
 
 	function goToNextBlock(): void {
@@ -2068,9 +2124,14 @@
 			actualLoadByBlock[currentBlock.id] ||
 			getResolvedPrescribedLoad(currentBlock) ||
 			'0 kg';
+		const updated = adjustLoad(current, amount);
 		actualLoadByBlock = {
 			...actualLoadByBlock,
-			[currentBlock.id]: adjustLoad(current, amount)
+			[currentBlock.id]: updated
+		};
+		overrideLoads = {
+			...overrideLoads,
+			[currentBlock.id]: updated
 		};
 	}
 
@@ -2257,6 +2318,7 @@
 						actualLoadByBlock = savedState.actualLoadByBlock ?? {};
 						actualRPEByBlock = savedState.actualRPEByBlock ?? {};
 						actualRIRByBlock = savedState.actualRIRByBlock ?? {};
+						overrideLoads = savedState.overrideLoads ?? {};
 						sessionElapsedSeconds = Math.max(savedState.sessionElapsedSeconds ?? 0, 0);
 						activeSection = initialSection;
 						activityEntries = (savedState.activityEntries ?? []).filter((entry) => blockIDs.has(entry.blockID));
@@ -2366,6 +2428,7 @@
 			actualLoadByBlock = savedState.actualLoadByBlock ?? {};
 			actualRPEByBlock = savedState.actualRPEByBlock ?? {};
 			actualRIRByBlock = savedState.actualRIRByBlock ?? {};
+			overrideLoads = savedState.overrideLoads ?? {};
 			sessionElapsedSeconds = Math.max(savedState.sessionElapsedSeconds ?? 0, 0);
 			activeSection = savedSection;
 
@@ -2586,6 +2649,7 @@
 			actualLoadByBlock,
 			actualRPEByBlock,
 			actualRIRByBlock,
+			overrideLoads,
 			sessionElapsedSeconds,
 			activeSectionID: activeSection?.id ?? null,
 			backendSessionID: activePersistedSession?.id ?? completedSessionSummary?.id ?? null,
@@ -3482,9 +3546,14 @@
 												placeholder={getResolvedPrescribedLoad(currentBlock) || '0 kg'}
 												value={actualLoadByBlock[currentBlock.id] ?? ''}
 												oninput={(event) => {
+													const val = (event.currentTarget as HTMLInputElement).value;
 													actualLoadByBlock = {
 														...actualLoadByBlock,
-														[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+														[currentBlock.id]: val
+													};
+													overrideLoads = {
+														...overrideLoads,
+														[currentBlock.id]: val
 													};
 												}}
 											/>

@@ -1355,9 +1355,23 @@
 											<input
 												id="exercise-load-value"
 												type="number"
+												step="0.5"
 												class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
-												value={typeof selectedBlock.data.load_value === 'number' ? selectedBlock.data.load_value : ''}
-												oninput={(event) => updateBlockField(selectedBlock.client_id, 'load_value', Number((event.currentTarget as HTMLInputElement).value))}
+												value={typeof selectedBlock.data.load_value === 'number'
+													? selectedBlock.data.load_value
+													: (typeof selectedBlock.data.load === 'number'
+														? selectedBlock.data.load
+														: (typeof selectedBlock.data.start_load === 'number'
+															? selectedBlock.data.start_load
+															: ''))}
+												oninput={(event) => {
+													const val = Number((event.currentTarget as HTMLInputElement).value);
+													updateBlockField(selectedBlock.client_id, 'load_value', val);
+													updateBlockField(selectedBlock.client_id, 'load', val);
+													if (!selectedBlock.data.load_unit) {
+														updateBlockField(selectedBlock.client_id, 'load_unit', 'kg');
+													}
+												}}
 												placeholder="85"
 											/>
 										</div>
@@ -1366,12 +1380,12 @@
 											<select
 												id="exercise-load-unit"
 												class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
-												value={typeof selectedBlock.data.load_unit === 'string' ? selectedBlock.data.load_unit : 'percent_1rm'}
+												value={typeof selectedBlock.data.load_unit === 'string' ? selectedBlock.data.load_unit : 'kg'}
 												onchange={(event) => updateBlockField(selectedBlock.client_id, 'load_unit', (event.currentTarget as HTMLSelectElement).value)}
 											>
-												<option value="percent_1rm">% 1RM</option>
 												<option value="kg">kg</option>
 												<option value="lb">lb</option>
+												<option value="percent_1rm">% 1RM</option>
 											</select>
 										</div>
 									</div>
@@ -1642,8 +1656,21 @@
 												type="number"
 												step="0.5"
 												class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
-												value={typeof selectedBlock.data.start_load === 'number' ? selectedBlock.data.start_load : ''}
-												oninput={(event) => updateBlockField(selectedBlock.client_id, 'start_load', Number((event.currentTarget as HTMLInputElement).value))}
+												value={typeof selectedBlock.data.start_load === 'number'
+													? selectedBlock.data.start_load
+													: (typeof selectedBlock.data.load === 'number'
+														? selectedBlock.data.load
+														: (typeof selectedBlock.data.load_value === 'number'
+															? selectedBlock.data.load_value
+															: ''))}
+												oninput={(event) => {
+													const val = Number((event.currentTarget as HTMLInputElement).value);
+													updateBlockField(selectedBlock.client_id, 'start_load', val);
+													updateBlockField(selectedBlock.client_id, 'load', val);
+													if (!selectedBlock.data.load_unit) {
+														updateBlockField(selectedBlock.client_id, 'load_unit', 'kg');
+													}
+												}}
 											/>
 										</div>
 										<div class="space-y-2">

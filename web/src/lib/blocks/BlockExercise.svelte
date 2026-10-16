@@ -12,11 +12,17 @@
 	const reps = $derived(
 		typeof block.data.reps === 'number' || typeof block.data.reps === 'string' ? block.data.reps : null
 	);
-	const loadUnit = $derived(typeof block.data.load_unit === 'string' ? block.data.load_unit : null);
+	const loadUnit = $derived(typeof block.data.load_unit === 'string' ? block.data.load_unit : 'kg');
 	const loadValue = $derived(
 		typeof block.data.load_value === 'number' || typeof block.data.load_value === 'string'
 			? block.data.load_value
-			: null
+			: typeof block.data.load === 'number' || typeof block.data.load === 'string'
+				? block.data.load
+				: typeof block.data.start_load === 'number' || typeof block.data.start_load === 'string'
+					? block.data.start_load
+					: typeof block.data.target_load === 'number' || typeof block.data.target_load === 'string'
+						? block.data.target_load
+						: null
 	);
 	const restSeconds = $derived(typeof block.data.rest_seconds === 'number' ? block.data.rest_seconds : null);
 	const notes = $derived(typeof block.data.notes === 'string' ? block.data.notes : '');

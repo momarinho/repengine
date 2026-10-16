@@ -159,3 +159,59 @@ test('normalizePlayerRoutine parses string numeric rest_seconds and sets', () =>
 	assert.equal(routine.blocks[0].sets, 4);
 	assert.equal(routine.blocks[0].restSeconds, 75);
 });
+
+test('normalizePlayerRoutine parses loads from load_value, start_load, and strings with units', () => {
+	const workflow: Workflow = {
+		id: 1,
+		user_id: 1,
+		name: 'Load Test Routine',
+		description: 'Testing load parsing',
+		is_public: false,
+		created_at: '',
+		updated_at: '',
+		blocks: [
+			{
+				id: 201,
+				workflow_id: 1,
+				node_type_slug: 'exercise',
+				position: 0,
+				data: {
+					exercise_name: 'Bench Press',
+					load_value: 80,
+					load_unit: 'kg'
+				}
+			},
+			{
+				id: 202,
+				workflow_id: 1,
+				node_type_slug: 'linear_progression',
+				position: 1,
+				data: {
+					exercise_name: 'Squat',
+					start_load: '100 kg'
+				}
+			},
+			{
+				id: 203,
+				workflow_id: 1,
+				node_type_slug: 'exercise',
+				position: 2,
+				data: {
+					exercise_name: 'Overhead Press',
+					target_load: 45
+				}
+			}
+		]
+	};
+
+	const routine = normalizePlayerRoutine(workflow);
+	assert.ok(routine);
+	assert.equal(routine.blocks[0].load, 80);
+	assert.equal(routine.blocks[0].loadUnit, 'kg');
+
+	assert.equal(routine.blocks[1].load, 100);
+	assert.equal(routine.blocks[1].loadUnit, 'kg');
+
+	assert.equal(routine.blocks[2].load, 45);
+	assert.equal(routine.blocks[2].loadUnit, 'kg');
+});
