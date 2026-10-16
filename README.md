@@ -166,6 +166,16 @@ To install the release APK directly to a connected device via ADB:
 adb install -r build/app/outputs/flutter-apk/app-release.apk
 ```
 
+### 3. Production Deployment (VPS)
+
+To deploy or update the production instance with zero downtime:
+
+```bash
+./deploy.sh
+```
+
+This single command automatically pulls the latest changes from Git, rebuilds and restarts the updated containers (`api` and `web`), prunes dangling build images to preserve disk space, and verifies the API healthcheck.
+
 ---
 
 ## 🧪 Validation & Tests
