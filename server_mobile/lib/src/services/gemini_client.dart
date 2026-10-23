@@ -96,7 +96,7 @@ Design progressive overload routines that strictly follow exercise science princ
         );
 
     try {
-      final result = await ai.generate(
+      final result = await ai.generate<dynamic, dynamic>(
         model: googleAI.gemini(modelName),
         system: systemPrompt,
         prompt: userPrompt,
@@ -296,12 +296,5 @@ Design progressive overload routines that strictly follow exercise science princ
     }
 
     return blocks;
-  }
-
-  String _slugify(String text) {
-    return text
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
-        .replaceAll(RegExp(r'^_+|_+$'), '');
   }
 }

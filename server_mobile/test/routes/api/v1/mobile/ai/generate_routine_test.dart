@@ -104,7 +104,7 @@ void main() {
       final mockRoutine = {
         'routine_name': 'Push Pull Legs',
         'description': 'AI Generated routine',
-        'days': [],
+        'days': <dynamic>[],
         'blocks': [
           {
             'id': 'sec_1',
@@ -154,7 +154,7 @@ void main() {
           constraints: any(named: 'constraints'),
           apiKey: 'user-custom-key',
         ),
-      ).thenAnswer((_) async => {'routine_name': 'Upper Body', 'blocks': []});
+      ).thenAnswer((_) async => {'routine_name': 'Upper Body', 'blocks': <dynamic>[]});
 
       final response = await route.onRequest(context);
 

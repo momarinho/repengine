@@ -30,9 +30,8 @@ graph TD
     end
 
     subgraph Service Tier
-        BFF[Mobile BFF - Dart Frog :8081]
+        BFF[Mobile BFF & Sports Science - Dart Frog :8081]
         CoreAPI[Go Fiber Core API :8080]
-        Analytics[Python FastAPI Analytics :8000]
     end
 
     subgraph Shared Core
@@ -45,7 +44,7 @@ graph TD
     end
 
     Web -- REST / Auth Cookie --> CoreAPI
-    Web -- REST / Insights --> Analytics
+    Web -- REST / Sports Science & AI --> BFF
     Mobile -- Local Reactive Streams --> LocalDB
     Mobile -.-> SharedPkg
     BFF -.-> SharedPkg
@@ -97,10 +96,10 @@ graph TD
 * **Hands-Free Multi-Phase Execution**: Automatically parses interval protocols (`30/15/15`, Tabata `20/10`), cycling through phases, announcing switches, auto-logging completed rounds, and progressing hands-free.
 * **High-Visibility HUD**: Features glowing phase badges, giant tabular countdown typography, round progress pills, audio toggles, and screen wake lock integration.
 
-### 🐍 8. Athletic Intelligence & Sports Science Microservice
+### 🧠 8. Athletic Intelligence & Sports Science Engine
 * **Statistical 1RM Consensus**: Aggregates 5 canonical formulas (Brzycki, Epley, Mayhew, Wathen, Lombardi) adjusted for athlete RPE / Reps in Reserve.
 * **ACWR Fatigue & Injury Prevention**: Calculates Acute:Chronic Workload Ratios via coupled rolling windows and EWMA models to detect non-functional overreaching and optimal training sweet-spots (0.8–1.3).
-* **Autoregulation Engine**: Shared core package (`packages/repengine_core`) and Python FastAPI engine evaluating chronological workout sessions to recommend progressive overload (+increment), load maintenance, or periodization cycle resets (-15%).
+* **Autoregulation Engine**: Evaluates chronological workout sessions directly in the pure Dart core (`packages/repengine_core`) and Dart Frog BFF to recommend progressive overload (+increment), load maintenance, or periodization cycle resets (-15%).
 
 ### 📱 9. Mobile-First Responsive Web Studio & Preview Hub
 * **Fluid Routine Previewing**: The Template Preview screen (`/templates/[id]`) and Studio preview tabs feature responsive 2x2 metadata metrics grids and nested block hierarchies, eliminating awkward horizontal scrolling and excessive vertical spacing on mobile screens.
@@ -116,10 +115,9 @@ graph TD
 |:---|:---|
 | **Core API** | Go (1.24+), Fiber, `pgx/pgxpool` (native PostgreSQL driver), JWT, `slog`, Prometheus metrics |
 | **Mobile App** | Flutter (3.47+), Dart (3.13+), Riverpod 2, Drift (SQLite), `flutter_test` |
-| **Mobile BFF** | Dart Frog, JWT proxy, batch sync reconciliation |
+| **Mobile BFF** | Dart Frog (:8081), JWT proxy, batch sync reconciliation, AI Copilot (Gemini) |
 | **Shared Sports Core** | Pure Dart package (`repengine_core`), Autoregulation, 1RM consensus, ACWR, INOL |
 | **Web Studio** | SvelteKit (Svelte 5 runes), TypeScript, TailwindCSS, Web Audio API, Screen Wake Lock API |
-| **Analytics Microservice** | Python 3.12, FastAPI, Pydantic v2, NumPy, Pytest |
 | **Database** | PostgreSQL 16 (Relational Core), SQLite 3 (Mobile Local-First) |
 | **DevOps & Containers** | Docker Compose, GitHub Actions, Alpine Linux minimal runtime |
 
@@ -129,7 +127,7 @@ graph TD
 
 ### 1. Full Stack with Docker (Recommended)
 
-Starts PostgreSQL, Go Core API, Mobile BFF, Python Analytics, and the SvelteKit Web App:
+Starts PostgreSQL, Go Core API, Mobile BFF (Sports Science & AI), and the SvelteKit Web App:
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build
@@ -138,7 +136,6 @@ docker compose -f docker-compose.dev.yml up --build
 * **Web Studio**: [http://localhost:3000](http://localhost:3000)
 * **Core API / Docs**: [http://localhost:8080/docs](http://localhost:8080/docs)
 * **Mobile BFF**: [http://localhost:8081](http://localhost:8081)
-* **Analytics Microservice**: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ### 2. Running Flutter Mobile
 
@@ -147,7 +144,7 @@ From the `mobile/` directory:
 ```bash
 cd mobile
 
-# Run all 74 unit and widget tests
+# Run all 75 unit and widget tests
 flutter test
 
 # Run linter

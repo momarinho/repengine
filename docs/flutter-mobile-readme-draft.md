@@ -11,16 +11,15 @@
 
 ---
 
-## 📲 Experimente no seu Celular (Download do APK)
+## 🏃 Como Executar e Testar
 
-Você não precisa compilar o código para avaliar este projeto. Escaneie o QR Code abaixo ou faça o download direto do APK Android gerado automaticamente pelo nosso pipeline de CI/CD:
+```bash
+cd mobile
+flutter pub get
+flutter run
+```
 
-| 📲 **Instalação Imediata (Android APK)** |
-|:---:|
-| ![Download APK QR Code](https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https://github.com/momarinho/repengine/releases/latest/download/app-release.apk) |
-| [🔗 **Clique aqui para baixar o `.apk` direto da GitHub Release**](https://github.com/momarinho/repengine/releases/latest) |
-
-*Dica de teste rápido*: Abra o app, ative o **Modo Avião** do seu telefone, registre um treino completo offline, desative o Modo Avião e veja a sincronização automática acontecer em segundo plano!
+*Dica de teste rápido*: Abra o app, ative o **Modo Avião** do seu telefone, registre um treino completo offline, desative o Modo Avião e veja a sincronização automática acontecer em segundo plano via Outbox Engine!
 
 ---
 

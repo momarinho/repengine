@@ -82,7 +82,7 @@ Future<Response> onRequest(RequestContext context) async {
           serverId,
           authHeader,
           clientId: session.clientId,
-          notes: session.notes ?? '',
+          notes: session.notes,
         );
         itemsResult.add(status);
       } else if (session.status == 'abandoned') {
@@ -90,7 +90,7 @@ Future<Response> onRequest(RequestContext context) async {
           serverId,
           authHeader,
           clientId: session.clientId,
-          notes: session.notes ?? '',
+          notes: session.notes,
         );
         itemsResult.add(status);
       }

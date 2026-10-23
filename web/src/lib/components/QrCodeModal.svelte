@@ -140,7 +140,7 @@
 					</div>
 					{#if defaultHost.includes('localhost') || defaultHost.includes('127.0.0.1')}
 						<p class="mt-1 text-[11px] text-amber-300/80">
-							💡 Accessing from your phone? Replace <code>localhost</code> with your PC's Wi-Fi IP (e.g., <code>192.168.100.2:3000</code>).
+							💡 Accessing from your phone? Replace <code>localhost</code> with your PC's Wi-Fi IP (e.g., <code>192.168.1.100:3000</code>).
 						</p>
 					{/if}
 				</div>
