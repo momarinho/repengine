@@ -75,7 +75,7 @@ dart run build_runner build --delete-conflicting-outputs
 # Run code analysis (strict lints)
 flutter analyze
 
-# Execute complete test suite (74 unit and widget tests)
+# Execute complete test suite (75 unit and widget tests)
 flutter test
 
 # Run app on connected device or emulator
@@ -94,3 +94,15 @@ To install the compiled release binary directly to an Android phone with USB deb
 ```bash
 adb install -r build/app/outputs/flutter-apk/app-release.apk
 ```
+
+---
+
+## 🗺️ Roadmap & Upcoming Milestones
+
+- [x] **Local-First SQLite Architecture**: Instant $<5\text{ms}$ UI response with Drift transactional outbox.
+- [x] **Gym-Proof Physical HUD**: Thumb-zone pads, tactile steppers, 120 FPS Canvas rest timer, and plate calculator.
+- [x] **Structured Progression Models**: Native support for GZCLP Hybrid, Linear Progression, and Double Progression.
+- [x] **Zero-Config LAN Auto-Discovery**: Automatic `/24` subnet probing for Docker desktop host on port 8081.
+- [x] **Bidirectional Outbox Sync**: Idempotent batch push and delta pull reconciliation via Dart Frog BFF.
+- [ ] **Native Wave Progression (5/3/1)**: Port the desktop studio's multi-week wave periodization tracker and Training Maxes to Flutter.
+- [ ] **Wear OS & Health Connect Bridge**: Background wrist vibration alerts during rest intervals.

@@ -215,6 +215,18 @@ npx playwright test
 
 ---
 
+## 🗺️ Roadmap & Upcoming Milestones
+
+- [x] **Local-First SQLite Architecture**: Instant $<5\text{ms}$ UI response with Drift outbox queue.
+- [x] **Gym-Proof HUD**: Thumb-zone pads, steppers, rest countdown timer, and plate calculator.
+- [x] **Structured Progression Models**: Native support for GZCLP, Linear Progression, and Double Progression.
+- [x] **Zero-Config LAN Auto-Discovery**: Automatic `/24` subnet probing for Docker desktop host.
+- [x] **Bidirectional Outbox Sync**: Idempotent batch push and delta pull reconciliation.
+- [ ] **Mobile Wave Progression (5/3/1)**: Port the web studio's multi-week wave tracker and Training Maxes engine to native Flutter HUD.
+- [ ] **Wear OS & Health Connect Bridge**: Background rest timer alerts and heart rate sync.
+
+---
+
 ## 📄 License
 
 This project is open-source software licensed under the [MIT License](LICENSE).
