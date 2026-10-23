@@ -8,9 +8,11 @@ Esta pasta reúne todos os arquivos necessários para a publicação no LinkedIn
 
 | Arquivo | Descrição | Onde usar no LinkedIn |
 |:---|:---|:---|
-| 🎬 [`video-flutter-mobile-demo.mp4`](video-flutter-mobile-demo.mp4) | Vídeo nativo do Flutter (26s, 1.7 MB, 1080×2340, 60fps) | **Mídia principal do post (Opção A: Foco Mobile)** |
-| 🎬 [`video-web-desktop-demo.mp4`](video-web-desktop-demo.mp4) | Vídeo HD do Web Studio no Desktop (31s, 1.3 MB, 1280×720) | **Mídia principal do post (Opção B: Foco Web/Desktop)** |
-| 🎞️ [`bonus-comment-web-studio.gif`](bonus-comment-web-studio.gif) | GIF animado do Web Studio em ação (12s, 1.1 MB) | **Anexo animado no 1º comentário do post** |
+| ⭐ [`video-unified-dual-workflow.mp4`](video-unified-dual-workflow.mp4) | **Vídeo Unificado Dual-Workflow (29s, 1.5 MB, 1080p)**: Mostra os 10s no PC + 19s no Flutter Mobile! | **A melhor opção para post único (Mostra PC + Celular juntos!)** |
+| 🖼️ [`thumbnail-unified.png`](thumbnail-unified.png) | Capa do vídeo unificado | Miniatura para o vídeo unificado |
+| 🎬 [`video-flutter-mobile-demo.mp4`](video-flutter-mobile-demo.mp4) | Vídeo nativo do Flutter (26s, 1.7 MB, 1080×2340, 60fps) | Mídia principal caso queira focar 100% no celular |
+| 🎬 [`video-web-desktop-demo.mp4`](video-web-desktop-demo.mp4) | Vídeo HD do Web Studio no Desktop (31s, 1.3 MB, 1280×720) | Mídia principal caso queira focar 100% no PC |
+| 🎞️ [`bonus-comment-web-studio.gif`](bonus-comment-web-studio.gif) | GIF animado do Web Studio em ação (12s, 1.1 MB) | Anexo animado no 1º comentário |
 | 🖼️ [`thumbnail-video-hud.png`](thumbnail-video-hud.png) | Capa do HUD mobile em alta definição | Miniatura para o vídeo mobile |
 | 🖼️ [`thumbnail-desktop-studio.png`](thumbnail-desktop-studio.png) | Capa do Studio desktop em alta definição | Miniatura para o vídeo desktop |
 | 🖥️ [`bonus-comment-web-studio.png`](bonus-comment-web-studio.png) | Print estático do Web Studio | Alternativa estática para comentários |
