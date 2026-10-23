@@ -452,8 +452,8 @@ func calisthenicsSupersetBlock(exA, exB, repsA, repsB string, sets, restSeconds 
 			"sets":               sets,
 			"reps_a":             repsA,
 			"reps_b":             repsB,
-			"progression_type_a": "double_progression",
-			"progression_type_b": "double_progression",
+			"progression_type_a": "none",
+			"progression_type_b": "none",
 			"rest_seconds":       restSeconds,
 			"notes":              notes,
 		},
@@ -558,6 +558,68 @@ func cardioBlock(exercise, duration, notes string) templateBlockSeed {
 	}
 }
 
+
+func recommendedRoutineDayBlocks(dayNum int) []templateBlockSeed {
+	return []templateBlockSeed{
+		sectionBlock(
+			fmt.Sprintf("Day %d - Full Body (Recommended Routine)", dayNum),
+			"Pairs: Pull-Up + Squat, Dip + Hinge, Row + Push-Up, followed by functional core triplet.",
+			"day",
+		),
+		timedExerciseBlock("Dynamic Warm-up & Joint Prep", 300),
+		calisthenicsSupersetBlock(
+			"Pull-Up Progression",
+			"Squat Progression",
+			"5-8",
+			"5-8",
+			3,
+			90,
+			"Pair 1: Pull-up progression (Arch Hangs -> Negatives -> Strict Pull-up) paired with Squats (Bodyweight -> Bulgarian Split Squat -> Pistol). Double progression (3x5-8). 90s rest between alternating sets.",
+		),
+		restBlock(90),
+		calisthenicsSupersetBlock(
+			"Dip Progression",
+			"Hinge Progression",
+			"5-8",
+			"5-8",
+			3,
+			90,
+			"Pair 2: Dip progression (Parallel Bar Support -> Negative Dip -> Dip) paired with Hinge progression (Single-Leg RDL -> Banded Nordic Curl). Double progression (3x5-8). 90s rest between alternating sets.",
+		),
+		restBlock(90),
+		calisthenicsSupersetBlock(
+			"Inverted Row Progression",
+			"Push-Up Progression",
+			"5-8",
+			"5-8",
+			3,
+			90,
+			"Pair 3: Inverted Row progression (Incline Row -> Horizontal Row -> Ring Row) paired with Push-up progression (Standard -> Diamond -> Pseudo Planche). Double progression (3x5-8). 90s rest between alternating sets.",
+		),
+		restBlock(90),
+		calisthenicsDoubleProgressionBlock(
+			"Anti-Extension (Ring Rollout / Plank)",
+			"8-12",
+			3,
+			60,
+			"Core Triplet 1: Posterior pelvic tilt, lock ribs to pelvis. Progress from Plank to Ring/Ab Wheel Rollouts. 60s rest.",
+		),
+		calisthenicsDoubleProgressionBlock(
+			"Anti-Rotation (Pallof Press / Band Rotation)",
+			"8-12",
+			3,
+			60,
+			"Core Triplet 2: Resist trunk rotation against band or cable tension. 60s rest.",
+		),
+		calisthenicsDoubleProgressionBlock(
+			"Extension (Reverse Hyperextension / Arch Body)",
+			"8-12",
+			3,
+			60,
+			"Core Triplet 3: Squeeze glutes and lower back at top peak contraction. 60s rest before next round.",
+		),
+	}
+}
 
 func SeedTemplates(ctx context.Context) error {
 	seeds := []templateSeed{
@@ -843,6 +905,21 @@ func SeedTemplates(ctx context.Context) error {
 				restBlock(60),
 				exerciseBlockWithNotes("Barbell Bicep Curl", "10-12", 3, "T3 Arm Isolation. Strict form, elbows pinned at ribs."),
 			},
+		},
+		{
+			Name:        "The Recommended Routine (r/bodyweightfitness)",
+			Description: "The gold-standard full-body calisthenics routine from r/bodyweightfitness. 3 days/week full-body strength work organized into antagonistic pairs (3x5-8) with double progression and a functional core triplet.",
+			Category:    "calisthenics",
+			IsOfficial:  true,
+			Metadata: map[string]any{
+				"duration":  "12 weeks",
+				"frequency": "3 days/week",
+				"level":     "all_levels",
+			},
+			Blocks: append(
+				append(recommendedRoutineDayBlocks(1), recommendedRoutineDayBlocks(2)...),
+				recommendedRoutineDayBlocks(3)...,
+			),
 		},
 	}
 
