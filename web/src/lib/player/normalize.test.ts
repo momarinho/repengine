@@ -215,3 +215,38 @@ test('normalizePlayerRoutine parses loads from load_value, start_load, and strin
 	assert.equal(routine.blocks[2].load, 45);
 	assert.equal(routine.blocks[2].loadUnit, 'kg');
 });
+
+test('normalizePlayerRoutine properly resolves deload block with active recovery eyebrow and title', () => {
+	const workflow: Workflow = {
+		id: 1,
+		user_id: 1,
+		name: 'Deload Test Workflow',
+		description: 'Deload Test',
+		is_public: false,
+		created_at: '',
+		updated_at: '',
+		blocks: [
+			{
+				id: 301,
+				workflow_id: 1,
+				node_type_slug: 'deload',
+				position: 0,
+				data: {
+					title: 'Active Recovery Week',
+					frequency_weeks: 4,
+					strategy: 'volume',
+					target_rir: 3,
+					is_active: true
+				}
+			}
+		]
+	};
+
+	const routine = normalizePlayerRoutine(workflow);
+	assert.ok(routine);
+	assert.equal(routine.blocks.length, 1);
+	assert.equal(routine.blocks[0].node_type_slug, 'deload');
+	assert.equal(routine.blocks[0].title, 'Active Recovery Week');
+	assert.equal(routine.blocks[0].eyebrow, 'Active Recovery');
+	assert.equal(routine.blocks[0].tone, 'secondary');
+});

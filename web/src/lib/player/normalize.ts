@@ -67,6 +67,7 @@ function resolveTone(type: PlayerBlockType): QueueTone {
 			return 'tertiary';
 		case 'rest':
 		case 'repeat':
+		case 'deload':
 			return 'secondary';
 		default:
 			return 'muted';
@@ -74,7 +75,7 @@ function resolveTone(type: PlayerBlockType): QueueTone {
 }
 
 function resolveBlockType(slug: string): PlayerBlockType | null {
-	return ['section', 'exercise', 'linear_progression', 'rest', 'wave', 'repeat', 'exercise_timed', 'superset'].includes(slug)
+	return ['section', 'exercise', 'linear_progression', 'rest', 'wave', 'repeat', 'exercise_timed', 'superset', 'deload'].includes(slug)
 		? (slug as PlayerBlockType)
 		: null;
 }
@@ -95,6 +96,8 @@ function blockTitle(type: PlayerBlockType, data: Record<string, unknown>, index:
 			return `${asString(data.exercise_name) ?? `Lift ${index + 1}`} Wave`;
 		case 'repeat':
 			return asString(data.title) ?? `Repeat Block ${index + 1}`;
+		case 'deload':
+			return asString(data.title) ?? 'Deload & Recovery Protocol';
 	}
 }
 
@@ -116,6 +119,8 @@ function blockSubtitle(type: PlayerBlockType, data: Record<string, unknown>): st
 			return 'Structured progression with reps, intensity, and optional RPE.';
 		case 'repeat':
 			return 'Cycle through repeated rounds and mark each one locally.';
+		case 'deload':
+			return 'Scheduled active recovery to dissipate systemic fatigue and protect baseline strength.';
 	}
 }
 
@@ -137,6 +142,8 @@ function blockEyebrow(type: PlayerBlockType): string {
 			return 'Wave';
 		case 'repeat':
 			return 'Repeat';
+		case 'deload':
+			return 'Active Recovery';
 	}
 }
 
@@ -165,6 +172,8 @@ function estimateBlockSeconds(type: PlayerBlockType, block: PlayerBlock): number
 			return (block.rounds ?? 1) * 120;
 		case 'section':
 			return 45;
+		case 'deload':
+			return 30;
 	}
 }
 

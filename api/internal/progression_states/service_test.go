@@ -907,3 +907,84 @@ func TestApplySession_ExerciseWithLinearProgressionObject(t *testing.T) {
 		t.Fatalf("expected SuggestedLoad 82.5 kg, got %s", gotState.SuggestedLoad)
 	}
 }
+
+func TestApplySessionProgression_DeloadPreservesBaseline(t *testing.T) {
+	ctx := context.Background()
+
+	var gotState UpsertProgressionStateInput
+	repo := &fakeRepo{
+		userOwnsWorkflowFunc: func(ctx context.Context, userID, workflowID int) (bool, error) {
+			return true, nil
+		},
+		listWorkflowBlocksFunc: func(ctx context.Context, workflowID int) ([]workflowBlockConfig, error) {
+			return []workflowBlockConfig{
+				{
+					ID:           15,
+					Position:     0,
+					NodeTypeSlug: "linear_progression",
+					Data: map[string]any{
+						"exercise_name": "Back Squat",
+						"sets":          3,
+						"reps":          "5",
+						"increment":     2.5,
+						"load_unit":     "kg",
+					},
+				},
+				{
+					ID:           16,
+					Position:     1,
+					NodeTypeSlug: "deload",
+					Data: map[string]any{
+						"title":     "Recovery Protocol",
+						"is_active": true,
+						"strategy":  "volume",
+					},
+				},
+			}, nil
+		},
+		listProgressionStatesFunc: func(ctx context.Context, userID, workflowID int) ([]ProgressionState, error) {
+			return []ProgressionState{
+				{
+					WorkflowBlockID: 15,
+					BlockKey:        "::linear_progression::back-squat::1",
+					CurrentLoad:     "100 kg",
+					SuggestedLoad:   "102.5 kg",
+					Outcome:         OutcomeIncrease,
+					Metadata: map[string]any{
+						"session_count": 4,
+					},
+				},
+			}, nil
+		},
+		upsertProgressionStateFunc: func(ctx context.Context, in UpsertProgressionStateInput) (ProgressionState, error) {
+			gotState = in
+			return ProgressionState{}, nil
+		},
+	}
+
+	service := NewService(repo)
+
+	// In deload, user lifts fewer reps / lighter load or takes it easy
+	err := service.ApplySessionProgression(ctx, ApplySessionProgressionInput{
+		UserID:     1,
+		WorkflowID: 1,
+		SessionID:  20,
+		Logs: []CompletedSetLog{
+			{WorkflowBlockID: intPtr(15), Completed: true, SetIndex: 1, PrescribedReps: "5", PrescribedLoad: "80 kg", ActualReps: "4", ActualLoad: "80 kg", ActualRPE: "6"},
+			{WorkflowBlockID: intPtr(15), Completed: true, SetIndex: 2, PrescribedReps: "5", PrescribedLoad: "80 kg", ActualReps: "4", ActualLoad: "80 kg", ActualRPE: "6"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if gotState.Outcome != OutcomeMaintain {
+		t.Fatalf("expected OutcomeMaintain during deload, got %s", gotState.Outcome)
+	}
+	if gotState.SuggestedLoad != "102.5 kg" {
+		t.Fatalf("expected baseline 102.5 kg preserved, got %s", gotState.SuggestedLoad)
+	}
+	if isDeload, ok := gotState.Metadata["is_deload"].(bool); !ok || !isDeload {
+		t.Fatalf("expected is_deload true in metadata, got %v", gotState.Metadata["is_deload"])
+	}
+}

@@ -105,7 +105,10 @@ export function resolveNodeTypeIcon(icon: string): string {
 		repeat: 'repeat',
 		pause: 'timer_pause',
 		folder: 'folder',
-		layers: 'layers'
+		layers: 'layers',
+		battery_charging_full: 'battery_charging_full',
+		healing: 'healing',
+		spa: 'spa'
 	};
 
 	return map[icon] ?? 'extension';

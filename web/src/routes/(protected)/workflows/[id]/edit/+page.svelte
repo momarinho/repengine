@@ -2174,6 +2174,131 @@
 										{/if}
 									</div>
 								</div>
+							{:else if selectedBlock.node_type_slug === 'deload'}
+								<div class="space-y-4">
+									<div class="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3.5 flex items-center justify-between gap-3">
+										<div>
+											<p class="text-xs font-bold uppercase tracking-wider text-emerald-400">Deload Protocol</p>
+											<p class="text-[11px] text-on-surface-variant">Scheduled fatigue dissipation & baseline recovery</p>
+										</div>
+										<span class="material-symbols-outlined text-emerald-400 text-xl">battery_charging_full</span>
+									</div>
+
+									<div class="space-y-2">
+										<label for="deload-title" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Protocol Title</label>
+										<input
+											id="deload-title"
+											type="text"
+											class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+											value={typeof selectedBlock.data.title === 'string' ? selectedBlock.data.title : 'Deload & Recovery Protocol'}
+											oninput={(event) => updateBlockField(selectedBlock.client_id, 'title', (event.currentTarget as HTMLInputElement).value)}
+										/>
+									</div>
+
+									<div class="grid grid-cols-2 gap-3">
+										<div class="space-y-2">
+											<label for="deload-freq" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Trigger Every</label>
+											<div class="flex items-center gap-1.5">
+												<input
+													id="deload-freq"
+													type="number"
+													min="1"
+													max="16"
+													class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+													value={typeof selectedBlock.data.frequency_weeks === 'number' ? selectedBlock.data.frequency_weeks : 4}
+													oninput={(event) => updateBlockField(selectedBlock.client_id, 'frequency_weeks', Number((event.currentTarget as HTMLInputElement).value))}
+												/>
+												<span class="text-xs text-on-surface-variant font-medium">weeks</span>
+											</div>
+										</div>
+
+										<div class="space-y-2">
+											<label for="deload-rir" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Target RIR</label>
+											<input
+												id="deload-rir"
+												type="number"
+												min="1"
+												max="5"
+												class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+												value={typeof selectedBlock.data.target_rir === 'number' ? selectedBlock.data.target_rir : 3}
+												oninput={(event) => updateBlockField(selectedBlock.client_id, 'target_rir', Number((event.currentTarget as HTMLInputElement).value))}
+											/>
+										</div>
+									</div>
+
+									<div class="space-y-2">
+										<label for="deload-strategy" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Recovery Strategy</label>
+										<select
+											id="deload-strategy"
+											class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+											value={typeof selectedBlock.data.strategy === 'string' ? selectedBlock.data.strategy : 'volume'}
+											onchange={(event) => updateBlockField(selectedBlock.client_id, 'strategy', (event.currentTarget as HTMLSelectElement).value)}
+										>
+											<option value="volume">Volume Reduction (Fewer sets, High RIR)</option>
+											<option value="intensity">Intensity Reduction (15% Less Load)</option>
+											<option value="hybrid">Hybrid (Reduced sets & load)</option>
+										</select>
+									</div>
+
+									{#if selectedBlock.data.strategy === 'volume' || selectedBlock.data.strategy === 'hybrid'}
+										<div class="space-y-2">
+											<label for="deload-vol" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Volume Reduction (%)</label>
+											<input
+												id="deload-vol"
+												type="number"
+												min="10"
+												max="75"
+												class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+												value={typeof selectedBlock.data.volume_reduction_percent === 'number' ? selectedBlock.data.volume_reduction_percent : 40}
+												oninput={(event) => updateBlockField(selectedBlock.client_id, 'volume_reduction_percent', Number((event.currentTarget as HTMLInputElement).value))}
+											/>
+										</div>
+									{/if}
+
+									{#if selectedBlock.data.strategy === 'intensity' || selectedBlock.data.strategy === 'hybrid'}
+										<div class="space-y-2">
+											<label for="deload-int" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Load Reduction (%)</label>
+											<input
+												id="deload-int"
+												type="number"
+												min="5"
+												max="50"
+												class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+												value={typeof selectedBlock.data.intensity_reduction_percent === 'number' ? selectedBlock.data.intensity_reduction_percent : 15}
+												oninput={(event) => updateBlockField(selectedBlock.client_id, 'intensity_reduction_percent', Number((event.currentTarget as HTMLInputElement).value))}
+											/>
+										</div>
+									{/if}
+
+									<!-- Manual Activation Toggle -->
+									<div class="rounded-xl border border-outline-variant/20 bg-surface-container p-3 flex items-center justify-between gap-3">
+										<div>
+											<p class="text-xs font-semibold text-on-surface">Activate For Next Workout</p>
+											<p class="text-[10px] text-on-surface-variant">Immediately activates deload mode in the player</p>
+										</div>
+										<label class="relative inline-flex items-center cursor-pointer">
+											<input
+												type="checkbox"
+												class="sr-only peer"
+												checked={Boolean(selectedBlock.data.is_active)}
+												onchange={(event) => updateBlockField(selectedBlock.client_id, 'is_active', (event.currentTarget as HTMLInputElement).checked)}
+											/>
+											<div class="w-9 h-5 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+										</label>
+									</div>
+
+									<div class="space-y-2">
+										<label for="deload-notes" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Recovery Notes & Cues</label>
+										<textarea
+											id="deload-notes"
+											rows="3"
+											class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+											value={typeof selectedBlock.data.notes === 'string' ? selectedBlock.data.notes : ''}
+											oninput={(event) => updateBlockField(selectedBlock.client_id, 'notes', (event.currentTarget as HTMLTextAreaElement).value)}
+											placeholder="Focus on clean form, speed, joint decompression, and high bar velocity..."
+										></textarea>
+									</div>
+								</div>
 							{/if}
 						</div>
 

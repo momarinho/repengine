@@ -6,7 +6,8 @@ export type PlayerBlockType =
 	| 'wave'
 	| 'repeat'
 	| 'exercise_timed'
-	| 'superset';
+	| 'superset'
+	| 'deload';
 
 export type QueueTone = 'primary' | 'secondary' | 'tertiary' | 'muted';
 

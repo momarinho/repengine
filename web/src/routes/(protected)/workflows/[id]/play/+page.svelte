@@ -1134,6 +1134,8 @@
 				}
 				return getCurrentRound(block) >= (block.rounds ?? 1) ? 'Complete Block' : 'Log Round';
 			}
+			case 'deload':
+				return 'Acknowledge Protocol';
 			case 'section':
 				return 'Start Section';
 			default:
@@ -2043,6 +2045,10 @@
 
 				const nextRound = currentRound + 1;
 				roundByBlock = { ...roundByBlock, [block.id]: nextRound };
+				return;
+			}
+			case 'deload': {
+				completeCurrentBlock(block, 'Deload protocol active');
 				return;
 			}
 			case 'section':
@@ -5039,6 +5045,63 @@
 								{/if}
 							</div>
 						{/if}
+					{:else if currentBlock.node_type_slug === 'deload'}
+						<div class="space-y-6">
+							<div class="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6 sm:p-8 shadow-xl">
+								<div class="flex items-center gap-3">
+									<div class="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400">
+										<span class="material-symbols-outlined text-2xl">battery_charging_full</span>
+									</div>
+									<div>
+										<span class="rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+											Active Recovery Protocol
+										</span>
+										<h3 class="text-xl sm:text-2xl font-black text-on-surface mt-1">
+											{currentBlock.title || 'Deload & Recovery Protocol'}
+										</h3>
+									</div>
+								</div>
+
+								<div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+									<div class="rounded-xl border border-white/5 bg-surface-container-low p-3.5">
+										<span class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Strategy</span>
+										<p class="text-base font-bold text-emerald-400 capitalize mt-1">
+											{currentBlock.data?.strategy || 'volume'}
+										</p>
+									</div>
+									<div class="rounded-xl border border-white/5 bg-surface-container-low p-3.5">
+										<span class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Target RIR</span>
+										<p class="text-base font-bold text-on-surface mt-1">
+											RIR {currentBlock.data?.target_rir ?? 3} (Stop short of failure)
+										</p>
+									</div>
+									<div class="rounded-xl border border-white/5 bg-surface-container-low p-3.5">
+										<span class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Volume Cap</span>
+										<p class="text-base font-bold text-on-surface mt-1">
+											-{currentBlock.data?.volume_reduction_percent ?? 40}% Sets
+										</p>
+									</div>
+									<div class="rounded-xl border border-white/5 bg-surface-container-low p-3.5">
+										<span class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Baseline Status</span>
+										<p class="text-base font-bold text-emerald-400 mt-1">
+											Preserved (No reset)
+										</p>
+									</div>
+								</div>
+
+								{#if currentBlock.data?.notes}
+									<div class="mt-5 rounded-xl border border-white/5 bg-surface-container-low p-4 text-xs sm:text-sm text-on-surface-variant leading-relaxed">
+										<p class="font-bold text-on-surface mb-1">Coach Cues:</p>
+										{currentBlock.data.notes}
+									</div>
+								{/if}
+
+								<div class="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-4 border-t border-emerald-500/20 text-xs text-on-surface-variant">
+									<span>Training volume & loads will return to normal after this recovery block.</span>
+									<span class="font-bold text-emerald-400">Supercompensation Active</span>
+								</div>
+							</div>
+						</div>
 					{:else}
 						<div class="rounded-xl border border-white/5 bg-surface-container-low p-6">
 							<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Section objective</p>

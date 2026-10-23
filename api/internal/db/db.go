@@ -188,6 +188,22 @@ func SeedNodeTypes(ctx context.Context) error {
 				"collapsed": false,
 				"label": ""
 			}`},
+		{
+			"deload",
+			"Deload & Recovery",
+			"Configures scheduled active recovery or deload parameters for routine blocks",
+			"battery_charging_full",
+			`{
+				"title": "Deload & Recovery Protocol",
+				"frequency_weeks": 4,
+				"strategy": "volume",
+				"volume_reduction_percent": 40,
+				"intensity_reduction_percent": 15,
+				"target_rir": 3,
+				"notes": "Reduce fatigue and promote joint recovery. Cap sets and stop well before failure.",
+				"is_active": false
+			}`,
+		},
 	}
 
 	for _, n := range seedData {

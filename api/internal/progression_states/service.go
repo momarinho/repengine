@@ -58,6 +58,17 @@ func (s *Service) ApplySessionProgression(ctx context.Context, in ApplySessionPr
 	}
 	resolvedBlocks := resolveWorkflowBlocks(blocks)
 
+	isDeloadSession := in.IsDeload
+	if !isDeloadSession {
+		for _, b := range resolvedBlocks {
+			if b.NodeTypeSlug == "deload" && asBool(b.Data["is_active"]) {
+				isDeloadSession = true
+				break
+			}
+		}
+	}
+	in.IsDeload = isDeloadSession
+
 	existingStates, err := s.repo.ListProgressionStates(ctx, in.UserID, in.WorkflowID)
 	if err != nil {
 		return err
@@ -321,6 +332,32 @@ func buildLinearProgressionState(
 		steps = parseFailSequence(failSequenceStr)
 	}
 
+	if session.IsDeload && hasExisting {
+		return UpsertProgressionStateInput{
+			UserID:          session.UserID,
+			WorkflowID:      session.WorkflowID,
+			WorkflowBlockID: block.ID,
+			BlockKey:        block.BlockKey,
+			NodeTypeSlug:    block.NodeTypeSlug,
+			StateType:       StateTypeLinear,
+			ExerciseName:    asString(block.Data["exercise_name"]),
+			Outcome:         OutcomeMaintain,
+			CurrentLoad:     existing.CurrentLoad,
+			SuggestedLoad:   existing.SuggestedLoad,
+			AvgActualRPE:    existing.AvgActualRPE,
+			AvgActualRIR:    existing.AvgActualRIR,
+			LastSessionID:   session.SessionID,
+			LastLogCount:    len(logs),
+			Summary:         "Deload session completed. Preserving baseline load and sequence for the regular training cycle.",
+			Metadata: map[string]any{
+				"current_sequence_index": currentSeqIndex,
+				"session_count":          sessionCount,
+				"is_deload":              true,
+				"baseline_load":          existing.SuggestedLoad,
+			},
+		}
+	}
+
 	var setsPlanned int
 	var repsPrescribed string
 	if len(steps) > 0 {
@@ -459,6 +496,30 @@ func buildWaveProgressionState(
 	hasExisting bool,
 	session ApplySessionProgressionInput,
 ) UpsertProgressionStateInput {
+	if session.IsDeload && hasExisting {
+		return UpsertProgressionStateInput{
+			UserID:                   session.UserID,
+			WorkflowID:               session.WorkflowID,
+			WorkflowBlockID:          block.ID,
+			BlockKey:                 block.BlockKey,
+			NodeTypeSlug:             block.NodeTypeSlug,
+			StateType:                StateTypeWave,
+			ExerciseName:             asString(block.Data["exercise_name"]),
+			Outcome:                  OutcomeMaintain,
+			CurrentWeek:              existing.CurrentWeek,
+			SuggestedWeek:            existing.SuggestedWeek,
+			SuggestedIntensityOffset: existing.SuggestedIntensityOffset,
+			AvgActualRPE:             existing.AvgActualRPE,
+			AvgActualRIR:             existing.AvgActualRIR,
+			LastSessionID:            session.SessionID,
+			LastLogCount:             len(logs),
+			Summary:                  fmt.Sprintf("Deload session completed: week %d baseline preserved.", existing.CurrentWeek),
+			Metadata: map[string]any{
+				"is_deload": true,
+			},
+		}
+	}
+
 	currentWeek := resolveWaveCurrentWeek(block, logs, existing, hasExisting)
 	currentOffset := 0.0
 	if hasExisting {
@@ -1284,4 +1345,21 @@ func maxInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func asBool(v any) bool {
+	switch val := v.(type) {
+	case bool:
+		return val
+	case string:
+		return strings.EqualFold(val, "true") || val == "1"
+	case int:
+		return val != 0
+	case int64:
+		return val != 0
+	case float64:
+		return val != 0
+	default:
+		return false
+	}
 }

@@ -66,6 +66,7 @@ type ApplySessionProgressionInput struct {
 	UserID     int
 	WorkflowID int
 	SessionID  int
+	IsDeload   bool
 	Logs       []CompletedSetLog
 }
 
