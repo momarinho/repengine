@@ -56,6 +56,9 @@ else
     fi
 fi
 
+# Reload Nginx configuration to apply proxy/rate-limiting updates
+docker compose -f docker-compose.prod.yml exec -T nginx nginx -s reload >/dev/null 2>&1 || true
+
 # 3. Clean up dangling images to preserve VPS disk space
 echo ""
 echo "🧹 [3/4] Cleaning up dangling docker images..."

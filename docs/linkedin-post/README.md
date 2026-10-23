@@ -45,7 +45,7 @@ Frontend reativo e minimalista, com renderização de gráficos SVG nativos clie
 
 O projeto é 100% open-source, conta com mais de 145 testes automatizados (unitários, integração e widgets) e pipeline de CI/CD no GitHub Actions.
 
-Confira no vídeo de 26s a execução fluida do Flutter na academia 👇
+Confira no vídeo rápido (29s) a experiência integrada do Dual-Workflow (Web Studio + Flutter Mobile) 👇
 
 🔗 Repositório no GitHub: https://github.com/momarinho/repengine
 
@@ -70,7 +70,9 @@ Confira no vídeo de 26s a execução fluida do Flutter na academia 👇
 
 1. Abra o LinkedIn e clique em **"Iniciar publicação"**.
 2. Cole o texto da **Seção 1**.
-3. Clique no ícone de **Vídeo** e selecione [`video-flutter-mobile-demo.mp4`](video-flutter-mobile-demo.mp4).
-4. Na tela de prévia do vídeo, clique em **"Selecionar miniatura" / "Select thumbnail"** e escolha [`thumbnail-video-hud.png`](thumbnail-video-hud.png).
+3. Clique no ícone de **Vídeo** e selecione o vídeo escolhido:
+   * **Recomendado (Dual-Workflow PC + Celular):** [`video-unified-dual-workflow.mp4`](video-unified-dual-workflow.mp4) com a miniatura [`thumbnail-unified.png`](thumbnail-unified.png).
+   * **Alternativa (Foco 100% Mobile):** [`video-flutter-mobile-demo.mp4`](video-flutter-mobile-demo.mp4) com a miniatura [`thumbnail-video-hud.png`](thumbnail-video-hud.png) *(se usar este, troque a linha 48 para "Confira no vídeo de 26s a execução fluida do Flutter na academia 👇")*.
+4. Na tela de prévia do vídeo, clique em **"Selecionar miniatura" / "Select thumbnail"** e escolha a capa correspondente.
 5. Clique em **Avançar** e publique.
 6. Vá na área de comentários do post recém-criado, cole o texto da **Seção 2** e anexe a imagem [`bonus-comment-web-studio.png`](bonus-comment-web-studio.png).
