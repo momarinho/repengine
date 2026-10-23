@@ -7,6 +7,7 @@ The workout editor should keep distinct block types for distinct programming mod
 - `exercise`: simple fixed prescription.
 - `wave`: set-by-set wave loading with week presets.
 - `linear_progression`: session-to-session load progression.
+- `deload`: active recovery protocol, scheduled frequency, and baseline-preserving progression guard.
 - `section`: visual and logical divider for days, phases, or groups.
 
 Avoid turning `wave` into a generic progression block. It should stay focused on programs like 5/3/1 where one block contains multiple set prescriptions and week-specific variations.
@@ -99,6 +100,56 @@ Player behavior:
 - show current load target;
 - show planned increment and rule;
 - complete only after all sets are logged.
+
+## Deload Block (Active Recovery Protocol)
+
+In strength programming and calisthenics, systematic fatigue accumulation requires scheduled deload periods (typically every 4 to 6 weeks) to dissipate systemic CNS fatigue, reduce connective tissue strain, and resensitize muscle fibers to hypertrophy/strength stimuli.
+
+The `deload` block defines routine-level recovery parameters and directly integrates with both the Routine Architect and the Workout Player.
+
+### Node Type Slug
+```text
+deload
+```
+
+### Canonical Data Schema
+```json
+{
+  "title": "Scheduled Deload Protocol",
+  "frequency_weeks": 4,
+  "strategy": "volume_intensity",
+  "volume_reduction_pct": 50,
+  "intensity_reduction_pct": 10,
+  "target_rir": 3,
+  "is_active": false,
+  "notes": "Reduce total working sets by half. Keep weights light, crisp, and focus on movement quality."
+}
+```
+
+### Core Configuration Fields
+- `frequency_weeks` (int): Number of training weeks before activating a deload block (e.g., 4 to 8 weeks).
+- `strategy` (enum: `volume`, `intensity`, `volume_intensity`):
+  - `volume`: Cut working sets by 40-50%, maintaining working load to preserve neuromuscular intensity.
+  - `intensity`: Drop working weight by 10-20% while performing normal set/rep volume.
+  - `volume_intensity`: Hybrid reduction (standard for heavy compound and calisthenics routines).
+- `volume_reduction_pct` (int): Target volume reduction (typically 40-50%).
+- `intensity_reduction_pct` (int): Target intensity or load reduction (typically 10-20%).
+- `target_rir` (int): Target Reps In Reserve during deload sets (3-4 RIR recommended).
+- `is_active` (bool): Manual activation toggle for the current training cycle.
+- `notes` (string): Coach cues, mobility instructions, or custom notes.
+
+### Baseline-Preserving Progression Mechanics
+A critical flaw in naive training apps is treating a deload session (where logged sets and loads are intentionally reduced) as a stall, plateau, or failure—improperly decreasing working weights upon resuming normal training.
+
+RepEngine solves this with **Baseline-Preserving Progression Protection**:
+1. When a routine with an active `deload` block is completed (or `is_deload: true` is passed), the Go Core progression engine (`api/internal/progression_states/service.go`) intercepts the evaluation.
+2. The engine computes `OutcomeMaintain`, tags metadata with `is_deload: true`, and **preserves the athlete's pre-deload `SuggestedLoad` intact**.
+3. Upon completing the deload week and deactivating the block, the subsequent normal workout session immediately resumes from the true baseline weight without any penalty or regression.
+
+### Player Behavior
+- Displays a dedicated active recovery status banner in the top app bar (`Deload` badge).
+- Injects an **Active Recovery Protocol** milestone card showing configured volume cuts, target RIR, and coach cues.
+- Provides a one-tap acknowledgment action (`Acknowledge Protocol`) without obstructing set logging.
 
 ## Template Mapping
 

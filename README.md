@@ -70,11 +70,12 @@ graph TD
 * **Cross-Platform Compatibility**: Full 1-click export and import across Web Studio, AI assistant prompts, and Mobile.
 * **Defensive Parsing**: Validates required structural keys while gracefully tolerating alternative AI formats (`days`/`exercises` vs `sections`/`blocks`), providing clear validation diagnostics.
 
-### 📈 3. Structured Progression Sub-blocks
+### 📈 3. Structured Progression Sub-blocks & Deload Protocols
 * **First-Class Progression Models**: Integrated progression metadata directly into canonical `exercise` blocks, supporting:
   * **Linear Progression**: Configurable load increment (+kg per successful session) with autoregulation adjustments.
   * **Double Progression**: Rep range cycling (`min_reps` to `max_reps`). Reaching max reps across sets increases load and resets reps to the lower bound; otherwise maintains load and advances target reps.
-* **Visual Graph Rendering**: The Web Studio renders visually connected progression badges and inline sub-block editors (`BlockExercise.svelte`), eliminating detached legacy nodes while preserving backwards compatibility.
+* **Deload & Active Recovery Protection**: Routine-level `deload` block defining scheduled frequency (e.g., every 4 to 6 weeks), volume/intensity reduction percentages, and target RIR. When deload sessions are logged, the backend progression engine automatically intercepts evaluation to record `maintain` state while **strictly preserving pre-deload baseline loads**, preventing false regression upon returning to normal training.
+* **Visual Graph Rendering**: The Web Studio renders visually connected progression badges, recovery protocol cards, and inline sub-block editors (`BlockExercise.svelte`, `BlockDeload.svelte`), eliminating detached legacy nodes while preserving backwards compatibility.
 
 ### 📊 4. Native SVG Analytics Engine (Zero Bloat)
 * **Custom Vector Charts**: Built a native SVG-based chart renderer using Svelte 5 runes (`$derived`, `$state`) to compute coordinate projection scales dynamically on the client.
@@ -220,6 +221,7 @@ npx playwright test
 - [x] **Local-First SQLite Architecture**: Instant $<5\text{ms}$ UI response with Drift outbox queue.
 - [x] **Gym-Proof HUD**: Thumb-zone pads, steppers, rest countdown timer, and plate calculator.
 - [x] **Structured Progression Models**: Native support for GZCLP, Linear Progression, and Double Progression.
+- [x] **Deload & Active Recovery Protocol**: Routine Architect recovery block with automatic baseline preservation across deload sessions.
 - [x] **Zero-Config LAN Auto-Discovery**: Automatic `/24` subnet probing for Docker desktop host.
 - [x] **Bidirectional Outbox Sync**: Idempotent batch push and delta pull reconciliation.
 - [ ] **Mobile Wave Progression (5/3/1)**: Port the web studio's multi-week wave tracker and Training Maxes engine to native Flutter HUD.
