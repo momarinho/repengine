@@ -40,7 +40,8 @@ type CreateWorkoutSetLogRequest struct {
 type UpdateWorkoutSetLogRequest = CreateWorkoutSetLogRequest
 
 type CompleteWorkoutSessionRequest struct {
-	Notes string `json:"notes"`
+	Notes    string `json:"notes"`
+	IsDeload bool   `json:"is_deload"`
 }
 
 type AbandonWorkoutSessionRequest struct {
@@ -218,6 +219,7 @@ func (a *App) CompleteWorkoutSession(c *fiber.Ctx) error {
 		UserID:    userID,
 		SessionID: sessionID,
 		Notes:     req.Notes,
+		IsDeload:  req.IsDeload,
 	})
 	if serviceErr != nil {
 		return apperrors.WriteAppError(c, serviceErr)

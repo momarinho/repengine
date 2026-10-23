@@ -181,6 +181,7 @@ func (s *Service) CompleteSession(ctx context.Context, in CompleteSessionInput) 
 			UserID:     in.UserID,
 			WorkflowID: session.WorkflowID,
 			SessionID:  session.ID,
+			IsDeload:   in.IsDeload,
 			Logs:       logs,
 		}); err != nil {
 			return WorkoutSession{}, apperrors.ErrInternal()

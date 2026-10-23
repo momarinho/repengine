@@ -93,6 +93,7 @@ type CompleteSessionInput struct {
 	UserID    int
 	SessionID int
 	Notes     string
+	IsDeload  bool
 }
 
 type AbandonSessionInput struct {

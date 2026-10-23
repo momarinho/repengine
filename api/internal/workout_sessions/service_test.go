@@ -329,6 +329,59 @@ func TestServiceCompleteSession_ReturnsErrorWhenProgressionFails(t *testing.T) {
 	}
 }
 
+func TestServiceCompleteSession_ForwardsDeloadFlagToProgression(t *testing.T) {
+	ctx := context.Background()
+	var gotDeload bool
+	progressionCalled := false
+
+	repo := &fakeRepo{
+		completeSessionFunc: func(ctx context.Context, sessionID, userID int, notes string) error {
+			return nil
+		},
+		getSessionFunc: func(ctx context.Context, sessionID, userID int) (WorkoutSession, error) {
+			return WorkoutSession{
+				ID:         sessionID,
+				UserID:     userID,
+				WorkflowID: 17,
+				Status:     SessionStatusCompleted,
+				Logs: []WorkoutSetLog{
+					{
+						ID:           1,
+						NodeTypeSlug: "linear_progression",
+						SetIndex:     1,
+						Completed:    true,
+					},
+				},
+			}, nil
+		},
+	}
+
+	service := NewService(repo, &fakeProgressionApplier{
+		applyFunc: func(ctx context.Context, in progressionstates.ApplySessionProgressionInput) error {
+			progressionCalled = true
+			gotDeload = in.IsDeload
+			return nil
+		},
+	})
+
+	_, err := service.CompleteSession(ctx, CompleteSessionInput{
+		UserID:    7,
+		SessionID: 11,
+		Notes:     "deload recovery",
+		IsDeload:  true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !progressionCalled {
+		t.Fatal("expected progression to be called")
+	}
+	if !gotDeload {
+		t.Fatal("expected IsDeload to be forwarded as true")
+	}
+}
+
 func TestServiceListSessions_WorkflowNotOwned(t *testing.T) {
 	ctx := context.Background()
 

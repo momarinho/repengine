@@ -156,6 +156,10 @@
 		return getNextAndLastCompletedSection(routine?.sections, sessionHistory);
 	});
 
+	const isDeloadActive = $derived.by(() => {
+		return routine?.blocks.some((b) => b.node_type_slug === 'deload' && (b.data?.is_active === true || b.data?.is_active === 'true')) ?? false;
+	});
+
 	function resumeSavedSession(): void {
 		isChoosingSection = false;
 		isSessionComplete = false;
@@ -1390,11 +1394,14 @@
 	async function completePersistedSession(): Promise<void> {
 		if (!activePersistedSession) return;
 
+		const isDeloadActive = routine?.blocks.some((b) => b.node_type_slug === 'deload' && (b.data?.is_active === true || b.data?.is_active === 'true')) ?? false;
+
 		const response = await fetch(`/api/workout-sessions/${activePersistedSession.id}/complete`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				notes: buildSessionNotes()
+				notes: buildSessionNotes(),
+				is_deload: isDeloadActive
 			})
 		});
 		const session = await parseApiResponse<WorkoutSession>(response);
@@ -3229,6 +3236,12 @@
 		<div class="flex h-14 w-full items-center justify-between px-3 sm:px-6">
 			<div class="flex items-center gap-2 sm:gap-3 min-w-0">
 				<p class="truncate text-xs sm:text-sm font-bold tracking-tight text-on-background max-w-[120px] sm:max-w-xs">{routine.name}</p>
+				{#if isDeloadActive}
+					<span class="rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shrink-0">
+						<span class="material-symbols-outlined text-xs">battery_charging_full</span>
+						<span>Deload</span>
+					</span>
+				{/if}
 				{#if routine.sections.length > 1}
 					<button
 						type="button"
