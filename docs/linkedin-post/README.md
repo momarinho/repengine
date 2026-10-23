@@ -8,9 +8,12 @@ Esta pasta reúne todos os arquivos necessários para a publicação no LinkedIn
 
 | Arquivo | Descrição | Onde usar no LinkedIn |
 |:---|:---|:---|
-| 🎬 [`video-flutter-mobile-demo.mp4`](video-flutter-mobile-demo.mp4) | Vídeo nativo do Flutter (26s, 1.7 MB, 1080×2340, 60fps) | **Mídia principal do post** |
-| 🖼️ [`thumbnail-video-hud.png`](thumbnail-video-hud.png) | Capa do HUD de treino em alta definição | Opção **"Carregar miniatura"** no upload do vídeo |
-| 🖥️ [`bonus-comment-web-studio.png`](bonus-comment-web-studio.png) | Print do Web Studio de blocos no PC | Anexo de imagem no **1º comentário do post** |
+| 🎬 [`video-flutter-mobile-demo.mp4`](video-flutter-mobile-demo.mp4) | Vídeo nativo do Flutter (26s, 1.7 MB, 1080×2340, 60fps) | **Mídia principal do post (Opção A: Foco Mobile)** |
+| 🎬 [`video-web-desktop-demo.mp4`](video-web-desktop-demo.mp4) | Vídeo HD do Web Studio no Desktop (31s, 1.3 MB, 1280×720) | **Mídia principal do post (Opção B: Foco Web/Desktop)** |
+| 🎞️ [`bonus-comment-web-studio.gif`](bonus-comment-web-studio.gif) | GIF animado do Web Studio em ação (12s, 1.1 MB) | **Anexo animado no 1º comentário do post** |
+| 🖼️ [`thumbnail-video-hud.png`](thumbnail-video-hud.png) | Capa do HUD mobile em alta definição | Miniatura para o vídeo mobile |
+| 🖼️ [`thumbnail-desktop-studio.png`](thumbnail-desktop-studio.png) | Capa do Studio desktop em alta definição | Miniatura para o vídeo desktop |
+| 🖥️ [`bonus-comment-web-studio.png`](bonus-comment-web-studio.png) | Print estático do Web Studio | Alternativa estática para comentários |
 
 ---
 
