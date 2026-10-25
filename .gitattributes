@@ -1,0 +1,6 @@
+# Vendor mobile and asset files so GitHub Linguist detects the core languages (Go and Svelte)
+mobile/** linguist-vendored
+*.dart linguist-vendored
+*.apk linguist-vendored
+android/** linguist-vendored
+ios/** linguist-vendored
