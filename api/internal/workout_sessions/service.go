@@ -2,6 +2,7 @@ package workoutsessions
 
 import (
 	"context"
+	"log/slog"
 	"strconv"
 	"strings"
 
@@ -184,6 +185,7 @@ func (s *Service) CompleteSession(ctx context.Context, in CompleteSessionInput) 
 			IsDeload:   in.IsDeload,
 			Logs:       logs,
 		}); err != nil {
+			slog.Error("failed to apply session progression", "error", err, "session_id", session.ID, "user_id", in.UserID)
 			return WorkoutSession{}, apperrors.ErrInternal()
 		}
 	}
