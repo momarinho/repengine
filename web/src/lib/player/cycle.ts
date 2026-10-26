@@ -195,10 +195,15 @@ export function getSectionProgressionSummaries(
 
 	type ProgressionItem = NonNullable<typeof progressionStates>[number];
 	const stateByBlockID = new Map<number, ProgressionItem>();
+	const stateByBlockKey = new Map<string, ProgressionItem>();
 	if (progressionStates && progressionStates.length > 0) {
 		for (const state of progressionStates) {
 			if (state.workflow_block_id) {
 				stateByBlockID.set(state.workflow_block_id, state);
+			}
+			const key = (state as Record<string, unknown>).block_key;
+			if (typeof key === 'string' && key) {
+				stateByBlockKey.set(key, state);
 			}
 		}
 	}
@@ -206,8 +211,8 @@ export function getSectionProgressionSummaries(
 	const summaries: SectionProgressionSummary[] = [];
 	for (const block of sectionBlocks) {
 		const blockExercise = (typeof block.data?.exercise_name === 'string' ? block.data.exercise_name : null) || block.title;
-		if (block.workflowBlockID && stateByBlockID.has(block.workflowBlockID)) {
-			const state = stateByBlockID.get(block.workflowBlockID)!;
+		const state = (block.workflowBlockID ? stateByBlockID.get(block.workflowBlockID) : undefined) ?? stateByBlockKey.get(block.id);
+		if (state) {
 			summaries.push({
 				title: block.title,
 				exerciseName: state.exercise_name || blockExercise,

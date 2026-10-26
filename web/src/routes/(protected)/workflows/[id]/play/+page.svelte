@@ -89,6 +89,9 @@
 	const { data }: { data: PageData } = $props();
 	const initialData = untrack(() => ({
 		routine: data.routine ? JSON.parse(JSON.stringify(data.routine)) : null,
+		sessionHistory: data.sessionHistory ? JSON.parse(JSON.stringify(data.sessionHistory)) : [],
+		progressionStates: data.progressionStates ? JSON.parse(JSON.stringify(data.progressionStates)) : [],
+		trainingMaxes: data.trainingMaxes ? JSON.parse(JSON.stringify(data.trainingMaxes)) : [],
 		error: data.error
 	})) as PageData;
 	const routine: PlayerRoutine | null = initialData.routine;
@@ -151,6 +154,21 @@
 	let isPreviewingLoads = $state(false);
 	let previewSection = $state<PlayerSection | null>(null);
 	let overrideLoads = $state<Record<string, string>>({});
+
+	$effect(() => {
+		if (data.sessionHistory && data.sessionHistory.length > 0) {
+			const localActive = sessionHistory.filter((s) => s.status === 'active');
+			const serverIds = new Set(data.sessionHistory.map((s) => s.id));
+			const missingLocal = localActive.filter((s) => !serverIds.has(s.id));
+			sessionHistory = [...missingLocal, ...data.sessionHistory];
+		}
+	});
+
+	$effect(() => {
+		if (data.progressionStates && data.progressionStates.length > 0) {
+			progressionStates = data.progressionStates;
+		}
+	});
 
 	const nextCycleInfo = $derived.by(() => {
 		return getNextAndLastCompletedSection(routine?.sections, sessionHistory);
@@ -334,16 +352,22 @@
 					const titleMatches =
 						session.section_title &&
 						session.section_title.trim().toLowerCase() === targetSection.title.trim().toLowerCase();
-					if (!idMatches && !titleMatches) {
+					const dayMatchTarget = targetSection.title.match(/(?:day|dia)\s*(\d+)/i);
+					const dayMatchSession = session.section_title ? session.section_title.match(/(?:day|dia)\s*(\d+)/i) : null;
+					const dayMatches = Boolean(dayMatchTarget && dayMatchSession && dayMatchTarget[1] === dayMatchSession[1]);
+					if (!idMatches && !titleMatches && !dayMatches) {
 						continue;
 					}
 				}
 			}
-			const blockLogs = session.logs.filter(
+			let blockLogs = session.logs.filter(
 				(log) =>
 					(block.workflowBlockID && log.workflow_block_id === block.workflowBlockID) ||
-					(log.block_client_id === block.id)
+					(Boolean(log.block_client_id) && log.block_client_id === block.id)
 			);
+			if (blockLogs.length === 0) {
+				blockLogs = session.logs.filter((log) => log.node_type_slug === block.node_type_slug);
+			}
 			if (blockLogs.length > 0) {
 				return [...blockLogs].sort((a, b) => a.set_index - b.set_index);
 			}
@@ -394,7 +418,10 @@
 		return reps;
 	});
 	const currentProgressionState = $derived(
-		currentBlock?.workflowBlockID ? progressionStateByBlockID[currentBlock.workflowBlockID] ?? null : null
+		progressionStates.find((state) =>
+			(currentBlock?.workflowBlockID && state.workflow_block_id === currentBlock.workflowBlockID) ||
+			(currentBlock?.id && state.block_key === currentBlock.id)
+		) ?? (currentBlock?.workflowBlockID ? progressionStateByBlockID[currentBlock.workflowBlockID] ?? null : null)
 	);
 	const activeSectionEndIndex = $derived(
 		routine
