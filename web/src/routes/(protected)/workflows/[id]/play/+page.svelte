@@ -2148,11 +2148,50 @@
 		};
 	}
 
+	function getSupersetTargetValues() {
+		if (!currentBlock) return { repsA: '5', repsB: '5', loadA: '0 kg', loadB: '0 kg' };
+		const meta = currentProgressionState?.metadata as Record<string, any> | undefined;
+		const lastLogs = getLastSessionLogs(currentBlock);
+		const lastPair = lastLogs.length > 0 ? lastLogs[lastLogs.length - 1] : null;
+		const lastLoads = lastPair?.actual_load ? lastPair.actual_load.split('/') : [];
+		const lastReps = lastPair?.actual_reps ? lastPair.actual_reps.split('/') : [];
+
+		const fallbackLoadA = lastLoads[0]?.trim() ? (lastLoads[0].trim().match(/\d/) ? (lastLoads[0].trim().toLowerCase().includes('kg') ? lastLoads[0].trim() : `${lastLoads[0].trim()} ${currentBlock.data?.load_unit_a || 'kg'}`) : lastLoads[0].trim()) : null;
+		const fallbackLoadB = lastLoads[1]?.trim() ? (lastLoads[1].trim().match(/\d/) ? (lastLoads[1].trim().toLowerCase().includes('kg') ? lastLoads[1].trim() : `${lastLoads[1].trim()} ${currentBlock.data?.load_unit_b || 'kg'}`) : lastLoads[1].trim()) : null;
+
+		const metaLoadA = typeof meta?.suggested_load_a === 'string' ? meta.suggested_load_a : (currentProgressionState?.suggested_load?.includes(' / ') ? currentProgressionState.suggested_load.split(' / ')[0] : fallbackLoadA);
+		const metaLoadB = typeof meta?.suggested_load_b === 'string' ? meta.suggested_load_b : (currentProgressionState?.suggested_load?.includes(' / ') ? currentProgressionState.suggested_load.split(' / ')[1] : fallbackLoadB);
+
+		const loadA = metaLoadA ?? (currentBlock.data?.start_load_a !== null && currentBlock.data?.start_load_a !== undefined
+			? `${currentBlock.data.start_load_a} ${currentBlock.data.load_unit_a || 'kg'}`
+			: (currentBlock.data?.load_value_a !== null && currentBlock.data?.load_value_a !== undefined
+				? `${currentBlock.data.load_value_a} ${currentBlock.data.load_unit_a || 'kg'}`
+				: '0 kg'));
+
+		const loadB = metaLoadB ?? (currentBlock.data?.start_load_b !== null && currentBlock.data?.start_load_b !== undefined
+			? `${currentBlock.data.start_load_b} ${currentBlock.data.load_unit_b || 'kg'}`
+			: (currentBlock.data?.load_value_b !== null && currentBlock.data?.load_value_b !== undefined
+				? `${currentBlock.data.load_value_b} ${currentBlock.data.load_unit_b || 'kg'}`
+				: '0 kg'));
+
+		const minA = Number(currentBlock.data?.min_reps_a || (currentBlock.data?.reps_a && String(currentBlock.data.reps_a).includes('-') ? String(currentBlock.data.reps_a).split('-')[0] : 5));
+		const maxA = Number(currentBlock.data?.max_reps_a || (currentBlock.data?.reps_a && String(currentBlock.data.reps_a).includes('-') ? String(currentBlock.data.reps_a).split('-')[1] : 8));
+		const minB = Number(currentBlock.data?.min_reps_b || (currentBlock.data?.reps_b && String(currentBlock.data.reps_b).includes('-') ? String(currentBlock.data.reps_b).split('-')[0] : 5));
+		const maxB = Number(currentBlock.data?.max_reps_b || (currentBlock.data?.reps_b && String(currentBlock.data.reps_b).includes('-') ? String(currentBlock.data.reps_b).split('-')[1] : 8));
+
+		const fallbackRepsA = lastReps[0] && Number.parseInt(lastReps[0]) >= minA ? String(Math.min(Number.parseInt(lastReps[0]) + (Number.parseInt(lastReps[0]) >= maxA ? 0 : 1), maxA)) : null;
+		const fallbackRepsB = lastReps[1] && Number.parseInt(lastReps[1]) >= minB ? String(Math.min(Number.parseInt(lastReps[1]) + (Number.parseInt(lastReps[1]) >= maxB ? 0 : 1), maxB)) : null;
+
+		const repsA = (typeof meta?.suggested_reps_a === 'string' ? meta.suggested_reps_a : null) ?? fallbackRepsA ?? (currentBlock.data?.reps_a ? String(currentBlock.data.reps_a) : '5');
+		const repsB = (typeof meta?.suggested_reps_b === 'string' ? meta.suggested_reps_b : null) ?? fallbackRepsB ?? (currentBlock.data?.reps_b ? String(currentBlock.data.reps_b) : '5');
+
+		return { repsA, repsB, loadA, loadB };
+	}
+
 	function stepActiveBlockRepsA(amount: number): void {
 		if (!currentBlock) return;
-		const meta = currentProgressionState?.metadata as Record<string, any> | undefined;
-		const defaultReps = (typeof meta?.suggested_reps_a === 'string' ? meta.suggested_reps_a : null) ?? (currentBlock.data?.reps_a ? String(currentBlock.data.reps_a) : '5');
-		const current = actualRepsAByBlock[currentBlock.id] || defaultReps;
+		const { repsA } = getSupersetTargetValues();
+		const current = actualRepsAByBlock[currentBlock.id] || repsA;
 		actualRepsAByBlock = {
 			...actualRepsAByBlock,
 			[currentBlock.id]: adjustReps(current, amount)
@@ -2161,9 +2200,8 @@
 
 	function stepActiveBlockRepsB(amount: number): void {
 		if (!currentBlock) return;
-		const meta = currentProgressionState?.metadata as Record<string, any> | undefined;
-		const defaultReps = (typeof meta?.suggested_reps_b === 'string' ? meta.suggested_reps_b : null) ?? (currentBlock.data?.reps_b ? String(currentBlock.data.reps_b) : '5');
-		const current = actualRepsBByBlock[currentBlock.id] || defaultReps;
+		const { repsB } = getSupersetTargetValues();
+		const current = actualRepsBByBlock[currentBlock.id] || repsB;
 		actualRepsBByBlock = {
 			...actualRepsBByBlock,
 			[currentBlock.id]: adjustReps(current, amount)
@@ -2172,14 +2210,8 @@
 
 	function stepActiveBlockLoadA(amount: number): void {
 		if (!currentBlock) return;
-		const meta = currentProgressionState?.metadata as Record<string, any> | undefined;
-		const metaLoad = typeof meta?.suggested_load_a === 'string' ? meta.suggested_load_a : (currentProgressionState?.suggested_load?.includes(' / ') ? currentProgressionState.suggested_load.split(' / ')[0] : null);
-		const defaultLoad = metaLoad ?? (currentBlock.data?.start_load_a !== null && currentBlock.data?.start_load_a !== undefined
-			? `${currentBlock.data.start_load_a} ${currentBlock.data.load_unit_a || 'kg'}`
-			: (currentBlock.data?.load_value_a !== null && currentBlock.data?.load_value_a !== undefined
-				? `${currentBlock.data.load_value_a} ${currentBlock.data.load_unit_a || 'kg'}`
-				: '0 kg'));
-		const current = actualLoadAByBlock[currentBlock.id] || defaultLoad;
+		const { loadA } = getSupersetTargetValues();
+		const current = actualLoadAByBlock[currentBlock.id] || loadA;
 		actualLoadAByBlock = {
 			...actualLoadAByBlock,
 			[currentBlock.id]: adjustLoad(current, amount)
@@ -2188,14 +2220,8 @@
 
 	function stepActiveBlockLoadB(amount: number): void {
 		if (!currentBlock) return;
-		const meta = currentProgressionState?.metadata as Record<string, any> | undefined;
-		const metaLoad = typeof meta?.suggested_load_b === 'string' ? meta.suggested_load_b : (currentProgressionState?.suggested_load?.includes(' / ') ? currentProgressionState.suggested_load.split(' / ')[1] : null);
-		const defaultLoad = metaLoad ?? (currentBlock.data?.start_load_b !== null && currentBlock.data?.start_load_b !== undefined
-			? `${currentBlock.data.start_load_b} ${currentBlock.data.load_unit_b || 'kg'}`
-			: (currentBlock.data?.load_value_b !== null && currentBlock.data?.load_value_b !== undefined
-				? `${currentBlock.data.load_value_b} ${currentBlock.data.load_unit_b || 'kg'}`
-				: '0 kg'));
-		const current = actualLoadBByBlock[currentBlock.id] || defaultLoad;
+		const { loadB } = getSupersetTargetValues();
+		const current = actualLoadBByBlock[currentBlock.id] || loadB;
 		actualLoadBByBlock = {
 			...actualLoadBByBlock,
 			[currentBlock.id]: adjustLoad(current, amount)
@@ -2259,39 +2285,22 @@
 
 	function fillSupersetTargets(): void {
 		if (!currentBlock?.data) return;
-		const meta = currentProgressionState?.metadata as Record<string, any> | undefined;
-		const targetRepsA = (typeof meta?.suggested_reps_a === 'string' ? meta.suggested_reps_a : null) ?? (currentBlock.data.reps_a ? String(currentBlock.data.reps_a) : '5');
+		const { repsA, repsB, loadA, loadB } = getSupersetTargetValues();
 		actualRepsAByBlock = {
 			...actualRepsAByBlock,
-			[currentBlock.id]: targetRepsA
+			[currentBlock.id]: repsA
 		};
-
-		const metaLoadA = typeof meta?.suggested_load_a === 'string' ? meta.suggested_load_a : (currentProgressionState?.suggested_load?.includes(' / ') ? currentProgressionState.suggested_load.split(' / ')[0] : null);
-		const targetLoadA = metaLoadA ?? (currentBlock.data.start_load_a !== null && currentBlock.data.start_load_a !== undefined
-			? `${currentBlock.data.start_load_a} ${currentBlock.data.load_unit_a || 'kg'}`
-			: (currentBlock.data?.load_value_a !== null && currentBlock.data?.load_value_a !== undefined
-				? `${currentBlock.data.load_value_a} ${currentBlock.data.load_unit_a || 'kg'}`
-				: '0 kg'));
 		actualLoadAByBlock = {
 			...actualLoadAByBlock,
-			[currentBlock.id]: targetLoadA
+			[currentBlock.id]: loadA
 		};
-
-		const targetRepsB = (typeof meta?.suggested_reps_b === 'string' ? meta.suggested_reps_b : null) ?? (currentBlock.data.reps_b ? String(currentBlock.data.reps_b) : '5');
 		actualRepsBByBlock = {
 			...actualRepsBByBlock,
-			[currentBlock.id]: targetRepsB
+			[currentBlock.id]: repsB
 		};
-
-		const metaLoadB = typeof meta?.suggested_load_b === 'string' ? meta.suggested_load_b : (currentProgressionState?.suggested_load?.includes(' / ') ? currentProgressionState.suggested_load.split(' / ')[1] : null);
-		const targetLoadB = metaLoadB ?? (currentBlock.data.start_load_b !== null && currentBlock.data.start_load_b !== undefined
-			? `${currentBlock.data.start_load_b} ${currentBlock.data.load_unit_b || 'kg'}`
-			: (currentBlock.data?.load_value_b !== null && currentBlock.data?.load_value_b !== undefined
-				? `${currentBlock.data.load_value_b} ${currentBlock.data.load_unit_b || 'kg'}`
-				: '0 kg'));
 		actualLoadBByBlock = {
 			...actualLoadBByBlock,
-			[currentBlock.id]: targetLoadB
+			[currentBlock.id]: loadB
 		};
 	}
 
@@ -3898,14 +3907,26 @@
 
 						<!-- Two Exercises Side by Side -->
 						{@const meta = currentProgressionState?.metadata as Record<string, any> | undefined}
-						{@const metaLoadA = typeof meta?.suggested_load_a === 'string' ? meta.suggested_load_a : (currentProgressionState?.suggested_load?.includes(' / ') ? currentProgressionState.suggested_load.split(' / ')[0] : null)}
-						{@const metaLoadB = typeof meta?.suggested_load_b === 'string' ? meta.suggested_load_b : (currentProgressionState?.suggested_load?.includes(' / ') ? currentProgressionState.suggested_load.split(' / ')[1] : null)}
+						{@const lastSessionLogs = getLastSessionLogs(currentBlock)}
+						{@const lastLog = lastSessionLogs.length > 0 ? lastSessionLogs[lastSessionLogs.length - 1] : null}
+						{@const lastLoadParts = lastLog?.actual_load ? lastLog.actual_load.split('/') : []}
+						{@const lastRepsParts = lastLog?.actual_reps ? lastLog.actual_reps.split('/') : []}
+						{@const fallbackLoadA = lastLoadParts[0]?.trim() ? (lastLoadParts[0].trim().match(/\d/) ? (lastLoadParts[0].trim().toLowerCase().includes('kg') ? lastLoadParts[0].trim() : `${lastLoadParts[0].trim()} ${currentBlock.data?.load_unit_a || 'kg'}`) : lastLoadParts[0].trim()) : null}
+						{@const fallbackLoadB = lastLoadParts[1]?.trim() ? (lastLoadParts[1].trim().match(/\d/) ? (lastLoadParts[1].trim().toLowerCase().includes('kg') ? lastLoadParts[1].trim() : `${lastLoadParts[1].trim()} ${currentBlock.data?.load_unit_b || 'kg'}`) : lastLoadParts[1].trim()) : null}
+						{@const metaLoadA = typeof meta?.suggested_load_a === 'string' ? meta.suggested_load_a : (currentProgressionState?.suggested_load?.includes(' / ') ? currentProgressionState.suggested_load.split(' / ')[0] : fallbackLoadA)}
+						{@const metaLoadB = typeof meta?.suggested_load_b === 'string' ? meta.suggested_load_b : (currentProgressionState?.suggested_load?.includes(' / ') ? currentProgressionState.suggested_load.split(' / ')[1] : fallbackLoadB)}
 						{@const prescribedLoadA = metaLoadA ?? (currentBlock.data?.start_load_a !== null && currentBlock.data?.start_load_a !== undefined ? `${currentBlock.data.start_load_a} ${currentBlock.data.load_unit_a || 'kg'}` : (currentBlock.data?.load_value_a !== null && currentBlock.data?.load_value_a !== undefined ? `${currentBlock.data.load_value_a} ${currentBlock.data.load_unit_a || 'kg'}` : '-'))}
 						{@const prescribedLoadB = metaLoadB ?? (currentBlock.data?.start_load_b !== null && currentBlock.data?.start_load_b !== undefined ? `${currentBlock.data.start_load_b} ${currentBlock.data.load_unit_b || 'kg'}` : (currentBlock.data?.load_value_b !== null && currentBlock.data?.load_value_b !== undefined ? `${currentBlock.data.load_value_b} ${currentBlock.data.load_unit_b || 'kg'}` : '-'))}
-						{@const targetRepsA = (typeof meta?.suggested_reps_a === 'string' ? meta.suggested_reps_a : null) ?? currentBlock.data?.reps_a ?? '5'}
-						{@const targetRepsB = (typeof meta?.suggested_reps_b === 'string' ? meta.suggested_reps_b : null) ?? currentBlock.data?.reps_b ?? '10'}
-						{@const progTypeA = currentBlock.data?.progression_type_a ?? 'none'}
-						{@const progTypeB = currentBlock.data?.progression_type_b ?? 'none'}
+						{@const minRepsA = Number(currentBlock.data?.min_reps_a || (currentBlock.data?.reps_a && String(currentBlock.data.reps_a).includes('-') ? String(currentBlock.data.reps_a).split('-')[0] : 5))}
+						{@const maxRepsA = Number(currentBlock.data?.max_reps_a || (currentBlock.data?.reps_a && String(currentBlock.data.reps_a).includes('-') ? String(currentBlock.data.reps_a).split('-')[1] : 8))}
+						{@const minRepsB = Number(currentBlock.data?.min_reps_b || (currentBlock.data?.reps_b && String(currentBlock.data.reps_b).includes('-') ? String(currentBlock.data.reps_b).split('-')[0] : 5))}
+						{@const maxRepsB = Number(currentBlock.data?.max_reps_b || (currentBlock.data?.reps_b && String(currentBlock.data.reps_b).includes('-') ? String(currentBlock.data.reps_b).split('-')[1] : 8))}
+						{@const fallbackRepsA = lastRepsParts[0] && Number.parseInt(lastRepsParts[0]) >= minRepsA ? String(Math.min(Number.parseInt(lastRepsParts[0]) + (Number.parseInt(lastRepsParts[0]) >= maxRepsA ? 0 : 1), maxRepsA)) : null}
+						{@const fallbackRepsB = lastRepsParts[1] && Number.parseInt(lastRepsParts[1]) >= minRepsB ? String(Math.min(Number.parseInt(lastRepsParts[1]) + (Number.parseInt(lastRepsParts[1]) >= maxRepsB ? 0 : 1), maxRepsB)) : null}
+						{@const targetRepsA = (typeof meta?.suggested_reps_a === 'string' ? meta.suggested_reps_a : null) ?? fallbackRepsA ?? currentBlock.data?.reps_a ?? '5'}
+						{@const targetRepsB = (typeof meta?.suggested_reps_b === 'string' ? meta.suggested_reps_b : null) ?? fallbackRepsB ?? currentBlock.data?.reps_b ?? '10'}
+						{@const progTypeA = (currentBlock.data?.progression_type_a && currentBlock.data.progression_type_a !== 'none') ? currentBlock.data.progression_type_a : (String(currentBlock.data?.reps_a ?? '').includes('-') ? 'double' : 'none')}
+						{@const progTypeB = (currentBlock.data?.progression_type_b && currentBlock.data.progression_type_b !== 'none') ? currentBlock.data.progression_type_b : (String(currentBlock.data?.reps_b ?? '').includes('-') ? 'double' : 'none')}
 
 						<div class="mb-6 sm:mb-8 grid gap-4 sm:gap-6 md:grid-cols-2">
 							<!-- Exercise A -->
@@ -4170,7 +4191,7 @@
 													autocomplete="off"
 													enterkeyhint="next"
 													class="w-full h-10 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[16px] font-black text-on-surface focus:border-secondary focus:ring-1 focus:ring-secondary/50"
-													placeholder={prescribedLoadB !== '-' ? prescribedLoadB.replace(/[^\d.]/g, '') : 'kg'}
+													placeholder={prescribedLoadB !== '-' ? prescribedLoadB.replace(/[^\d.]/g, '') : '0'}
 													value={actualLoadBByBlock[currentBlock.id] ?? ''}
 													oninput={(event) => {
 														actualLoadBByBlock = {

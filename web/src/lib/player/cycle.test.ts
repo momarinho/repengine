@@ -87,6 +87,56 @@ test('matches by section title fallback if section_id changed', () => {
 	assert.equal(result.lastCompletedSection?.id, 'sec-2');
 });
 
+test('matches section by day number or subtitle variations', () => {
+	const sections: PlayerSection[] = [
+		{ id: 's-1', title: 'Day 1 - Full Body (Dips & RDL)', subtitle: '', kind: 'day', startBlockIndex: 0, blockCount: 3 },
+		{ id: 's-2', title: 'Day 2 - Full Body (Pull-Up & Squat)', subtitle: '', kind: 'day', startBlockIndex: 3, blockCount: 3 },
+		{ id: 's-3', title: 'Day 3 - Full Body (Row & Push-up)', subtitle: '', kind: 'day', startBlockIndex: 6, blockCount: 3 }
+	];
+
+	const history: WorkoutSession[] = [
+		{
+			id: 30,
+			workflow_id: 1,
+			user_id: 1,
+			section_id: 'outdated-id',
+			section_title: 'Day 1',
+			status: 'completed',
+			started_at: new Date().toISOString(),
+			completed_at: new Date().toISOString(),
+			notes: '',
+			log_count: 5
+		}
+	];
+
+	const result = getNextAndLastCompletedSection(sections, history);
+	assert.equal(result.nextSection?.id, 's-2');
+	assert.equal(result.lastCompletedSection?.id, 's-1');
+});
+
+test('single section routine always cycles to that section', () => {
+	const singleSection: PlayerSection[] = [
+		{ id: 's-1', title: 'Day 1 - Full Body', subtitle: '', kind: 'day', startBlockIndex: 0, blockCount: 5 }
+	];
+	const history: WorkoutSession[] = [
+		{
+			id: 35,
+			workflow_id: 1,
+			user_id: 1,
+			section_id: 's-1',
+			section_title: 'Day 1 - Full Body',
+			status: 'completed',
+			started_at: new Date().toISOString(),
+			completed_at: new Date().toISOString(),
+			notes: '',
+			log_count: 5
+		}
+	];
+	const result = getNextAndLastCompletedSection(singleSection, history);
+	assert.equal(result.nextSection?.id, 's-1');
+	assert.equal(result.lastCompletedSection?.id, 's-1');
+});
+
 test('ignores abandoned sessions when finding next section', () => {
 	const history: WorkoutSession[] = [
 		{

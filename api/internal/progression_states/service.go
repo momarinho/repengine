@@ -81,10 +81,35 @@ func (s *Service) ApplySessionProgression(ctx context.Context, in ApplySessionPr
 
 	logsByBlock := map[int][]CompletedSetLog{}
 	for _, log := range in.Logs {
-		if log.WorkflowBlockID == nil || !log.Completed {
+		if !log.Completed {
 			continue
 		}
-		logsByBlock[*log.WorkflowBlockID] = append(logsByBlock[*log.WorkflowBlockID], log)
+		if log.WorkflowBlockID != nil {
+			logsByBlock[*log.WorkflowBlockID] = append(logsByBlock[*log.WorkflowBlockID], log)
+			continue
+		}
+		// Fallback: match by BlockClientID or NodeTypeSlug
+		matched := false
+		for _, b := range resolvedBlocks {
+			if log.BlockClientID != "" && (b.BlockKey == log.BlockClientID || strconv.Itoa(b.ID) == log.BlockClientID) {
+				logsByBlock[b.ID] = append(logsByBlock[b.ID], log)
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			var candidateID int
+			count := 0
+			for _, b := range resolvedBlocks {
+				if b.NodeTypeSlug == log.NodeTypeSlug {
+					candidateID = b.ID
+					count++
+				}
+			}
+			if count == 1 {
+				logsByBlock[candidateID] = append(logsByBlock[candidateID], log)
+			}
+		}
 	}
 
 	for _, block := range resolvedBlocks {
@@ -162,6 +187,15 @@ func (s *Service) ListProgressionStates(ctx context.Context, in ListProgressionS
 		if !exists {
 			history, ok := historyByBlockID[block.ID]
 			if !ok {
+				for _, h := range historyByBlockID {
+					if len(h.Logs) > 0 && h.Logs[0].NodeTypeSlug == block.NodeTypeSlug {
+						history = h
+						ok = true
+						break
+					}
+				}
+			}
+			if !ok {
 				continue
 			}
 			stateInput, ok := s.buildNextState(block, history.Logs, ProgressionState{}, false, ApplySessionProgressionInput{
@@ -174,6 +208,7 @@ func (s *Service) ListProgressionStates(ctx context.Context, in ListProgressionS
 				continue
 			}
 			synthesized := progressionStateFromUpsert(stateInput)
+			synthesized.WorkflowBlockID = block.ID
 			synthesized.Metadata = enrichStateMetadata(block, synthesized.Metadata, waveHistoryByBlockID[block.ID])
 			ordered = append(ordered, synthesized)
 			continue
@@ -1110,12 +1145,20 @@ func buildSupersetProgressionState(
 	minB, maxB := parseMinMaxConfig(block.Data["min_reps_b"], block.Data["max_reps_b"], repsBStr)
 
 	progTypeA := asString(block.Data["progression_type_a"])
-	if progTypeA == "" {
-		progTypeA = "none"
+	if progTypeA == "" || progTypeA == "none" {
+		if minA != maxA && minA > 0 && maxA > 0 {
+			progTypeA = "double"
+		} else {
+			progTypeA = "none"
+		}
 	}
 	progTypeB := asString(block.Data["progression_type_b"])
-	if progTypeB == "" {
-		progTypeB = "none"
+	if progTypeB == "" || progTypeB == "none" {
+		if minB != maxB && minB > 0 && maxB > 0 {
+			progTypeB = "double"
+		} else {
+			progTypeB = "none"
+		}
 	}
 
 	incA := parseNumberValue(block.Data["increment_a"])

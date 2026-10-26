@@ -49,6 +49,22 @@ export function getNextAndLastCompletedSection(
 	if (lastIdx === -1 && lastCompleted.section_title) {
 		const targetTitle = lastCompleted.section_title.trim().toLowerCase();
 		lastIdx = playableSections.findIndex((s) => s.title.trim().toLowerCase() === targetTitle);
+		if (lastIdx === -1) {
+			lastIdx = playableSections.findIndex((s) => {
+				const sTitle = s.title.trim().toLowerCase();
+				return targetTitle.includes(sTitle) || sTitle.includes(targetTitle);
+			});
+		}
+		if (lastIdx === -1) {
+			const dayMatch = targetTitle.match(/(?:day|dia)\s*(\d+)/i);
+			if (dayMatch) {
+				const dayNum = dayMatch[1];
+				lastIdx = playableSections.findIndex((s) => {
+					const sMatch = s.title.toLowerCase().match(/(?:day|dia)\s*(\d+)/i);
+					return sMatch && sMatch[1] === dayNum;
+				});
+			}
+		}
 	}
 
 	if (lastIdx === -1) {
@@ -138,12 +154,19 @@ export function getLastCompletedSessionForSection(
 ): WorkoutSession | null {
 	if (!sessionHistory || sessionHistory.length === 0) return null;
 	const targetTitle = section.title.trim().toLowerCase();
+	const dayMatch = targetTitle.match(/(?:day|dia)\s*(\d+)/i);
 	return (
-		sessionHistory.find(
-			(s) =>
-				s.status === 'completed' &&
-				(String(s.section_id) === String(section.id) || (Boolean(s.section_title) && s.section_title.trim().toLowerCase() === targetTitle))
-		) ?? null
+		sessionHistory.find((s) => {
+			if (s.status !== 'completed') return false;
+			if (s.section_id && String(s.section_id) === String(section.id)) return true;
+			if (s.section_title) {
+				const sTitle = s.section_title.trim().toLowerCase();
+				if (sTitle === targetTitle || sTitle.includes(targetTitle) || targetTitle.includes(sTitle)) return true;
+				const sMatch = sTitle.match(/(?:day|dia)\s*(\d+)/i);
+				if (dayMatch && sMatch && dayMatch[1] === sMatch[1]) return true;
+			}
+			return false;
+		}) ?? null
 	);
 }
 
