@@ -3,9 +3,11 @@ package progressionstates
 import "time"
 
 const (
-	StateTypeLinear = "linear"
-	StateTypeWave   = "wave"
-	StateTypeSkill  = "skill"
+	StateTypeLinear   = "linear"
+	StateTypeWave     = "wave"
+	StateTypeSkill    = "skill"
+	StateTypeDouble   = "double"
+	StateTypeSuperset = "superset"
 
 	OutcomeIncrease = "increase"
 	OutcomeMaintain = "maintain"

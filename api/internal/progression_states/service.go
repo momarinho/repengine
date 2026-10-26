@@ -38,6 +38,7 @@ type waveHistorySession struct {
 }
 
 var numberPattern = regexp.MustCompile(`-?\d+(?:\.\d+)?`)
+var digitPattern = regexp.MustCompile(`\d+`)
 
 func (s *Service) ApplySessionProgression(ctx context.Context, in ApplySessionProgressionInput) error {
 	if in.WorkflowID <= 0 || in.UserID <= 0 || in.SessionID <= 0 {
@@ -201,7 +202,10 @@ func (s *Service) buildNextState(
 	case "exercise", "exercise_timed":
 		if prog, ok := block.Data["progression"].(map[string]any); ok && prog != nil {
 			progType := asString(prog["type"])
-			if progType == "linear" || progType == "double" {
+			if progType == "double" {
+				return buildDoubleProgressionState(block, logs, existing, hasExisting, session), true
+			}
+			if progType == "linear" {
 				return buildLinearProgressionState(block, logs, existing, hasExisting, session), true
 			}
 		}
@@ -209,6 +213,8 @@ func (s *Service) buildNextState(
 			return UpsertProgressionStateInput{}, false
 		}
 		return buildSkillProgressionState(block, logs, existing, hasExisting, session), true
+	case "superset":
+		return buildSupersetProgressionState(block, logs, existing, hasExisting, session), true
 	default:
 		return UpsertProgressionStateInput{}, false
 	}
@@ -703,8 +709,556 @@ func progressionStateFromUpsert(in UpsertProgressionStateInput) ProgressionState
 	}
 }
 
+func splitPair(val string) (string, string) {
+	val = strings.TrimSpace(val)
+	if val == "" {
+		return "", ""
+	}
+	parts := strings.Split(val, "/")
+	if len(parts) >= 2 {
+		return strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
+	}
+	return val, ""
+}
+
+func parseRepsMinMax(reps string) (int, int) {
+	matches := digitPattern.FindAllString(reps, -1)
+	if len(matches) == 0 {
+		return 5, 8
+	}
+	first, _ := strconv.Atoi(matches[0])
+	if len(matches) == 1 {
+		return first, first
+	}
+	last, _ := strconv.Atoi(matches[len(matches)-1])
+	if last < first {
+		last = first
+	}
+	return first, last
+}
+
+func parseFirstInt(val string) (int, bool) {
+	match := digitPattern.FindString(val)
+	if match == "" {
+		return 0, false
+	}
+	num, err := strconv.Atoi(match)
+	if err != nil {
+		return 0, false
+	}
+	return num, true
+}
+
+func parseMinMaxConfig(minVal, maxVal any, fallbackReps string) (int, int) {
+	minR := intOrDefault(minVal, 0)
+	maxR := intOrDefault(maxVal, 0)
+	if minR > 0 && maxR > 0 {
+		if maxR < minR {
+			maxR = minR
+		}
+		return minR, maxR
+	}
+	return parseRepsMinMax(fallbackReps)
+}
+
+type singleProgressionResult struct {
+	CurrentLoad   string
+	SuggestedLoad string
+	TargetReps    string
+	Outcome       string
+	Summary       string
+	Metadata      map[string]any
+}
+
+func evalSingleExerciseProgression(
+	exerciseName string,
+	progType string,
+	setsPlanned int,
+	repsStr string,
+	minReps int,
+	maxReps int,
+	increment float64,
+	loadUnit string,
+	configuredLoad float64,
+	existingSuggestedLoad string,
+	existingMetadata map[string]any,
+	logs []CompletedSetLog,
+	isDeload bool,
+) singleProgressionResult {
+	if loadUnit == "" {
+		loadUnit = "kg"
+	}
+	if setsPlanned <= 0 {
+		setsPlanned = 3
+	}
+	if minReps <= 0 || maxReps <= 0 {
+		minReps, maxReps = parseRepsMinMax(repsStr)
+	}
+	if increment <= 0 {
+		increment = 2.5
+	}
+
+	currentLoad := ""
+	for _, l := range logs {
+		if val := strings.TrimSpace(l.ActualLoad); val != "" && val != "0" && val != "0 kg" && val != "0.0" && val != "0.0 kg" {
+			if num, ok := parseNumberString(val); ok {
+				currentLoad = formatLoad(num, loadUnit)
+				break
+			}
+			currentLoad = val
+			break
+		}
+	}
+	if currentLoad == "" && existingSuggestedLoad != "" && existingSuggestedLoad != "0" && existingSuggestedLoad != "0 kg" && existingSuggestedLoad != "0.0" && existingSuggestedLoad != "0.0 kg" {
+		currentLoad = existingSuggestedLoad
+	}
+	if currentLoad == "" && configuredLoad > 0 {
+		currentLoad = formatLoad(configuredLoad, loadUnit)
+	}
+	if currentLoad == "" {
+		for _, l := range logs {
+			if val := strings.TrimSpace(l.ActualLoad); val != "" {
+				currentLoad = val
+				break
+			}
+		}
+	}
+	if currentLoad == "" && existingSuggestedLoad != "" {
+		currentLoad = existingSuggestedLoad
+	}
+	if currentLoad == "" {
+		currentLoad = formatLoad(0, loadUnit)
+	}
+	currentLoadVal, hasCurrentLoad := parseNumberString(currentLoad)
+	if hasCurrentLoad {
+		currentLoad = formatLoad(currentLoadVal, loadUnit)
+	}
+
+	actualReps := make([]int, 0, len(logs))
+	for _, l := range logs {
+		if !l.Completed {
+			continue
+		}
+		if r, ok := parseFirstInt(l.ActualReps); ok && r > 0 {
+			actualReps = append(actualReps, r)
+		}
+	}
+
+	minActualReps := 0
+	if len(actualReps) > 0 {
+		minActualReps = actualReps[0]
+		for _, r := range actualReps {
+			if r < minActualReps {
+				minActualReps = r
+			}
+		}
+	}
+
+	allSetsCompleted := len(actualReps) >= setsPlanned
+
+	currentRepTarget := minReps
+	if existingMetadata != nil {
+		if tr := intOrDefault(existingMetadata["target_reps"], 0); tr > 0 {
+			currentRepTarget = tr
+		}
+	}
+	if currentRepTarget < minReps {
+		currentRepTarget = minReps
+	}
+	if currentRepTarget > maxReps {
+		currentRepTarget = maxReps
+	}
+
+	if isDeload && existingSuggestedLoad != "" {
+		return singleProgressionResult{
+			CurrentLoad:   currentLoad,
+			SuggestedLoad: existingSuggestedLoad,
+			TargetReps:    strconv.Itoa(currentRepTarget),
+			Outcome:       OutcomeMaintain,
+			Summary:       fmt.Sprintf("Deload session completed. Preserved %s at %d reps.", existingSuggestedLoad, currentRepTarget),
+			Metadata: map[string]any{
+				"target_reps":   currentRepTarget,
+				"min_reps":      minReps,
+				"max_reps":      maxReps,
+				"is_deload":     true,
+				"baseline_load": existingSuggestedLoad,
+			},
+		}
+	}
+
+	switch progType {
+	case "double":
+		if allSetsCompleted && minActualReps >= maxReps {
+			outcome := OutcomeIncrease
+			suggestedLoad := currentLoad
+			if hasCurrentLoad && increment > 0 {
+				suggestedLoad = formatLoad(currentLoadVal+increment, loadUnit)
+			}
+			return singleProgressionResult{
+				CurrentLoad:   currentLoad,
+				SuggestedLoad: suggestedLoad,
+				TargetReps:    strconv.Itoa(minReps),
+				Outcome:       outcome,
+				Summary:       fmt.Sprintf("Hit %d reps across all %d sets! Adding load to %s and resetting target to %d reps.", maxReps, setsPlanned, suggestedLoad, minReps),
+				Metadata: map[string]any{
+					"target_reps":      minReps,
+					"min_reps":         minReps,
+					"max_reps":         maxReps,
+					"increment":        increment,
+					"load_unit":        loadUnit,
+					"progression_type": "double",
+				},
+			}
+		}
+
+		if allSetsCompleted && minActualReps >= currentRepTarget {
+			nextTarget := minActualReps + 1
+			if nextTarget > maxReps {
+				nextTarget = maxReps
+			}
+			return singleProgressionResult{
+				CurrentLoad:   currentLoad,
+				SuggestedLoad: currentLoad,
+				TargetReps:    strconv.Itoa(nextTarget),
+				Outcome:       OutcomeMaintain,
+				Summary:       fmt.Sprintf("Completed %d reps across all sets. Maintained %s; target %d reps next session.", minActualReps, currentLoad, nextTarget),
+				Metadata: map[string]any{
+					"target_reps":      nextTarget,
+					"min_reps":         minReps,
+					"max_reps":         maxReps,
+					"increment":        increment,
+					"load_unit":        loadUnit,
+					"progression_type": "double",
+				},
+			}
+		}
+
+		return singleProgressionResult{
+			CurrentLoad:   currentLoad,
+			SuggestedLoad: currentLoad,
+			TargetReps:    strconv.Itoa(currentRepTarget),
+			Outcome:       OutcomeMaintain,
+			Summary:       fmt.Sprintf("Stay at %s. Aim for %d reps across all %d sets.", currentLoad, currentRepTarget, setsPlanned),
+			Metadata: map[string]any{
+				"target_reps":      currentRepTarget,
+				"min_reps":         minReps,
+				"max_reps":         maxReps,
+				"increment":        increment,
+				"load_unit":        loadUnit,
+				"progression_type": "double",
+			},
+		}
+
+	case "linear":
+		lowerTarget := float64(minReps)
+		if allSetsCompleted && float64(minActualReps) >= lowerTarget {
+			suggestedLoad := currentLoad
+			if hasCurrentLoad && increment > 0 {
+				suggestedLoad = formatLoad(currentLoadVal+increment, loadUnit)
+			}
+			return singleProgressionResult{
+				CurrentLoad:   currentLoad,
+				SuggestedLoad: suggestedLoad,
+				TargetReps:    repsStr,
+				Outcome:       OutcomeIncrease,
+				Summary:       fmt.Sprintf("Target completed. Adding %s next session (%s).", formatMetric(increment)+loadUnit, suggestedLoad),
+				Metadata: map[string]any{
+					"target_reps":      repsStr,
+					"increment":        increment,
+					"load_unit":        loadUnit,
+					"progression_type": "linear",
+				},
+			}
+		}
+		return singleProgressionResult{
+			CurrentLoad:   currentLoad,
+			SuggestedLoad: currentLoad,
+			TargetReps:    repsStr,
+			Outcome:       OutcomeMaintain,
+			Summary:       fmt.Sprintf("Maintain %s next session.", currentLoad),
+			Metadata: map[string]any{
+				"target_reps":      repsStr,
+				"increment":        increment,
+				"load_unit":        loadUnit,
+				"progression_type": "linear",
+			},
+		}
+
+	default: // "none"
+		return singleProgressionResult{
+			CurrentLoad:   currentLoad,
+			SuggestedLoad: currentLoad,
+			TargetReps:    repsStr,
+			Outcome:       OutcomeMaintain,
+			Summary:       fmt.Sprintf("Fixed prescription at %s.", currentLoad),
+			Metadata: map[string]any{
+				"target_reps":      repsStr,
+				"load_unit":        loadUnit,
+				"progression_type": "none",
+			},
+		}
+	}
+}
+
+func buildDoubleProgressionState(
+	block resolvedWorkflowBlock,
+	logs []CompletedSetLog,
+	existing ProgressionState,
+	hasExisting bool,
+	session ApplySessionProgressionInput,
+) UpsertProgressionStateInput {
+	exerciseName := asString(block.Data["exercise_name"])
+	setsPlanned := intOrDefault(block.Data["sets"], len(logs))
+	repsStr := asString(block.Data["reps"])
+
+	prog, _ := block.Data["progression"].(map[string]any)
+	minReps := 5
+	maxReps := 8
+	increment := 2.5
+	if prog != nil {
+		minReps = intOrDefault(prog["min_reps"], 5)
+		maxReps = intOrDefault(prog["max_reps"], 8)
+		increment = parseNumberValue(prog["increment"])
+		if increment == 0 {
+			increment = 2.5
+		}
+	} else {
+		minReps, maxReps = parseRepsMinMax(repsStr)
+	}
+
+	loadUnit := asString(block.Data["load_unit"])
+	if loadUnit == "" {
+		loadUnit = "kg"
+	}
+	configuredLoad := parseNumberValue(block.Data["load_value"])
+	if configuredLoad == 0 {
+		configuredLoad = parseNumberValue(block.Data["start_load"])
+	}
+
+	var existingLoad string
+	var existingMeta map[string]any
+	if hasExisting {
+		existingLoad = existing.SuggestedLoad
+		existingMeta = existing.Metadata
+	}
+
+	res := evalSingleExerciseProgression(
+		exerciseName, "double", setsPlanned, repsStr, minReps, maxReps, increment, loadUnit,
+		configuredLoad, existingLoad, existingMeta, logs, session.IsDeload,
+	)
+
+	_, avgRPELabel, _ := averageMetric(logs, func(log CompletedSetLog) string { return log.ActualRPE })
+	_, avgRIRLabel, _ := averageMetric(logs, func(log CompletedSetLog) string { return log.ActualRIR })
+
+	meta := res.Metadata
+	if meta == nil {
+		meta = map[string]any{}
+	}
+	meta["sets_planned"] = setsPlanned
+
+	return UpsertProgressionStateInput{
+		UserID:          session.UserID,
+		WorkflowID:      session.WorkflowID,
+		WorkflowBlockID: block.ID,
+		BlockKey:        block.BlockKey,
+		NodeTypeSlug:    block.NodeTypeSlug,
+		StateType:       StateTypeDouble,
+		ExerciseName:    exerciseName,
+		Outcome:         res.Outcome,
+		CurrentLoad:     res.CurrentLoad,
+		SuggestedLoad:   res.SuggestedLoad,
+		AvgActualRPE:    avgRPELabel,
+		AvgActualRIR:    avgRIRLabel,
+		LastSessionID:   session.SessionID,
+		LastLogCount:    len(logs),
+		Summary:         res.Summary,
+		Metadata:        meta,
+	}
+}
+
+func buildSupersetProgressionState(
+	block resolvedWorkflowBlock,
+	logs []CompletedSetLog,
+	existing ProgressionState,
+	hasExisting bool,
+	session ApplySessionProgressionInput,
+) UpsertProgressionStateInput {
+	exA := asString(block.Data["exercise_a_name"])
+	if exA == "" {
+		exA = "Exercise A"
+	}
+	exB := asString(block.Data["exercise_b_name"])
+	if exB == "" {
+		exB = "Exercise B"
+	}
+
+	setsPlanned := intOrDefault(block.Data["sets"], len(logs))
+	if setsPlanned <= 0 {
+		setsPlanned = 3
+	}
+
+	repsAStr := asString(block.Data["reps_a"])
+	if repsAStr == "" {
+		repsAStr = "5-8"
+	}
+	repsBStr := asString(block.Data["reps_b"])
+	if repsBStr == "" {
+		repsBStr = "5-8"
+	}
+
+	minA, maxA := parseMinMaxConfig(block.Data["min_reps_a"], block.Data["max_reps_a"], repsAStr)
+	minB, maxB := parseMinMaxConfig(block.Data["min_reps_b"], block.Data["max_reps_b"], repsBStr)
+
+	progTypeA := asString(block.Data["progression_type_a"])
+	if progTypeA == "" {
+		progTypeA = "none"
+	}
+	progTypeB := asString(block.Data["progression_type_b"])
+	if progTypeB == "" {
+		progTypeB = "none"
+	}
+
+	incA := parseNumberValue(block.Data["increment_a"])
+	if incA == 0 {
+		incA = 2.5
+	}
+	incB := parseNumberValue(block.Data["increment_b"])
+	if incB == 0 {
+		incB = 2.5
+	}
+
+	unitA := asString(block.Data["load_unit_a"])
+	if unitA == "" {
+		unitA = "kg"
+	}
+	unitB := asString(block.Data["load_unit_b"])
+	if unitB == "" {
+		unitB = "kg"
+	}
+
+	startLoadA := parseNumberValue(block.Data["start_load_a"])
+	if startLoadA == 0 {
+		startLoadA = parseNumberValue(block.Data["load_value_a"])
+	}
+	startLoadB := parseNumberValue(block.Data["start_load_b"])
+	if startLoadB == 0 {
+		startLoadB = parseNumberValue(block.Data["load_value_b"])
+	}
+
+	logsA := make([]CompletedSetLog, len(logs))
+	logsB := make([]CompletedSetLog, len(logs))
+	for i, l := range logs {
+		rA, rB := splitPair(l.ActualReps)
+		ldA, ldB := splitPair(l.ActualLoad)
+		logsA[i] = CompletedSetLog{
+			WorkflowBlockID: l.WorkflowBlockID,
+			BlockClientID:   l.BlockClientID,
+			NodeTypeSlug:    l.NodeTypeSlug,
+			SetIndex:        l.SetIndex,
+			PrescribedReps:  rA,
+			PrescribedLoad:  ldA,
+			ActualReps:      rA,
+			ActualLoad:      ldA,
+			ActualRPE:       l.ActualRPE,
+			ActualRIR:       l.ActualRIR,
+			Completed:       l.Completed,
+			Notes:           l.Notes,
+		}
+		logsB[i] = CompletedSetLog{
+			WorkflowBlockID: l.WorkflowBlockID,
+			BlockClientID:   l.BlockClientID,
+			NodeTypeSlug:    l.NodeTypeSlug,
+			SetIndex:        l.SetIndex,
+			PrescribedReps:  rB,
+			PrescribedLoad:  ldB,
+			ActualReps:      rB,
+			ActualLoad:      ldB,
+			ActualRPE:       l.ActualRPE,
+			ActualRIR:       l.ActualRIR,
+			Completed:       l.Completed,
+			Notes:           l.Notes,
+		}
+	}
+
+	var existingMetaA, existingMetaB map[string]any
+	var existingLoadA, existingLoadB string
+	if hasExisting && existing.Metadata != nil {
+		if aMap, ok := existing.Metadata["exercise_a"].(map[string]any); ok {
+			existingMetaA = aMap
+			existingLoadA = asString(aMap["suggested_load"])
+		}
+		if bMap, ok := existing.Metadata["exercise_b"].(map[string]any); ok {
+			existingMetaB = bMap
+			existingLoadB = asString(bMap["suggested_load"])
+		}
+		if existingLoadA == "" {
+			existingLoadA = asString(existing.Metadata["suggested_load_a"])
+		}
+		if existingLoadB == "" {
+			existingLoadB = asString(existing.Metadata["suggested_load_b"])
+		}
+	}
+
+	resA := evalSingleExerciseProgression(
+		exA, progTypeA, setsPlanned, repsAStr, minA, maxA, incA, unitA,
+		startLoadA, existingLoadA, existingMetaA, logsA, session.IsDeload,
+	)
+	resB := evalSingleExerciseProgression(
+		exB, progTypeB, setsPlanned, repsBStr, minB, maxB, incB, unitB,
+		startLoadB, existingLoadB, existingMetaB, logsB, session.IsDeload,
+	)
+
+	overallOutcome := OutcomeMaintain
+	if resA.Outcome == OutcomeIncrease || resB.Outcome == OutcomeIncrease {
+		overallOutcome = OutcomeIncrease
+	} else if resA.Outcome == OutcomeReduce || resB.Outcome == OutcomeReduce {
+		overallOutcome = OutcomeReduce
+	}
+
+	_, avgRPELabel, _ := averageMetric(logs, func(log CompletedSetLog) string { return log.ActualRPE })
+	_, avgRIRLabel, _ := averageMetric(logs, func(log CompletedSetLog) string { return log.ActualRIR })
+
+	summary := fmt.Sprintf("%s: %s | %s: %s", exA, resA.Summary, exB, resB.Summary)
+
+	return UpsertProgressionStateInput{
+		UserID:          session.UserID,
+		WorkflowID:      session.WorkflowID,
+		WorkflowBlockID: block.ID,
+		BlockKey:        block.BlockKey,
+		NodeTypeSlug:    block.NodeTypeSlug,
+		StateType:       StateTypeSuperset,
+		ExerciseName:    exA + " + " + exB,
+		Outcome:         overallOutcome,
+		CurrentLoad:     resA.CurrentLoad + " / " + resB.CurrentLoad,
+		SuggestedLoad:   resA.SuggestedLoad + " / " + resB.SuggestedLoad,
+		AvgActualRPE:    avgRPELabel,
+		AvgActualRIR:    avgRIRLabel,
+		LastSessionID:   session.SessionID,
+		LastLogCount:    len(logs),
+		Summary:         summary,
+		Metadata: map[string]any{
+			"exercise_a":       resA.Metadata,
+			"exercise_b":       resB.Metadata,
+			"suggested_load_a": resA.SuggestedLoad,
+			"suggested_load_b": resB.SuggestedLoad,
+			"suggested_reps_a": resA.TargetReps,
+			"suggested_reps_b": resB.TargetReps,
+			"sets_planned":     setsPlanned,
+		},
+	}
+}
+
 func (s *Service) syncProgressionStateWithBlock(state *ProgressionState, block resolvedWorkflowBlock) {
-	if state.NodeTypeSlug != "linear_progression" && state.NodeTypeSlug != "exercise" {
+	if state.NodeTypeSlug != "linear_progression" && state.NodeTypeSlug != "exercise" && state.NodeTypeSlug != "superset" {
+		return
+	}
+	if state.Metadata == nil {
+		state.Metadata = make(map[string]any)
+	}
+
+	if state.NodeTypeSlug == "superset" {
+		sets := intOrDefault(block.Data["sets"], 3)
+		state.Metadata["sets_planned"] = sets
 		return
 	}
 	if state.Metadata == nil {
@@ -831,6 +1385,12 @@ func blockDisplayName(block workflowBlockConfig) string {
 	}
 	if value := asString(block.Data["title"]); value != "" {
 		return value
+	}
+	if exA := asString(block.Data["exercise_a_name"]); exA != "" {
+		if exB := asString(block.Data["exercise_b_name"]); exB != "" {
+			return exA + " + " + exB
+		}
+		return exA
 	}
 	return block.NodeTypeSlug
 }

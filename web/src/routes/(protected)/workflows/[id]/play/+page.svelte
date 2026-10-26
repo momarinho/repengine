@@ -2150,9 +2150,9 @@
 
 	function stepActiveBlockRepsA(amount: number): void {
 		if (!currentBlock) return;
-		const current =
-			actualRepsAByBlock[currentBlock.id] ||
-			(currentBlock.data?.reps_a ? String(currentBlock.data.reps_a) : '0');
+		const meta = currentProgressionState?.metadata as Record<string, any> | undefined;
+		const defaultReps = (typeof meta?.suggested_reps_a === 'string' ? meta.suggested_reps_a : null) ?? (currentBlock.data?.reps_a ? String(currentBlock.data.reps_a) : '5');
+		const current = actualRepsAByBlock[currentBlock.id] || defaultReps;
 		actualRepsAByBlock = {
 			...actualRepsAByBlock,
 			[currentBlock.id]: adjustReps(current, amount)
@@ -2161,9 +2161,9 @@
 
 	function stepActiveBlockRepsB(amount: number): void {
 		if (!currentBlock) return;
-		const current =
-			actualRepsBByBlock[currentBlock.id] ||
-			(currentBlock.data?.reps_b ? String(currentBlock.data.reps_b) : '0');
+		const meta = currentProgressionState?.metadata as Record<string, any> | undefined;
+		const defaultReps = (typeof meta?.suggested_reps_b === 'string' ? meta.suggested_reps_b : null) ?? (currentBlock.data?.reps_b ? String(currentBlock.data.reps_b) : '5');
+		const current = actualRepsBByBlock[currentBlock.id] || defaultReps;
 		actualRepsBByBlock = {
 			...actualRepsBByBlock,
 			[currentBlock.id]: adjustReps(current, amount)
@@ -2172,11 +2172,14 @@
 
 	function stepActiveBlockLoadA(amount: number): void {
 		if (!currentBlock) return;
-		const current =
-			actualLoadAByBlock[currentBlock.id] ||
-			(currentBlock.data?.start_load_a !== null && currentBlock.data?.start_load_a !== undefined
-				? `${currentBlock.data.start_load_a} ${currentBlock.data.load_unit_a || 'kg'}`
-				: '0 kg');
+		const meta = currentProgressionState?.metadata as Record<string, any> | undefined;
+		const metaLoad = typeof meta?.suggested_load_a === 'string' ? meta.suggested_load_a : (currentProgressionState?.suggested_load?.includes(' / ') ? currentProgressionState.suggested_load.split(' / ')[0] : null);
+		const defaultLoad = metaLoad ?? (currentBlock.data?.start_load_a !== null && currentBlock.data?.start_load_a !== undefined
+			? `${currentBlock.data.start_load_a} ${currentBlock.data.load_unit_a || 'kg'}`
+			: (currentBlock.data?.load_value_a !== null && currentBlock.data?.load_value_a !== undefined
+				? `${currentBlock.data.load_value_a} ${currentBlock.data.load_unit_a || 'kg'}`
+				: '0 kg'));
+		const current = actualLoadAByBlock[currentBlock.id] || defaultLoad;
 		actualLoadAByBlock = {
 			...actualLoadAByBlock,
 			[currentBlock.id]: adjustLoad(current, amount)
@@ -2185,11 +2188,14 @@
 
 	function stepActiveBlockLoadB(amount: number): void {
 		if (!currentBlock) return;
-		const current =
-			actualLoadBByBlock[currentBlock.id] ||
-			(currentBlock.data?.start_load_b !== null && currentBlock.data?.start_load_b !== undefined
-				? `${currentBlock.data.start_load_b} ${currentBlock.data.load_unit_b || 'kg'}`
-				: '0 kg');
+		const meta = currentProgressionState?.metadata as Record<string, any> | undefined;
+		const metaLoad = typeof meta?.suggested_load_b === 'string' ? meta.suggested_load_b : (currentProgressionState?.suggested_load?.includes(' / ') ? currentProgressionState.suggested_load.split(' / ')[1] : null);
+		const defaultLoad = metaLoad ?? (currentBlock.data?.start_load_b !== null && currentBlock.data?.start_load_b !== undefined
+			? `${currentBlock.data.start_load_b} ${currentBlock.data.load_unit_b || 'kg'}`
+			: (currentBlock.data?.load_value_b !== null && currentBlock.data?.load_value_b !== undefined
+				? `${currentBlock.data.load_value_b} ${currentBlock.data.load_unit_b || 'kg'}`
+				: '0 kg'));
+		const current = actualLoadBByBlock[currentBlock.id] || defaultLoad;
 		actualLoadBByBlock = {
 			...actualLoadBByBlock,
 			[currentBlock.id]: adjustLoad(current, amount)
@@ -2253,30 +2259,40 @@
 
 	function fillSupersetTargets(): void {
 		if (!currentBlock?.data) return;
-		if (currentBlock.data.reps_a) {
-			actualRepsAByBlock = {
-				...actualRepsAByBlock,
-				[currentBlock.id]: String(currentBlock.data.reps_a)
-			};
-		}
-		if (currentBlock.data.start_load_a !== null && currentBlock.data.start_load_a !== undefined) {
-			actualLoadAByBlock = {
-				...actualLoadAByBlock,
-				[currentBlock.id]: `${currentBlock.data.start_load_a} ${currentBlock.data.load_unit_a || 'kg'}`
-			};
-		}
-		if (currentBlock.data.reps_b) {
-			actualRepsBByBlock = {
-				...actualRepsBByBlock,
-				[currentBlock.id]: String(currentBlock.data.reps_b)
-			};
-		}
-		if (currentBlock.data.start_load_b !== null && currentBlock.data.start_load_b !== undefined) {
-			actualLoadBByBlock = {
-				...actualLoadBByBlock,
-				[currentBlock.id]: `${currentBlock.data.start_load_b} ${currentBlock.data.load_unit_b || 'kg'}`
-			};
-		}
+		const meta = currentProgressionState?.metadata as Record<string, any> | undefined;
+		const targetRepsA = (typeof meta?.suggested_reps_a === 'string' ? meta.suggested_reps_a : null) ?? (currentBlock.data.reps_a ? String(currentBlock.data.reps_a) : '5');
+		actualRepsAByBlock = {
+			...actualRepsAByBlock,
+			[currentBlock.id]: targetRepsA
+		};
+
+		const metaLoadA = typeof meta?.suggested_load_a === 'string' ? meta.suggested_load_a : (currentProgressionState?.suggested_load?.includes(' / ') ? currentProgressionState.suggested_load.split(' / ')[0] : null);
+		const targetLoadA = metaLoadA ?? (currentBlock.data.start_load_a !== null && currentBlock.data.start_load_a !== undefined
+			? `${currentBlock.data.start_load_a} ${currentBlock.data.load_unit_a || 'kg'}`
+			: (currentBlock.data?.load_value_a !== null && currentBlock.data?.load_value_a !== undefined
+				? `${currentBlock.data.load_value_a} ${currentBlock.data.load_unit_a || 'kg'}`
+				: '0 kg'));
+		actualLoadAByBlock = {
+			...actualLoadAByBlock,
+			[currentBlock.id]: targetLoadA
+		};
+
+		const targetRepsB = (typeof meta?.suggested_reps_b === 'string' ? meta.suggested_reps_b : null) ?? (currentBlock.data.reps_b ? String(currentBlock.data.reps_b) : '5');
+		actualRepsBByBlock = {
+			...actualRepsBByBlock,
+			[currentBlock.id]: targetRepsB
+		};
+
+		const metaLoadB = typeof meta?.suggested_load_b === 'string' ? meta.suggested_load_b : (currentProgressionState?.suggested_load?.includes(' / ') ? currentProgressionState.suggested_load.split(' / ')[1] : null);
+		const targetLoadB = metaLoadB ?? (currentBlock.data.start_load_b !== null && currentBlock.data.start_load_b !== undefined
+			? `${currentBlock.data.start_load_b} ${currentBlock.data.load_unit_b || 'kg'}`
+			: (currentBlock.data?.load_value_b !== null && currentBlock.data?.load_value_b !== undefined
+				? `${currentBlock.data.load_value_b} ${currentBlock.data.load_unit_b || 'kg'}`
+				: '0 kg'));
+		actualLoadBByBlock = {
+			...actualLoadBByBlock,
+			[currentBlock.id]: targetLoadB
+		};
 	}
 
 	function addIntraSetRestSeconds(seconds: number): void {
@@ -3881,6 +3897,16 @@
 						</div>
 
 						<!-- Two Exercises Side by Side -->
+						{@const meta = currentProgressionState?.metadata as Record<string, any> | undefined}
+						{@const metaLoadA = typeof meta?.suggested_load_a === 'string' ? meta.suggested_load_a : (currentProgressionState?.suggested_load?.includes(' / ') ? currentProgressionState.suggested_load.split(' / ')[0] : null)}
+						{@const metaLoadB = typeof meta?.suggested_load_b === 'string' ? meta.suggested_load_b : (currentProgressionState?.suggested_load?.includes(' / ') ? currentProgressionState.suggested_load.split(' / ')[1] : null)}
+						{@const prescribedLoadA = metaLoadA ?? (currentBlock.data?.start_load_a !== null && currentBlock.data?.start_load_a !== undefined ? `${currentBlock.data.start_load_a} ${currentBlock.data.load_unit_a || 'kg'}` : (currentBlock.data?.load_value_a !== null && currentBlock.data?.load_value_a !== undefined ? `${currentBlock.data.load_value_a} ${currentBlock.data.load_unit_a || 'kg'}` : '-'))}
+						{@const prescribedLoadB = metaLoadB ?? (currentBlock.data?.start_load_b !== null && currentBlock.data?.start_load_b !== undefined ? `${currentBlock.data.start_load_b} ${currentBlock.data.load_unit_b || 'kg'}` : (currentBlock.data?.load_value_b !== null && currentBlock.data?.load_value_b !== undefined ? `${currentBlock.data.load_value_b} ${currentBlock.data.load_unit_b || 'kg'}` : '-'))}
+						{@const targetRepsA = (typeof meta?.suggested_reps_a === 'string' ? meta.suggested_reps_a : null) ?? currentBlock.data?.reps_a ?? '5'}
+						{@const targetRepsB = (typeof meta?.suggested_reps_b === 'string' ? meta.suggested_reps_b : null) ?? currentBlock.data?.reps_b ?? '10'}
+						{@const progTypeA = currentBlock.data?.progression_type_a ?? 'none'}
+						{@const progTypeB = currentBlock.data?.progression_type_b ?? 'none'}
+
 						<div class="mb-6 sm:mb-8 grid gap-4 sm:gap-6 md:grid-cols-2">
 							<!-- Exercise A -->
 							<div class="rounded-xl border border-primary/20 bg-primary/5 p-4 sm:p-5">
@@ -3889,18 +3915,24 @@
 								<div class="mt-3 sm:mt-4 grid grid-cols-2 gap-3 sm:gap-4">
 									<div>
 										<p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Target Reps</p>
-										<p class="text-xl sm:text-2xl font-bold mt-1">{currentBlock.data?.reps_a || '5'}</p>
+										<p class="text-xl sm:text-2xl font-bold mt-1">
+											{targetRepsA}{typeof meta?.suggested_reps_a === 'string' && currentBlock.data?.reps_a && meta.suggested_reps_a !== currentBlock.data.reps_a ? ` (${currentBlock.data.reps_a})` : ''}
+										</p>
 									</div>
 									<div>
 										<p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Prescribed Load</p>
 										<p class="text-xl sm:text-2xl font-bold mt-1">
-											{currentBlock.data?.start_load_a !== null && currentBlock.data?.start_load_a !== undefined ? `${currentBlock.data.start_load_a} ${currentBlock.data.load_unit_a || 'kg'}` : '-'}
+											{prescribedLoadA}
 										</p>
 									</div>
 								</div>
-								{#if currentBlock.data?.progression_type_a === 'linear'}
+								{#if progTypeA === 'linear'}
 									<div class="mt-3 text-[10px] text-primary bg-primary/10 rounded px-2 py-1 inline-block font-semibold">
-										Linear: +{currentBlock.data.increment_a || 2.5} {currentBlock.data.load_unit_a || 'kg'}
+										Linear: +{currentBlock.data?.increment_a || 2.5} {currentBlock.data?.load_unit_a || 'kg'}
+									</div>
+								{:else if progTypeA === 'double'}
+									<div class="mt-3 text-[10px] text-primary bg-primary/10 rounded px-2 py-1 inline-block font-semibold">
+										Double: {currentBlock.data?.min_reps_a ?? 5}-{currentBlock.data?.max_reps_a ?? 8} reps ➔ +{currentBlock.data?.increment_a || 2.5} {currentBlock.data?.load_unit_a || 'kg'}
 									</div>
 								{/if}
 							</div>
@@ -3912,18 +3944,24 @@
 								<div class="mt-3 sm:mt-4 grid grid-cols-2 gap-3 sm:gap-4">
 									<div>
 										<p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Target Reps</p>
-										<p class="text-xl sm:text-2xl font-bold mt-1">{currentBlock.data?.reps_b || '10'}</p>
+										<p class="text-xl sm:text-2xl font-bold mt-1">
+											{targetRepsB}{typeof meta?.suggested_reps_b === 'string' && currentBlock.data?.reps_b && meta.suggested_reps_b !== currentBlock.data.reps_b ? ` (${currentBlock.data.reps_b})` : ''}
+										</p>
 									</div>
 									<div>
 										<p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Prescribed Load</p>
 										<p class="text-xl sm:text-2xl font-bold mt-1">
-											{currentBlock.data?.start_load_b !== null && currentBlock.data?.start_load_b !== undefined ? `${currentBlock.data.start_load_b} ${currentBlock.data.load_unit_b || 'kg'}` : '-'}
+											{prescribedLoadB}
 										</p>
 									</div>
 								</div>
-								{#if currentBlock.data?.progression_type_b === 'linear'}
+								{#if progTypeB === 'linear'}
 									<div class="mt-3 text-[10px] text-secondary bg-secondary/10 rounded px-2 py-1 inline-block font-semibold">
-										Linear: +{currentBlock.data.increment_b || 2.5} {currentBlock.data.load_unit_b || 'kg'}
+										Linear: +{currentBlock.data?.increment_b || 2.5} {currentBlock.data?.load_unit_b || 'kg'}
+									</div>
+								{:else if progTypeB === 'double'}
+									<div class="mt-3 text-[10px] text-secondary bg-secondary/10 rounded px-2 py-1 inline-block font-semibold">
+										Double: {currentBlock.data?.min_reps_b ?? 5}-{currentBlock.data?.max_reps_b ?? 8} reps ➔ +{currentBlock.data?.increment_b || 2.5} {currentBlock.data?.load_unit_b || 'kg'}
 									</div>
 								{/if}
 							</div>
@@ -3987,7 +4025,7 @@
 										<div>
 											<div class="flex items-center justify-between mb-1">
 												<label for="superset-actual-reps-a" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Reps A</label>
-												<span class="text-[10px] font-semibold text-primary">Target: {currentBlock.data?.reps_a ?? '5'}</span>
+												<span class="text-[10px] font-semibold text-primary">Target: {targetRepsA}</span>
 											</div>
 											<div class="flex items-center gap-1">
 												<button
@@ -4005,7 +4043,7 @@
 													autocomplete="off"
 													enterkeyhint="next"
 													class="w-full h-10 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[16px] font-black text-on-surface focus:border-primary focus:ring-1 focus:ring-primary/50"
-													placeholder={`${currentBlock.data?.reps_a ?? '5'}`}
+													placeholder={`${targetRepsA}`}
 													value={actualRepsAByBlock[currentBlock.id] ?? ''}
 													oninput={(event) => {
 														actualRepsAByBlock = {
@@ -4027,7 +4065,7 @@
 										<div>
 											<div class="flex items-center justify-between mb-1">
 												<label for="superset-actual-load-a" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Load A</label>
-												<span class="text-[10px] font-semibold text-primary">{currentBlock.data?.start_load_a ? `${currentBlock.data.start_load_a}kg` : '-'}</span>
+												<span class="text-[10px] font-semibold text-primary">{prescribedLoadA !== '-' ? prescribedLoadA : 'BW'}</span>
 											</div>
 											<div class="flex items-center gap-1">
 												<button
@@ -4045,7 +4083,7 @@
 													autocomplete="off"
 													enterkeyhint="next"
 													class="w-full h-10 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[16px] font-black text-on-surface focus:border-primary focus:ring-1 focus:ring-primary/50"
-													placeholder={currentBlock.data?.start_load_a !== null && currentBlock.data?.start_load_a !== undefined ? `${currentBlock.data.start_load_a}` : 'kg'}
+													placeholder={prescribedLoadA !== '-' ? prescribedLoadA.replace(/[^\d.]/g, '') : '0'}
 													value={actualLoadAByBlock[currentBlock.id] ?? ''}
 													oninput={(event) => {
 														actualLoadAByBlock = {
@@ -4074,7 +4112,7 @@
 										<div>
 											<div class="flex items-center justify-between mb-1">
 												<label for="superset-actual-reps-b" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Reps B</label>
-												<span class="text-[10px] font-semibold text-secondary">Target: {currentBlock.data?.reps_b ?? '10'}</span>
+												<span class="text-[10px] font-semibold text-secondary">Target: {targetRepsB}</span>
 											</div>
 											<div class="flex items-center gap-1">
 												<button
@@ -4092,7 +4130,7 @@
 													autocomplete="off"
 													enterkeyhint="next"
 													class="w-full h-10 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[16px] font-black text-on-surface focus:border-secondary focus:ring-1 focus:ring-secondary/50"
-													placeholder={`${currentBlock.data?.reps_b ?? '10'}`}
+													placeholder={`${targetRepsB}`}
 													value={actualRepsBByBlock[currentBlock.id] ?? ''}
 													oninput={(event) => {
 														actualRepsBByBlock = {
@@ -4114,7 +4152,7 @@
 										<div>
 											<div class="flex items-center justify-between mb-1">
 												<label for="superset-actual-load-b" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Load B</label>
-												<span class="text-[10px] font-semibold text-secondary">{currentBlock.data?.start_load_b ? `${currentBlock.data.start_load_b}kg` : '-'}</span>
+												<span class="text-[10px] font-semibold text-secondary">{prescribedLoadB !== '-' ? prescribedLoadB : 'BW'}</span>
 											</div>
 											<div class="flex items-center gap-1">
 												<button
@@ -4132,7 +4170,7 @@
 													autocomplete="off"
 													enterkeyhint="next"
 													class="w-full h-10 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[16px] font-black text-on-surface focus:border-secondary focus:ring-1 focus:ring-secondary/50"
-													placeholder={currentBlock.data?.start_load_b !== null && currentBlock.data?.start_load_b !== undefined ? `${currentBlock.data.start_load_b}` : 'kg'}
+													placeholder={prescribedLoadB !== '-' ? prescribedLoadB.replace(/[^\d.]/g, '') : 'kg'}
 													value={actualLoadBByBlock[currentBlock.id] ?? ''}
 													oninput={(event) => {
 														actualLoadBByBlock = {

@@ -150,18 +150,22 @@ func SeedNodeTypes(ctx context.Context) error {
 				"exercise_a_name": "",
 				"exercise_b_name": "",
 				"sets": 3,
-				"reps_a": "5",
-				"reps_b": "10",
-				"progression_type_a": "linear",
+				"reps_a": "5-8",
+				"reps_b": "5-8",
+				"progression_type_a": "none",
 				"progression_type_b": "none",
 				"start_load_a": null,
 				"start_load_b": null,
 				"increment_a": 2.5,
-				"increment_b": 0,
+				"increment_b": 2.5,
 				"load_unit_a": "kg",
 				"load_unit_b": "kg",
+				"min_reps_a": 5,
+				"max_reps_a": 8,
+				"min_reps_b": 5,
+				"max_reps_b": 8,
 				"progression_rule_a": "add_each_session",
-				"progression_rule_b": "manual",
+				"progression_rule_b": "add_each_session",
 				"rest_seconds": 120,
 				"notes": ""
 			}`,
@@ -460,6 +464,8 @@ func calisthenicsStepProgressionBlock(exercise, reps, sequence string, restSecon
 }
 
 func calisthenicsSupersetBlock(exA, exB, repsA, repsB string, sets, restSeconds int, notes string) templateBlockSeed {
+	minA, maxA := parseRepsMinMax(repsA)
+	minB, maxB := parseRepsMinMax(repsB)
 	return templateBlockSeed{
 		NodeTypeSlug: "superset",
 		Data: map[string]any{
@@ -468,8 +474,18 @@ func calisthenicsSupersetBlock(exA, exB, repsA, repsB string, sets, restSeconds 
 			"sets":               sets,
 			"reps_a":             repsA,
 			"reps_b":             repsB,
-			"progression_type_a": "none",
-			"progression_type_b": "none",
+			"progression_type_a": "double",
+			"progression_type_b": "double",
+			"start_load_a":       0.0,
+			"start_load_b":       0.0,
+			"increment_a":        2.5,
+			"increment_b":        2.5,
+			"load_unit_a":        "kg",
+			"load_unit_b":        "kg",
+			"min_reps_a":         minA,
+			"max_reps_a":         maxA,
+			"min_reps_b":         minB,
+			"max_reps_b":         maxB,
 			"rest_seconds":       restSeconds,
 			"notes":              notes,
 		},

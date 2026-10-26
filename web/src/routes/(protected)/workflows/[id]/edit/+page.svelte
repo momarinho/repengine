@@ -2005,7 +2005,16 @@
 													type="text"
 													class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
 													value={typeof selectedBlock.data.reps_a === 'string' ? selectedBlock.data.reps_a : '5'}
-													oninput={(event) => updateBlockField(selectedBlock.client_id, 'reps_a', (event.currentTarget as HTMLInputElement).value)}
+													oninput={(event) => {
+														const val = (event.currentTarget as HTMLInputElement).value;
+														updateBlockField(selectedBlock.client_id, 'reps_a', val);
+														const rangeMatch = val.match(/(\d+)\s*[-–]\s*(\d+)/);
+														if (rangeMatch && selectedBlock.data.progression_type_a === 'double') {
+															updateBlockField(selectedBlock.client_id, 'min_reps_a', Number(rangeMatch[1]));
+															updateBlockField(selectedBlock.client_id, 'max_reps_a', Number(rangeMatch[2]));
+														}
+													}}
+													placeholder="5 or 5-8"
 												/>
 											</div>
 											<div class="space-y-2">
@@ -2014,43 +2023,126 @@
 													id="superset-a-prog-type"
 													class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
 													value={typeof selectedBlock.data.progression_type_a === 'string' ? selectedBlock.data.progression_type_a : 'none'}
-													onchange={(event) => updateBlockField(selectedBlock.client_id, 'progression_type_a', (event.currentTarget as HTMLSelectElement).value)}
+													onchange={(event) => {
+														const val = (event.currentTarget as HTMLSelectElement).value;
+														updateBlockField(selectedBlock.client_id, 'progression_type_a', val);
+														if (val === 'double') {
+															let minR = selectedBlock.data.min_reps_a;
+															let maxR = selectedBlock.data.max_reps_a;
+															if (!minR || !maxR) {
+																const rangeMatch = String(selectedBlock.data.reps_a || '').match(/(\d+)\s*[-–]\s*(\d+)/);
+																if (rangeMatch) {
+																	minR = Number(rangeMatch[1]);
+																	maxR = Number(rangeMatch[2]);
+																} else {
+																	minR = 5;
+																	maxR = 8;
+																}
+																updateBlockField(selectedBlock.client_id, 'min_reps_a', minR);
+																updateBlockField(selectedBlock.client_id, 'max_reps_a', maxR);
+															}
+															if (!selectedBlock.data.increment_a) {
+																updateBlockField(selectedBlock.client_id, 'increment_a', 2.5);
+															}
+														}
+													}}
 												>
 													<option value="none">Standard / None</option>
-													<option value="linear">Linear Progression</option>
+													<option value="linear">Linear Progression (+kg each session)</option>
+													<option value="double">Double Progression (Progress Reps ➔ Load)</option>
 												</select>
 											</div>
 										</div>
 
+										<div class="grid grid-cols-[1fr_110px] gap-3">
+											<div class="space-y-2">
+												<label for="superset-a-load" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Start Load</label>
+												<input
+													id="superset-a-load"
+													type="number"
+													step="0.5"
+													class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+													value={typeof selectedBlock.data.start_load_a === 'number'
+														? selectedBlock.data.start_load_a
+														: (typeof selectedBlock.data.load_value_a === 'number'
+															? selectedBlock.data.load_value_a
+															: '')}
+													oninput={(event) => {
+														const val = Number((event.currentTarget as HTMLInputElement).value);
+														updateBlockField(selectedBlock.client_id, 'start_load_a', val);
+														updateBlockField(selectedBlock.client_id, 'load_value_a', val);
+														if (!selectedBlock.data.load_unit_a) {
+															updateBlockField(selectedBlock.client_id, 'load_unit_a', 'kg');
+														}
+													}}
+													placeholder="0"
+												/>
+											</div>
+											<div class="space-y-2">
+												<label for="superset-a-unit" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Unit</label>
+												<select
+													id="superset-a-unit"
+													class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+													value={typeof selectedBlock.data.load_unit_a === 'string' ? selectedBlock.data.load_unit_a : 'kg'}
+													onchange={(event) => updateBlockField(selectedBlock.client_id, 'load_unit_a', (event.currentTarget as HTMLSelectElement).value)}
+												>
+													<option value="kg">kg</option>
+													<option value="lb">lb</option>
+												</select>
+											</div>
+										</div>
+
+										{#if selectedBlock.data.progression_type_a === 'double'}
+											<div class="rounded-lg border border-primary/20 bg-primary/10 p-3 space-y-3">
+												<div class="flex items-center gap-1.5 text-primary text-xs font-bold uppercase tracking-wider">
+													<span class="material-symbols-outlined text-sm">trending_up</span>
+													<span>Double Progression</span>
+												</div>
+												<div class="grid grid-cols-3 gap-2">
+													<div class="space-y-1">
+														<label for="superset-a-min-reps" class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Min Reps</label>
+														<input
+															id="superset-a-min-reps"
+															type="number"
+															min="1"
+															class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-2 py-1.5 text-sm text-on-surface outline-none"
+															value={typeof selectedBlock.data.min_reps_a === 'number' ? selectedBlock.data.min_reps_a : 5}
+															oninput={(event) => updateBlockField(selectedBlock.client_id, 'min_reps_a', Number((event.currentTarget as HTMLInputElement).value))}
+														/>
+													</div>
+													<div class="space-y-1">
+														<label for="superset-a-max-reps" class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Max Reps</label>
+														<input
+															id="superset-a-max-reps"
+															type="number"
+															min="1"
+															class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-2 py-1.5 text-sm text-on-surface outline-none"
+															value={typeof selectedBlock.data.max_reps_a === 'number' ? selectedBlock.data.max_reps_a : 8}
+															oninput={(event) => updateBlockField(selectedBlock.client_id, 'max_reps_a', Number((event.currentTarget as HTMLInputElement).value))}
+														/>
+													</div>
+													<div class="space-y-1">
+														<label for="superset-a-inc-double" class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">+Load ({selectedBlock.data.load_unit_a || 'kg'})</label>
+														<input
+															id="superset-a-inc-double"
+															type="number"
+															step="0.5"
+															class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-2 py-1.5 text-sm text-on-surface outline-none"
+															value={typeof selectedBlock.data.increment_a === 'number' ? selectedBlock.data.increment_a : 2.5}
+															oninput={(event) => updateBlockField(selectedBlock.client_id, 'increment_a', Number((event.currentTarget as HTMLInputElement).value))}
+														/>
+													</div>
+												</div>
+												<p class="text-[11px] text-on-surface-variant leading-relaxed">
+													Progress from {selectedBlock.data.min_reps_a ?? 5} to {selectedBlock.data.max_reps_a ?? 8} reps with current weight. When all sets hit {selectedBlock.data.max_reps_a ?? 8} reps, load increases by +{selectedBlock.data.increment_a ?? 2.5}{selectedBlock.data.load_unit_a || 'kg'} and reps reset to {selectedBlock.data.min_reps_a ?? 5}.
+												</p>
+											</div>
+										{/if}
+
 										{#if selectedBlock.data.progression_type_a === 'linear'}
 											<div class="grid grid-cols-2 gap-3 border-t border-primary/10 pt-3">
 												<div class="space-y-2">
-													<label for="superset-a-load" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Start Load</label>
-													<input
-														id="superset-a-load"
-														type="number"
-														step="0.5"
-														class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
-														value={typeof selectedBlock.data.start_load_a === 'number' ? selectedBlock.data.start_load_a : ''}
-														oninput={(event) => updateBlockField(selectedBlock.client_id, 'start_load_a', Number((event.currentTarget as HTMLInputElement).value))}
-													/>
-												</div>
-												<div class="space-y-2">
-													<label for="superset-a-unit" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Unit</label>
-													<select
-														id="superset-a-unit"
-														class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
-														value={typeof selectedBlock.data.load_unit_a === 'string' ? selectedBlock.data.load_unit_a : 'kg'}
-														onchange={(event) => updateBlockField(selectedBlock.client_id, 'load_unit_a', (event.currentTarget as HTMLSelectElement).value)}
-													>
-														<option value="kg">kg</option>
-														<option value="lb">lb</option>
-													</select>
-												</div>
-											</div>
-											<div class="grid grid-cols-2 gap-3">
-												<div class="space-y-2">
-													<label for="superset-a-increment" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Increment</label>
+													<label for="superset-a-increment" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Increment ({selectedBlock.data.load_unit_a || 'kg'})</label>
 													<input
 														id="superset-a-increment"
 														type="number"
@@ -2070,7 +2162,6 @@
 													>
 														<option value="add_each_session">Add each session</option>
 														<option value="add_weekly">Add weekly</option>
-														<option value="double_progression">Double progression</option>
 														<option value="manual">Manual</option>
 													</select>
 												</div>
@@ -2101,7 +2192,16 @@
 													type="text"
 													class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
 													value={typeof selectedBlock.data.reps_b === 'string' ? selectedBlock.data.reps_b : '10'}
-													oninput={(event) => updateBlockField(selectedBlock.client_id, 'reps_b', (event.currentTarget as HTMLInputElement).value)}
+													oninput={(event) => {
+														const val = (event.currentTarget as HTMLInputElement).value;
+														updateBlockField(selectedBlock.client_id, 'reps_b', val);
+														const rangeMatch = val.match(/(\d+)\s*[-–]\s*(\d+)/);
+														if (rangeMatch && selectedBlock.data.progression_type_b === 'double') {
+															updateBlockField(selectedBlock.client_id, 'min_reps_b', Number(rangeMatch[1]));
+															updateBlockField(selectedBlock.client_id, 'max_reps_b', Number(rangeMatch[2]));
+														}
+													}}
+													placeholder="10 or 5-8"
 												/>
 											</div>
 											<div class="space-y-2">
@@ -2110,43 +2210,126 @@
 													id="superset-b-prog-type"
 													class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
 													value={typeof selectedBlock.data.progression_type_b === 'string' ? selectedBlock.data.progression_type_b : 'none'}
-													onchange={(event) => updateBlockField(selectedBlock.client_id, 'progression_type_b', (event.currentTarget as HTMLSelectElement).value)}
+													onchange={(event) => {
+														const val = (event.currentTarget as HTMLSelectElement).value;
+														updateBlockField(selectedBlock.client_id, 'progression_type_b', val);
+														if (val === 'double') {
+															let minR = selectedBlock.data.min_reps_b;
+															let maxR = selectedBlock.data.max_reps_b;
+															if (!minR || !maxR) {
+																const rangeMatch = String(selectedBlock.data.reps_b || '').match(/(\d+)\s*[-–]\s*(\d+)/);
+																if (rangeMatch) {
+																	minR = Number(rangeMatch[1]);
+																	maxR = Number(rangeMatch[2]);
+																} else {
+																	minR = 5;
+																	maxR = 8;
+																}
+																updateBlockField(selectedBlock.client_id, 'min_reps_b', minR);
+																updateBlockField(selectedBlock.client_id, 'max_reps_b', maxR);
+															}
+															if (!selectedBlock.data.increment_b) {
+																updateBlockField(selectedBlock.client_id, 'increment_b', 2.5);
+															}
+														}
+													}}
 												>
 													<option value="none">Standard / None</option>
-													<option value="linear">Linear Progression</option>
+													<option value="linear">Linear Progression (+kg each session)</option>
+													<option value="double">Double Progression (Progress Reps ➔ Load)</option>
 												</select>
 											</div>
 										</div>
 
+										<div class="grid grid-cols-[1fr_110px] gap-3">
+											<div class="space-y-2">
+												<label for="superset-b-load" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Start Load</label>
+												<input
+													id="superset-b-load"
+													type="number"
+													step="0.5"
+													class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+													value={typeof selectedBlock.data.start_load_b === 'number'
+														? selectedBlock.data.start_load_b
+														: (typeof selectedBlock.data.load_value_b === 'number'
+															? selectedBlock.data.load_value_b
+															: '')}
+													oninput={(event) => {
+														const val = Number((event.currentTarget as HTMLInputElement).value);
+														updateBlockField(selectedBlock.client_id, 'start_load_b', val);
+														updateBlockField(selectedBlock.client_id, 'load_value_b', val);
+														if (!selectedBlock.data.load_unit_b) {
+															updateBlockField(selectedBlock.client_id, 'load_unit_b', 'kg');
+														}
+													}}
+													placeholder="0"
+												/>
+											</div>
+											<div class="space-y-2">
+												<label for="superset-b-unit" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Unit</label>
+												<select
+													id="superset-b-unit"
+													class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+													value={typeof selectedBlock.data.load_unit_b === 'string' ? selectedBlock.data.load_unit_b : 'kg'}
+													onchange={(event) => updateBlockField(selectedBlock.client_id, 'load_unit_b', (event.currentTarget as HTMLSelectElement).value)}
+												>
+													<option value="kg">kg</option>
+													<option value="lb">lb</option>
+												</select>
+											</div>
+										</div>
+
+										{#if selectedBlock.data.progression_type_b === 'double'}
+											<div class="rounded-lg border border-secondary/20 bg-secondary/10 p-3 space-y-3">
+												<div class="flex items-center gap-1.5 text-secondary text-xs font-bold uppercase tracking-wider">
+													<span class="material-symbols-outlined text-sm">trending_up</span>
+													<span>Double Progression</span>
+												</div>
+												<div class="grid grid-cols-3 gap-2">
+													<div class="space-y-1">
+														<label for="superset-b-min-reps" class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Min Reps</label>
+														<input
+															id="superset-b-min-reps"
+															type="number"
+															min="1"
+															class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-2 py-1.5 text-sm text-on-surface outline-none"
+															value={typeof selectedBlock.data.min_reps_b === 'number' ? selectedBlock.data.min_reps_b : 5}
+															oninput={(event) => updateBlockField(selectedBlock.client_id, 'min_reps_b', Number((event.currentTarget as HTMLInputElement).value))}
+														/>
+													</div>
+													<div class="space-y-1">
+														<label for="superset-b-max-reps" class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Max Reps</label>
+														<input
+															id="superset-b-max-reps"
+															type="number"
+															min="1"
+															class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-2 py-1.5 text-sm text-on-surface outline-none"
+															value={typeof selectedBlock.data.max_reps_b === 'number' ? selectedBlock.data.max_reps_b : 8}
+															oninput={(event) => updateBlockField(selectedBlock.client_id, 'max_reps_b', Number((event.currentTarget as HTMLInputElement).value))}
+														/>
+													</div>
+													<div class="space-y-1">
+														<label for="superset-b-inc-double" class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">+Load ({selectedBlock.data.load_unit_b || 'kg'})</label>
+														<input
+															id="superset-b-inc-double"
+															type="number"
+															step="0.5"
+															class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-2 py-1.5 text-sm text-on-surface outline-none"
+															value={typeof selectedBlock.data.increment_b === 'number' ? selectedBlock.data.increment_b : 2.5}
+															oninput={(event) => updateBlockField(selectedBlock.client_id, 'increment_b', Number((event.currentTarget as HTMLInputElement).value))}
+														/>
+													</div>
+												</div>
+												<p class="text-[11px] text-on-surface-variant leading-relaxed">
+													Progress from {selectedBlock.data.min_reps_b ?? 5} to {selectedBlock.data.max_reps_b ?? 8} reps with current weight. When all sets hit {selectedBlock.data.max_reps_b ?? 8} reps, load increases by +{selectedBlock.data.increment_b ?? 2.5}{selectedBlock.data.load_unit_b || 'kg'} and reps reset to {selectedBlock.data.min_reps_b ?? 5}.
+												</p>
+											</div>
+										{/if}
+
 										{#if selectedBlock.data.progression_type_b === 'linear'}
 											<div class="grid grid-cols-2 gap-3 border-t border-secondary/10 pt-3">
 												<div class="space-y-2">
-													<label for="superset-b-load" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Start Load</label>
-													<input
-														id="superset-b-load"
-														type="number"
-														step="0.5"
-														class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
-														value={typeof selectedBlock.data.start_load_b === 'number' ? selectedBlock.data.start_load_b : ''}
-														oninput={(event) => updateBlockField(selectedBlock.client_id, 'start_load_b', Number((event.currentTarget as HTMLInputElement).value))}
-													/>
-												</div>
-												<div class="space-y-2">
-													<label for="superset-b-unit" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Unit</label>
-													<select
-														id="superset-b-unit"
-														class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
-														value={typeof selectedBlock.data.load_unit_b === 'string' ? selectedBlock.data.load_unit_b : 'kg'}
-														onchange={(event) => updateBlockField(selectedBlock.client_id, 'load_unit_b', (event.currentTarget as HTMLSelectElement).value)}
-													>
-														<option value="kg">kg</option>
-														<option value="lb">lb</option>
-													</select>
-												</div>
-											</div>
-											<div class="grid grid-cols-2 gap-3">
-												<div class="space-y-2">
-													<label for="superset-b-increment" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Increment</label>
+													<label for="superset-b-increment" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Increment ({selectedBlock.data.load_unit_b || 'kg'})</label>
 													<input
 														id="superset-b-increment"
 														type="number"
@@ -2166,7 +2349,6 @@
 													>
 														<option value="add_each_session">Add each session</option>
 														<option value="add_weekly">Add weekly</option>
-														<option value="double_progression">Double progression</option>
 														<option value="manual">Manual</option>
 													</select>
 												</div>
