@@ -104,11 +104,26 @@ export function exportWorkflowToCanonicalJson(
 				blockJson.exercise_name = bData.exercise_name as string;
 			}
 
-			// Normalize target load
-			if (bData.load_value !== undefined) {
-				blockJson.target_load = bData.load_value as number;
-			} else if (bData.start_load !== undefined) {
-				blockJson.target_load = bData.start_load as number;
+			if (block.node_type_slug === 'exercise') {
+				if (bData.load_value !== undefined && bData.load_value !== null) {
+					blockJson.target_load = bData.load_value as number;
+				}
+				delete (blockJson as Record<string, any>).load_value;
+				delete (blockJson as Record<string, any>).load;
+				delete (blockJson as Record<string, any>).start_load;
+			} else if (block.node_type_slug === 'linear_progression') {
+				if (bData.start_load !== undefined && bData.start_load !== null) {
+					blockJson.target_load = bData.start_load as number;
+				}
+				delete (blockJson as Record<string, any>).start_load;
+				delete (blockJson as Record<string, any>).load_value;
+				delete (blockJson as Record<string, any>).load;
+			} else if (block.node_type_slug === 'superset') {
+				delete (blockJson as Record<string, any>).load_value_a;
+				delete (blockJson as Record<string, any>).load_value_b;
+				delete (blockJson as Record<string, any>).load_a;
+				delete (blockJson as Record<string, any>).load_b;
+				delete (blockJson as Record<string, any>).target_load;
 			}
 
 			// Normalize progression
@@ -330,6 +345,48 @@ export function parseAndValidateRoutineJson(jsonInput: string): ParseRoutineResu
 				cleanData = {
 					exercise_name: exerciseName,
 					duration
+				};
+			} else if (slug === 'superset') {
+				exerciseCount += 2;
+				const startLoadA =
+					rawBlock.start_load_a ??
+					rawBlock.load_value_a ??
+					rawBlock.load_a ??
+					rawBlock.target_load_a ??
+					rawBlockData?.start_load_a ??
+					rawBlockData?.load_value_a ??
+					null;
+				const startLoadB =
+					rawBlock.start_load_b ??
+					rawBlock.load_value_b ??
+					rawBlock.load_b ??
+					rawBlock.target_load_b ??
+					rawBlockData?.start_load_b ??
+					rawBlockData?.load_value_b ??
+					null;
+
+				cleanData = {
+					exercise_a_name: rawBlock.exercise_a_name ?? rawBlockData?.exercise_a_name ?? '',
+					exercise_b_name: rawBlock.exercise_b_name ?? rawBlockData?.exercise_b_name ?? '',
+					sets: Number(rawBlock.sets || rawBlockData?.sets || 3),
+					reps_a: String(rawBlock.reps_a ?? rawBlockData?.reps_a ?? '5-8'),
+					reps_b: String(rawBlock.reps_b ?? rawBlockData?.reps_b ?? '5-8'),
+					progression_type_a: String(rawBlock.progression_type_a ?? rawBlockData?.progression_type_a ?? 'none'),
+					progression_type_b: String(rawBlock.progression_type_b ?? rawBlockData?.progression_type_b ?? 'none'),
+					start_load_a: startLoadA !== null && startLoadA !== '' ? Number(startLoadA) : null,
+					start_load_b: startLoadB !== null && startLoadB !== '' ? Number(startLoadB) : null,
+					increment_a: Number(rawBlock.increment_a ?? rawBlockData?.increment_a ?? 2.5),
+					increment_b: Number(rawBlock.increment_b ?? rawBlockData?.increment_b ?? 2.5),
+					load_unit_a: String(rawBlock.load_unit_a ?? rawBlockData?.load_unit_a ?? 'kg'),
+					load_unit_b: String(rawBlock.load_unit_b ?? rawBlockData?.load_unit_b ?? 'kg'),
+					min_reps_a: Number(rawBlock.min_reps_a ?? rawBlockData?.min_reps_a ?? 5),
+					max_reps_a: Number(rawBlock.max_reps_a ?? rawBlockData?.max_reps_a ?? 8),
+					min_reps_b: Number(rawBlock.min_reps_b ?? rawBlockData?.min_reps_b ?? 5),
+					max_reps_b: Number(rawBlock.max_reps_b ?? rawBlockData?.max_reps_b ?? 8),
+					progression_rule_a: String(rawBlock.progression_rule_a ?? rawBlockData?.progression_rule_a ?? 'add_each_session'),
+					progression_rule_b: String(rawBlock.progression_rule_b ?? rawBlockData?.progression_rule_b ?? 'add_each_session'),
+					rest_seconds: Number(rawBlock.rest_seconds ?? rawBlockData?.rest_seconds ?? 120),
+					notes: String(rawBlock.notes ?? rawBlockData?.notes ?? '')
 				};
 			} else {
 				cleanData = { ...(rawBlockData || rawBlock) };

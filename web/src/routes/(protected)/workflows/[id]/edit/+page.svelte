@@ -1367,7 +1367,6 @@
 												oninput={(event) => {
 													const val = Number((event.currentTarget as HTMLInputElement).value);
 													updateBlockField(selectedBlock.client_id, 'load_value', val);
-													updateBlockField(selectedBlock.client_id, 'load', val);
 													if (!selectedBlock.data.load_unit) {
 														updateBlockField(selectedBlock.client_id, 'load_unit', 'kg');
 													}
@@ -1666,7 +1665,6 @@
 												oninput={(event) => {
 													const val = Number((event.currentTarget as HTMLInputElement).value);
 													updateBlockField(selectedBlock.client_id, 'start_load', val);
-													updateBlockField(selectedBlock.client_id, 'load', val);
 													if (!selectedBlock.data.load_unit) {
 														updateBlockField(selectedBlock.client_id, 'load_unit', 'kg');
 													}
@@ -2070,7 +2068,6 @@
 													oninput={(event) => {
 														const val = Number((event.currentTarget as HTMLInputElement).value);
 														updateBlockField(selectedBlock.client_id, 'start_load_a', val);
-														updateBlockField(selectedBlock.client_id, 'load_value_a', val);
 														if (!selectedBlock.data.load_unit_a) {
 															updateBlockField(selectedBlock.client_id, 'load_unit_a', 'kg');
 														}
@@ -2257,7 +2254,6 @@
 													oninput={(event) => {
 														const val = Number((event.currentTarget as HTMLInputElement).value);
 														updateBlockField(selectedBlock.client_id, 'start_load_b', val);
-														updateBlockField(selectedBlock.client_id, 'load_value_b', val);
 														if (!selectedBlock.data.load_unit_b) {
 															updateBlockField(selectedBlock.client_id, 'load_unit_b', 'kg');
 														}

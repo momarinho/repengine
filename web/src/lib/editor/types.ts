@@ -75,11 +75,61 @@ export function toDraftBlock(block: WorkflowBlockApi, index: number): DraftBlock
 }
 
 export function toWorkflowPayload(blocks: DraftBlock[]): WorkflowBlockApi[] {
-	return blocks.map((block, index) => ({
-		node_type_slug: block.node_type_slug,
-		position: index,
-		data: deepClone(block.data)
-	}));
+	return blocks.map((block, index) => {
+		const data = deepClone(block.data || {});
+
+		// Clean up internal / transient editor properties
+		delete (data as Record<string, any>).type;
+		delete (data as Record<string, any>).node_type_slug;
+
+		if (block.node_type_slug === 'exercise') {
+			const d = data as Record<string, any>;
+			if (d.load_value === undefined || d.load_value === null) {
+				if (d.target_load !== undefined && d.target_load !== null && d.target_load !== '') d.load_value = Number(d.target_load);
+				else if (d.load !== undefined && d.load !== null && d.load !== '') d.load_value = Number(d.load);
+				else if (d.start_load !== undefined && d.start_load !== null && d.start_load !== '') d.load_value = Number(d.start_load);
+			}
+			delete d.target_load;
+			delete d.load;
+			delete d.start_load;
+		} else if (block.node_type_slug === 'linear_progression') {
+			const d = data as Record<string, any>;
+			if (d.start_load === undefined || d.start_load === null) {
+				if (d.load !== undefined && d.load !== null && d.load !== '') d.start_load = Number(d.load);
+				else if (d.load_value !== undefined && d.load_value !== null && d.load_value !== '') d.start_load = Number(d.load_value);
+				else if (d.target_load !== undefined && d.target_load !== null && d.target_load !== '') d.start_load = Number(d.target_load);
+			}
+			delete d.load;
+			delete d.load_value;
+			delete d.target_load;
+		} else if (block.node_type_slug === 'superset') {
+			const d = data as Record<string, any>;
+			if (d.start_load_a === undefined || d.start_load_a === null) {
+				if (d.load_value_a !== undefined && d.load_value_a !== null && d.load_value_a !== '') d.start_load_a = Number(d.load_value_a);
+				else if (d.load_a !== undefined && d.load_a !== null && d.load_a !== '') d.start_load_a = Number(d.load_a);
+				else if (d.target_load_a !== undefined && d.target_load_a !== null && d.target_load_a !== '') d.start_load_a = Number(d.target_load_a);
+			}
+			if (d.start_load_b === undefined || d.start_load_b === null) {
+				if (d.load_value_b !== undefined && d.load_value_b !== null && d.load_value_b !== '') d.start_load_b = Number(d.load_value_b);
+				else if (d.load_b !== undefined && d.load_b !== null && d.load_b !== '') d.start_load_b = Number(d.load_b);
+				else if (d.target_load_b !== undefined && d.target_load_b !== null && d.target_load_b !== '') d.start_load_b = Number(d.target_load_b);
+			}
+			delete d.load_value_a;
+			delete d.load_value_b;
+			delete d.load_a;
+			delete d.load_b;
+			delete d.target_load_a;
+			delete d.target_load_b;
+			delete d.target_load;
+			delete d.load;
+		}
+
+		return {
+			node_type_slug: block.node_type_slug,
+			position: index,
+			data
+		};
+	});
 }
 
 export function defaultBlockForNodeType(nodeType: NodeType, position: number): DraftBlock {

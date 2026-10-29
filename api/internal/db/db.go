@@ -82,7 +82,7 @@ func SeedNodeTypes(ctx context.Context) error {
 		schema                        string
 	}{
 		{"exercise", "Exercise", "A single exercise node", "dumbbell",
-			`{"exercise_name": "", "sets": 3, "reps": "", "rest_seconds": 90, "notes": "", "load_value": null, "load_unit": "kg", "progression": null}`},
+			`{"exercise_name": "", "sets": 3, "reps": "", "rest_seconds": 90, "notes": "", "load_value": null, "load_unit": "kg", "progression": null, "load": null, "target_load": null}`},
 		{"exercise_timed", "Timed Exercise", "Exercise with duration", "timer",
 			`{"exercise_name": "", "duration": 30, "progression": null}`},
 		{
@@ -138,7 +138,10 @@ func SeedNodeTypes(ctx context.Context) error {
 				"notes": "",
 				"deload_weeks": null,
 				"deload_percent": null,
-				"progression": null
+				"progression": null,
+				"load": null,
+				"load_value": null,
+				"target_load": null
 			}`,
 		},
 		{
@@ -167,7 +170,13 @@ func SeedNodeTypes(ctx context.Context) error {
 				"progression_rule_a": "add_each_session",
 				"progression_rule_b": "add_each_session",
 				"rest_seconds": 120,
-				"notes": ""
+				"notes": "",
+				"load_value_a": null,
+				"load_value_b": null,
+				"load_a": null,
+				"load_b": null,
+				"target_load_a": null,
+				"target_load_b": null
 			}`,
 		},
 		{

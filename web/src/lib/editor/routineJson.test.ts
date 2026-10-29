@@ -6,7 +6,7 @@ import {
 	generateAiPromptTemplate,
 	type CanonicalRoutineJson
 } from './routineJson.ts';
-import type { DraftBlock } from './types.ts';
+import { type DraftBlock, toWorkflowPayload } from './types.ts';
 
 test('exportWorkflowToCanonicalJson formats sections and exercise blocks properly', () => {
 	const blocks: DraftBlock[] = [
@@ -249,4 +249,61 @@ test('parseAndValidateRoutineJson and exportWorkflowToCanonicalJson preserve and
 	assert.equal(exportedBlock.reps, '6-8');
 	assert.equal(exportedBlock.progression?.min_reps, 6);
 	assert.equal(exportedBlock.progression?.max_reps, 8);
+});
+
+test('parseAndValidateRoutineJson and toWorkflowPayload cleanly handle superset and exercise load aliases', () => {
+	const userJson = JSON.stringify({
+		name: 'Recommended Routine',
+		sections: [
+			{
+				title: 'Day 1',
+				blocks: [
+					{
+						type: 'superset',
+						node_type_slug: 'superset',
+						exercise_a_name: 'Dips',
+						exercise_b_name: 'RDL',
+						sets: 3,
+						reps_a: '5-8',
+						reps_b: '5-8',
+						start_load_b: 30,
+						load_value_b: 30,
+						load_unit_b: 'kg'
+					},
+					{
+						type: 'exercise',
+						node_type_slug: 'exercise',
+						exercise_name: 'Ab Wheel',
+						sets: 3,
+						reps: '8-12',
+						load_value: 0,
+						target_load: 0,
+						load_unit: 'kg'
+					}
+				]
+			}
+		]
+	});
+
+	const result = parseAndValidateRoutineJson(userJson);
+	assert.ok(result.success);
+	assert.ok(result.draftBlocks);
+
+	const payload = toWorkflowPayload(result.draftBlocks);
+	assert.equal(payload.length, 3); // 1 section + 2 blocks
+
+	// Superset block
+	const supersetPayload = payload[1];
+	assert.ok(supersetPayload?.data);
+	assert.equal(supersetPayload.node_type_slug, 'superset');
+	assert.equal(supersetPayload.data.start_load_b, 30);
+	assert.equal((supersetPayload.data as any).load_value_b, undefined);
+	assert.equal((supersetPayload.data as any).target_load, undefined);
+
+	// Exercise block
+	const exercisePayload = payload[2];
+	assert.ok(exercisePayload?.data);
+	assert.equal(exercisePayload.node_type_slug, 'exercise');
+	assert.equal(exercisePayload.data.load_value, 0);
+	assert.equal((exercisePayload.data as any).target_load, undefined);
 });
