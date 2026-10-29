@@ -4,7 +4,6 @@
 	import type { PageData } from './$types';
 	import AddBlockModal from '$lib/editor/AddBlockModal.svelte';
 	import BlockRenderer from '$lib/blocks/BlockRenderer.svelte';
-	import QrCodeModal from '$lib/components/QrCodeModal.svelte';
 	import AiArchitectModal from '$lib/components/AiArchitectModal.svelte';
 	import RoutineJsonModal from '$lib/components/RoutineJsonModal.svelte';
 	import { groupBlocksBySection, type SectionBlockGroup } from '$lib/sections/group';
@@ -41,7 +40,6 @@
 
 	let activeTab = $state<'editor' | 'preview' | 'history'>('editor');
 	let showAddBlock = $state(false);
-	let showQrModal = $state(false);
 	let showAiModal = $state(false);
 	let showJsonModal = $state(false);
 	let jsonModalInitialTab = $state<'export' | 'import' | 'prompt'>('export');
@@ -684,15 +682,6 @@
 						<span class="material-symbols-outlined text-base sm:text-lg">play_circle</span>
 						Play
 					</a>
-					<button
-						type="button"
-						onclick={() => (showQrModal = true)}
-						class="inline-flex h-10 sm:h-11 items-center gap-1.5 rounded-xl border border-outline-variant/20 bg-surface-container-low px-3 sm:px-3.5 text-xs sm:text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
-						title="Open on Mobile via QR code"
-					>
-						<span class="material-symbols-outlined text-base">qr_code_2</span>
-						<span class="hidden sm:inline">QR</span>
-					</button>
 					<button
 						type="button"
 						onclick={() => { jsonModalInitialTab = 'export'; showJsonModal = true; }}
@@ -2517,14 +2506,6 @@
 			onselect={addBlock}
 		/>
 
-		{#if workflow}
-			<QrCodeModal
-				open={showQrModal}
-				routineId={workflow.id}
-				routineName={title || workflow.name}
-				onclose={() => (showQrModal = false)}
-			/>
-		{/if}
 
 		<AiArchitectModal
 			open={showAiModal}
