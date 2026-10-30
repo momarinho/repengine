@@ -284,16 +284,29 @@ class WorkoutExecutionScreen extends ConsumerWidget {
               final nextIndex = currentLogs.length + 1;
               final logUniqueId = 'log-${DateTime.now().millisecondsSinceEpoch}';
 
+              final effectivePrescribedLoad = currentExercise.isSuperset
+                  ? (suggestion.displayText ?? currentExercise.formattedTargetLoad)
+                  : load.toString();
+              final effectiveActualLoad = currentExercise.isSuperset
+                  ? (suggestion.displayText ?? currentExercise.formattedTargetLoad)
+                  : load.toString();
+              final effectivePrescribedReps = currentExercise.isSuperset
+                  ? currentExercise.reps
+                  : reps.toString();
+              final effectiveActualReps = currentExercise.isSuperset
+                  ? currentExercise.reps
+                  : reps.toString();
+
               await repo.logSet(
                 clientId: logUniqueId,
                 sessionClientId: session.clientId,
                 blockClientId: currentExercise.blockClientId,
                 nodeTypeSlug: currentExercise.nodeTypeSlug,
                 setIndex: nextIndex,
-                prescribedReps: reps.toString(),
-                prescribedLoad: load.toString(),
-                actualReps: reps.toString(),
-                actualLoad: load.toString(),
+                prescribedReps: effectivePrescribedReps,
+                prescribedLoad: effectivePrescribedLoad,
+                actualReps: effectiveActualReps,
+                actualLoad: effectiveActualLoad,
                 actualRpe: rpe?.toString() ?? '',
                 completed: true,
                 createdAt: DateTime.now().toUtc(),
@@ -735,9 +748,11 @@ class _ActiveSessionContent extends ConsumerWidget {
                         ),
                       ),
                       Text(
-                        currentExercise.progressionType == 'double'
-                            ? '${suggestion?.reps ?? currentExercise.targetRepCount} reps (${currentExercise.reps})'
-                            : '${suggestion?.reps ?? currentExercise.reps} reps',
+                        currentExercise.isSuperset
+                            ? currentExercise.reps
+                            : (currentExercise.progressionType == 'double'
+                                ? '${suggestion?.reps ?? currentExercise.targetRepCount} reps (${currentExercise.reps})'
+                                : '${suggestion?.reps ?? currentExercise.reps} reps'),
                         style: AppTypography.titleMedium.copyWith(
                           fontSize: 15,
                           color: AppColors.onBackground,
@@ -754,7 +769,9 @@ class _ActiveSessionContent extends ConsumerWidget {
                         ),
                       ),
                       Text(
-                        '${(suggestion?.load ?? currentExercise.targetLoad).toStringAsFixed((suggestion?.load ?? currentExercise.targetLoad) % 1 == 0 ? 0 : 1)} kg',
+                        currentExercise.isSuperset
+                            ? (suggestion?.formattedLoad ?? currentExercise.formattedTargetLoad)
+                            : '${(suggestion?.load ?? currentExercise.targetLoad).toStringAsFixed((suggestion?.load ?? currentExercise.targetLoad) % 1 == 0 ? 0 : 1)} kg',
                         style: AppTypography.titleMedium.copyWith(
                           fontSize: 15,
                           color: AppColors.onBackground,

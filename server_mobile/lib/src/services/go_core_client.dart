@@ -374,6 +374,37 @@ class GoCoreClient {
       );
     }
   }
+
+  /// Registra um novo atleta no Go Core via e-mail e senha.
+  Future<Map<String, dynamic>> register(String email, String password) async {
+    final url = Uri.parse('$baseUrl/auth/register');
+
+    final response = await _httpClient.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({
+        'email': email,
+        'password': password,
+      }),
+    );
+
+    try {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return data;
+      }
+      final msg = data['error'] ?? data['message'] ?? 'Falha no cadastro';
+      throw GoCoreAuthException(response.statusCode, msg.toString());
+    } on FormatException {
+      throw GoCoreAuthException(
+        response.statusCode,
+        'Resposta inválida do servidor (${response.statusCode})',
+      );
+    }
+  }
 }
 
 /// Exceção para erros de autenticação originados no Go Core.

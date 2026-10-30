@@ -12,13 +12,31 @@ class ProgressionSuggestion {
   final int reps;
   final String? reasoning;
   final bool isProgressed;
+  final double? loadB;
+  final int? repsB;
+  final String? displayText;
 
   const ProgressionSuggestion({
     required this.load,
     required this.reps,
     this.reasoning,
     this.isProgressed = false,
+    this.loadB,
+    this.repsB,
+    this.displayText,
   });
+
+  /// Formatted representation for display in HUD (e.g. "0 / 35 kg" or "100 kg")
+  String get formattedLoad {
+    if (displayText != null && displayText!.isNotEmpty) return displayText!;
+    if (loadB != null) {
+      final strA = load % 1 == 0 ? load.toInt().toString() : load.toStringAsFixed(1);
+      final strB = loadB! % 1 == 0 ? loadB!.toInt().toString() : loadB!.toStringAsFixed(1);
+      return '$strA / $strB kg';
+    }
+    final str = load % 1 == 0 ? load.toInt().toString() : load.toStringAsFixed(1);
+    return '$str kg';
+  }
 }
 
 final workoutRepositoryProvider = Provider<WorkoutRepository>((ref) {
@@ -289,8 +307,16 @@ class WorkoutRepository {
     });
   }
 
-  double _parseLoadValue(String? raw, double fallback) {
+  double _parseLoadValue(String? raw, double fallback, {int partIndex = 0}) {
     if (raw == null || raw.trim().isEmpty) return fallback;
+    if (raw.contains('/')) {
+      final parts = raw.split('/');
+      final part = (partIndex >= 0 && partIndex < parts.length)
+          ? parts[partIndex]
+          : parts.first;
+      final cleanedPart = part.replaceAll(RegExp(r'[^\d.]'), '').trim();
+      return double.tryParse(cleanedPart) ?? fallback;
+    }
     final cleaned = raw.replaceAll(RegExp(r'[^\d.]'), '').trim();
     return double.tryParse(cleaned) ?? fallback;
   }
@@ -329,13 +355,22 @@ class WorkoutRepository {
 
       if (currentSessionSets.isNotEmpty) {
         final lastSet = currentSessionSets.first;
-        final load = _parseLoadValue(lastSet.actualLoad, fallbackLoad);
-        final reps = int.tryParse(lastSet.actualReps) ?? effectiveTargetReps;
+        final rawActual = lastSet.actualLoad;
+        final isSuperset = rawActual.contains('/');
+        final load = _parseLoadValue(rawActual, fallbackLoad, partIndex: 0);
+        final loadB = isSuperset ? _parseLoadValue(rawActual, 0.0, partIndex: 1) : null;
+        final reps = int.tryParse(lastSet.actualReps.split('/').first.trim()) ?? effectiveTargetReps;
+        final repsB = isSuperset && lastSet.actualReps.contains('/')
+            ? int.tryParse(lastSet.actualReps.split('/')[1].trim())
+            : null;
         return ProgressionSuggestion(
           load: load,
+          loadB: loadB,
           reps: reps,
+          repsB: repsB,
           reasoning: 'Maintaining load from previous set (#${lastSet.setIndex})',
           isProgressed: false,
+          displayText: isSuperset ? rawActual : null,
         );
       }
     }
@@ -409,12 +444,17 @@ class WorkoutRepository {
     if (lastSessionLogs.isEmpty) {
       final progressionState = await getProgressionStateForBlock(blockClientId);
       if (progressionState != null && progressionState.suggestedLoad != null) {
-        final syncedLoad = _parseLoadValue(progressionState.suggestedLoad, fallbackLoad);
+        final rawSugLoad = progressionState.suggestedLoad!;
+        final isSuperset = rawSugLoad.contains('/');
+        final syncedLoad = _parseLoadValue(rawSugLoad, fallbackLoad, partIndex: 0);
+        final syncedLoadB = isSuperset ? _parseLoadValue(rawSugLoad, 0.0, partIndex: 1) : null;
         return ProgressionSuggestion(
           load: syncedLoad,
+          loadB: syncedLoadB,
           reps: effectiveTargetReps,
           reasoning: progressionState.summary ?? 'Prescribed target load from coach',
           isProgressed: false,
+          displayText: isSuperset ? rawSugLoad : null,
         );
       }
 
@@ -795,6 +835,22 @@ class WorkoutRepository {
               'load': ex.targetLoad,
               'rest_seconds': ex.restSeconds,
             };
+            if (ex.isSuperset) {
+              if (ex.exerciseAName != null) dataMap['exercise_a_name'] = ex.exerciseAName;
+              if (ex.exerciseBName != null) dataMap['exercise_b_name'] = ex.exerciseBName;
+              if (ex.repsA != null) dataMap['reps_a'] = ex.repsA;
+              if (ex.repsB != null) dataMap['reps_b'] = ex.repsB;
+              if (ex.targetLoadA != null) dataMap['start_load_a'] = ex.targetLoadA;
+              if (ex.targetLoadB != null) dataMap['start_load_b'] = ex.targetLoadB;
+              if (ex.progressionTypeA != null) dataMap['progression_type_a'] = ex.progressionTypeA;
+              if (ex.progressionTypeB != null) dataMap['progression_type_b'] = ex.progressionTypeB;
+              if (ex.progressionIncrementA != null) dataMap['increment_a'] = ex.progressionIncrementA;
+              if (ex.progressionIncrementB != null) dataMap['increment_b'] = ex.progressionIncrementB;
+              if (ex.progressionMinRepsA != null) dataMap['min_reps_a'] = ex.progressionMinRepsA;
+              if (ex.progressionMaxRepsA != null) dataMap['max_reps_a'] = ex.progressionMaxRepsA;
+              if (ex.progressionMinRepsB != null) dataMap['min_reps_b'] = ex.progressionMinRepsB;
+              if (ex.progressionMaxRepsB != null) dataMap['max_reps_b'] = ex.progressionMaxRepsB;
+            }
             if (ex.progressionType != null) {
               dataMap['progression'] = {
                 'type': ex.progressionType,

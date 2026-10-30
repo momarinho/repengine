@@ -369,10 +369,33 @@ flowchart TD
     - Botão *"Copiar Prompt para ChatGPT / Claude"*: gera um prompt otimizado com a especificação do JSON do RepEngine para que o usuário possa pedir qualquer treino a qualquer IA externa e importá-lo em 1 segundo.
     - O assistente nativo *AI Workout Architect* passa a emitir diretamente esse formato canônico como padrão da plataforma.
 
-- [ ] **3. Testes Automatizados & Validação**:
+- [x] **3. Testes Automatizados & Validação**:
   - Testes unitários para o validador e parser do JSON canônico no Dart e no Go/TypeScript.
   - Testes de conexão de nós (edges) de progressão no Web Canvas.
   - Testes de renderização e exportação/importação no app Flutter.
+
+---
+
+### 🚀 SPRINT 13: Paridade Móvel Completa (Registro de Usuário, Progressão Independente de Supersets & Ciclo Automático de Treinos)
+> **Objetivo**: Atingir paridade funcional total entre o aplicativo móvel Flutter, o BFF Dart Frog e a versão Web SvelteKit/Go Core: viabilizando cadastro direto de conta no app com auto-login e sincronização imediata, motor de progressão independente para exercícios antagônicos em supersets (sem corrupção numérica de cargas com barras '/') e detecção inteligente do próximo dia da rotina (`nextCycleInfo`).
+
+- [x] **1. Autenticação & Cadastro Direto no App Flutter & BFF (`/auth/register`)**:
+  - **BFF Dart Frog (`server_mobile`)**: Nova rota `POST /api/v1/mobile/auth/register` com proxy autenticado para o Core Go (`/auth/register`), validação de payload e bypass no middleware de autenticação mobile.
+  - **Flutter Auth Repository & Notifier**: Implementação de `register(email, password)` no repositório mobile com validação preventiva de tamanho de senha e auto-login disparando sincronização em caso de sucesso.
+  - **AthleteAuthScreen UI**: Segmented switcher ("Log In" vs "Create Account"), campo de confirmação de senha com validação em tempo real e transição fluida entre modos.
+- [x] **2. Motor de Progressão Independente para Supersets (`RoutineExercise` & `WorkoutRepository`)**:
+  - **Modelagem de Parâmetros A & B**: Suporte a `exercise_a_name`, `exercise_b_name`, `target_load_a`, `target_load_b`, faixas de repetições `reps_a` / `reps_b` e tipos independentes de progressão (`progression_type_a`, `progression_type_b`, incrementos e limites de repetições).
+  - **Correção de Parsing Numérico**: Refatoração de `_parseLoadValue` para respeitar delimitadores `'/'`, eliminando o bug de strings compostas como `"0 kg / 35 kg"` serem corrompidas para `0.35` ou `1020`.
+  - **Exibição & Registro no HUD**: Card do HUD ativo e botões de registro exibem e persistem cargas compostas de supersets com fidelidade canônica (`displayText: "0 kg / 35 kg"`).
+- [x] **3. Detecção Inteligente do Ciclo de Treino (`RoutineCycleInfo`)**:
+  - **Algoritmo de Ciclo Espelhado da Web**: Implementação de `RoutineCycleInfo.calculate` com matching hierárquico por `sectionId`, título exato, substrings e padrões regex de `Day X` / `Dia X`.
+  - **Auto-seleção do Próximo Treino**: `RoutineSelectorView` seleciona automaticamente o próximo dia da rotina no ciclo `(lastIndex + 1) % sections.length`.
+  - **Badges & Histórico na UI**: Chip do dia seguinte destacado com badge *"NEXT UP"*, acompanhado do status de última sessão concluída.
+- [x] **4. Testes Automatizados & Validação**:
+  - BFF: 46 testes passando (`register_test.dart`).
+  - Mobile: 85 testes passando (`superset_and_cycle_test.dart`, `athlete_auth_screen_test.dart`, `auth_notifier_test.dart`, `widget_test.dart`).
+  - Web: 28 testes passando (`cycle.test.ts`, `routineJson.test.ts`) e 0 erros no `svelte-check`.
+
 
 
 

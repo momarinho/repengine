@@ -31,6 +31,7 @@ void main() {
     expect(find.text('Train Offline / Guest Mode'), findsOneWidget);
 
     // Advance via Guest Mode
+    await tester.ensureVisible(find.text('Train Offline / Guest Mode'));
     await tester.tap(find.text('Train Offline / Guest Mode'));
     await tester.pumpAndSettle();
 

@@ -17,6 +17,22 @@ class RoutineExercise {
   final int? progressionMaxReps;
   final String? progressionRule;
 
+  // Superset A & B parameters
+  final String? exerciseAName;
+  final String? exerciseBName;
+  final double? targetLoadA;
+  final double? targetLoadB;
+  final String? repsA;
+  final String? repsB;
+  final String? progressionTypeA;
+  final String? progressionTypeB;
+  final double? progressionIncrementA;
+  final double? progressionIncrementB;
+  final int? progressionMinRepsA;
+  final int? progressionMaxRepsA;
+  final int? progressionMinRepsB;
+  final int? progressionMaxRepsB;
+
   const RoutineExercise({
     required this.blockClientId,
     required this.nodeTypeSlug,
@@ -30,7 +46,37 @@ class RoutineExercise {
     this.progressionMinReps,
     this.progressionMaxReps,
     this.progressionRule,
+    this.exerciseAName,
+    this.exerciseBName,
+    this.targetLoadA,
+    this.targetLoadB,
+    this.repsA,
+    this.repsB,
+    this.progressionTypeA,
+    this.progressionTypeB,
+    this.progressionIncrementA,
+    this.progressionIncrementB,
+    this.progressionMinRepsA,
+    this.progressionMaxRepsA,
+    this.progressionMinRepsB,
+    this.progressionMaxRepsB,
   });
+
+  bool get isSuperset =>
+      nodeTypeSlug == 'superset' || (exerciseAName != null && exerciseBName != null);
+
+  /// Formatted target load string accounting for supersets (e.g. "0 / 35 kg" or "80 kg")
+  String get formattedTargetLoad {
+    if (isSuperset) {
+      final a = targetLoadA ?? (targetLoad > 0 ? targetLoad : 0.0);
+      final b = targetLoadB ?? 0.0;
+      final strA = a % 1 == 0 ? a.toInt().toString() : a.toStringAsFixed(1);
+      final strB = b % 1 == 0 ? b.toInt().toString() : b.toStringAsFixed(1);
+      return '$strA / $strB kg';
+    }
+    final str = targetLoad % 1 == 0 ? targetLoad.toInt().toString() : targetLoad.toStringAsFixed(1);
+    return '$str kg';
+  }
 
   /// Resolves the concrete numeric target reps for set logging & progressive overload.
   /// Correctly handles rep ranges (e.g. "6-8" -> 6), double progression minimums, and numeric strings.
@@ -271,34 +317,99 @@ class ParsedRoutine {
         }
       } else {
         // Exercise / linear_progression / superset / timed / repeat block
+        final isSupersetBlock = slug == 'superset' ||
+            (data['exercise_a_name'] != null && data['exercise_b_name'] != null);
+
         String exerciseName;
-        if (data['exercise_name'] != null &&
+        String? exAName;
+        String? exBName;
+        double? loadA;
+        double? loadB;
+        String? repsA;
+        String? repsB;
+        String? progTypeA;
+        String? progTypeB;
+        double? incA;
+        double? incB;
+        int? minRepsA;
+        int? maxRepsA;
+        int? minRepsB;
+        int? maxRepsB;
+
+        if (isSupersetBlock) {
+          exAName = data['exercise_a_name']?.toString().trim();
+          exBName = data['exercise_b_name']?.toString().trim();
+          exerciseName = '${exAName ?? "Exercise A"} + ${exBName ?? "Exercise B"}';
+
+          repsA = data['reps_a']?.toString() ?? data['reps']?.toString();
+          repsB = data['reps_b']?.toString() ?? data['reps']?.toString();
+
+          loadA = double.tryParse(
+            data['start_load_a']?.toString() ??
+                data['load_value_a']?.toString() ??
+                data['load_a']?.toString() ??
+                '',
+          );
+          loadB = double.tryParse(
+            data['start_load_b']?.toString() ??
+                data['load_value_b']?.toString() ??
+                data['load_b']?.toString() ??
+                '',
+          );
+
+          progTypeA = data['progression_type_a']?.toString();
+          progTypeB = data['progression_type_b']?.toString();
+          incA = double.tryParse(data['increment_a']?.toString() ?? '');
+          incB = double.tryParse(data['increment_b']?.toString() ?? '');
+          minRepsA = int.tryParse(data['min_reps_a']?.toString() ?? '');
+          maxRepsA = int.tryParse(data['max_reps_a']?.toString() ?? '');
+          minRepsB = int.tryParse(data['min_reps_b']?.toString() ?? '');
+          maxRepsB = int.tryParse(data['max_reps_b']?.toString() ?? '');
+
+          if (repsA != null && (minRepsA == null || maxRepsA == null)) {
+            final matchA = RegExp(r'(\d+)\s*[-–]\s*(\d+)').firstMatch(repsA);
+            if (matchA != null) {
+              minRepsA ??= int.tryParse(matchA.group(1)!);
+              maxRepsA ??= int.tryParse(matchA.group(2)!);
+              progTypeA ??= 'double';
+            }
+          }
+
+          if (repsB != null && (minRepsB == null || maxRepsB == null)) {
+            final matchB = RegExp(r'(\d+)\s*[-–]\s*(\d+)').firstMatch(repsB);
+            if (matchB != null) {
+              minRepsB ??= int.tryParse(matchB.group(1)!);
+              maxRepsB ??= int.tryParse(matchB.group(2)!);
+              progTypeB ??= 'double';
+            }
+          }
+        } else if (data['exercise_name'] != null &&
             data['exercise_name'].toString().trim().isNotEmpty) {
           exerciseName = data['exercise_name'].toString().trim();
         } else if (data['title'] != null &&
             data['title'].toString().trim().isNotEmpty) {
           exerciseName = data['title'].toString().trim();
-        } else if (data['exercise_a_name'] != null &&
-            data['exercise_b_name'] != null) {
-          exerciseName =
-              '${data['exercise_a_name']} + ${data['exercise_b_name']}';
         } else {
           exerciseName = 'Exercise ${currentExercises.length + 1}';
         }
 
         final sets = int.tryParse(data['sets']?.toString() ?? '') ?? 3;
-        final reps = data['reps']?.toString() ??
-            (data['reps_a'] != null && data['reps_b'] != null
-                ? '${data['reps_a']} / ${data['reps_b']}'
-                : (data['duration'] != null ? '${data['duration']}s' : '5'));
+        final reps = isSupersetBlock && repsA != null && repsB != null
+            ? '$repsA / $repsB'
+            : (data['reps']?.toString() ??
+                (data['reps_a'] != null && data['reps_b'] != null
+                    ? '${data['reps_a']} / ${data['reps_b']}'
+                    : (data['duration'] != null ? '${data['duration']}s' : '5')));
 
-        final parsedLoad = double.tryParse(
-          data['load']?.toString() ??
-              data['load_value']?.toString() ??
-              data['start_load']?.toString() ??
-              data['start_load_a']?.toString() ??
-              '',
-        );
+        final parsedLoad = isSupersetBlock
+            ? (loadA ?? 0.0)
+            : double.tryParse(
+                data['load']?.toString() ??
+                    data['load_value']?.toString() ??
+                    data['start_load']?.toString() ??
+                    data['start_load_a']?.toString() ??
+                    '',
+              );
         final isBodyweightOrCardio = slug.contains('timed') ||
             slug.contains('repeat') ||
             exerciseName.toLowerCase().contains('jump rope') ||
@@ -335,7 +446,7 @@ class ParsedRoutine {
 
         currentExercises.add(RoutineExercise(
           blockClientId: blockId,
-          nodeTypeSlug: slug.isNotEmpty ? slug : 'exercise',
+          nodeTypeSlug: slug.isNotEmpty ? slug : (isSupersetBlock ? 'superset' : 'exercise'),
           name: exerciseName,
           sets: sets,
           reps: reps,
@@ -346,6 +457,20 @@ class ParsedRoutine {
           progressionMinReps: minReps,
           progressionMaxReps: maxReps,
           progressionRule: progRule,
+          exerciseAName: exAName,
+          exerciseBName: exBName,
+          targetLoadA: loadA,
+          targetLoadB: loadB,
+          repsA: repsA,
+          repsB: repsB,
+          progressionTypeA: progTypeA,
+          progressionTypeB: progTypeB,
+          progressionIncrementA: incA,
+          progressionIncrementB: incB,
+          progressionMinRepsA: minRepsA,
+          progressionMaxRepsA: maxRepsA,
+          progressionMinRepsB: minRepsB,
+          progressionMaxRepsB: maxRepsB,
         ));
       }
     }
@@ -437,18 +562,77 @@ class CanonicalRoutineImport {
             final type = b['type']?.toString() ?? b['node_type_slug']?.toString() ?? 'exercise';
             if (type == 'rest' || type == 'section') continue;
 
-            final exName = b['exercise_name']?.toString() ??
-                b['name']?.toString() ??
-                'Exercise ${exercises.length + 1}';
+            final isSuperset = type == 'superset' ||
+                (b['exercise_a_name'] != null && b['exercise_b_name'] != null);
+
+            String exName;
+            String? exAName;
+            String? exBName;
+            double? loadA;
+            double? loadB;
+            String? repsA;
+            String? repsB;
+            String? progTypeA;
+            String? progTypeB;
+            double? incA;
+            double? incB;
+            int? minRepsA;
+            int? maxRepsA;
+            int? minRepsB;
+            int? maxRepsB;
+
+            if (isSuperset) {
+              exAName = b['exercise_a_name']?.toString().trim();
+              exBName = b['exercise_b_name']?.toString().trim();
+              exName = '${exAName ?? "Exercise A"} + ${exBName ?? "Exercise B"}';
+              repsA = b['reps_a']?.toString() ?? b['reps']?.toString();
+              repsB = b['reps_b']?.toString() ?? b['reps']?.toString();
+              loadA = double.tryParse(b['start_load_a']?.toString() ?? b['load_value_a']?.toString() ?? b['load_a']?.toString() ?? '');
+              loadB = double.tryParse(b['start_load_b']?.toString() ?? b['load_value_b']?.toString() ?? b['load_b']?.toString() ?? '');
+              progTypeA = b['progression_type_a']?.toString();
+              progTypeB = b['progression_type_b']?.toString();
+              incA = double.tryParse(b['increment_a']?.toString() ?? '');
+              incB = double.tryParse(b['increment_b']?.toString() ?? '');
+              minRepsA = int.tryParse(b['min_reps_a']?.toString() ?? '');
+              maxRepsA = int.tryParse(b['max_reps_a']?.toString() ?? '');
+              minRepsB = int.tryParse(b['min_reps_b']?.toString() ?? '');
+              maxRepsB = int.tryParse(b['max_reps_b']?.toString() ?? '');
+
+              if (repsA != null && (minRepsA == null || maxRepsA == null)) {
+                final matchA = RegExp(r'(\d+)\s*[-–]\s*(\d+)').firstMatch(repsA);
+                if (matchA != null) {
+                  minRepsA ??= int.tryParse(matchA.group(1)!);
+                  maxRepsA ??= int.tryParse(matchA.group(2)!);
+                  progTypeA ??= 'double';
+                }
+              }
+              if (repsB != null && (minRepsB == null || maxRepsB == null)) {
+                final matchB = RegExp(r'(\d+)\s*[-–]\s*(\d+)').firstMatch(repsB);
+                if (matchB != null) {
+                  minRepsB ??= int.tryParse(matchB.group(1)!);
+                  maxRepsB ??= int.tryParse(matchB.group(2)!);
+                  progTypeB ??= 'double';
+                }
+              }
+            } else {
+              exName = b['exercise_name']?.toString() ??
+                  b['name']?.toString() ??
+                  'Exercise ${exercises.length + 1}';
+            }
+
             final sets = int.tryParse(b['sets']?.toString() ?? '') ?? 3;
-            final reps = b['reps']?.toString() ?? '5';
-            final load = double.tryParse(
-                    b['target_load']?.toString() ??
-                        b['load_value']?.toString() ??
-                        b['start_load']?.toString() ??
-                        b['load']?.toString() ??
-                        '') ??
-                0.0;
+            final reps = isSuperset && repsA != null && repsB != null
+                ? '$repsA / $repsB'
+                : (b['reps']?.toString() ?? '5');
+            final load = isSuperset
+                ? (loadA ?? 0.0)
+                : (double.tryParse(
+                        b['target_load']?.toString() ??
+                            b['load_value']?.toString() ??
+                            b['start_load']?.toString() ??
+                            b['load']?.toString() ??
+                            '') ??
+                    0.0);
             final rest = int.tryParse(b['rest_seconds']?.toString() ?? '') ?? 90;
 
             final prog = b['progression'] as Map<String, dynamic>?;
@@ -479,6 +663,20 @@ class CanonicalRoutineImport {
               progressionMinReps: minR,
               progressionMaxReps: maxR,
               progressionRule: rule,
+              exerciseAName: exAName,
+              exerciseBName: exBName,
+              targetLoadA: loadA,
+              targetLoadB: loadB,
+              repsA: repsA,
+              repsB: repsB,
+              progressionTypeA: progTypeA,
+              progressionTypeB: progTypeB,
+              progressionIncrementA: incA,
+              progressionIncrementB: incB,
+              progressionMinRepsA: minRepsA,
+              progressionMaxRepsA: maxRepsA,
+              progressionMinRepsB: minRepsB,
+              progressionMaxRepsB: maxRepsB,
             ));
           }
         }

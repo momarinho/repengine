@@ -57,6 +57,52 @@ void main() {
       await db.close();
     });
 
+    testWidgets('toggling mode switches between Log In and Create Account form', (
+      WidgetTester tester,
+    ) async {
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(db),
+            serverHealthProvider.overrideWith(
+              (ref) => ServerHealthNotifier(ref, autoStartTimer: false),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.darkTheme,
+            home: const AthleteAuthScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Initially Log In mode
+      expect(find.text('RepEngine Athlete'), findsOneWidget);
+      expect(find.text('Confirm Password'), findsNothing);
+      expect(find.text('Log In & Sync'), findsOneWidget);
+
+      // Tap 'Create Account' tab
+      await tester.tap(find.text('Create Account'));
+      await tester.pumpAndSettle();
+
+      // Now in Create Account mode
+      expect(find.text('Join RepEngine'), findsOneWidget);
+      expect(find.text('Confirm Password'), findsOneWidget);
+      expect(find.text('Create Account & Sync'), findsOneWidget);
+
+      // Tap 'Log In' tab to toggle back
+      await tester.tap(find.text('Log In'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('RepEngine Athlete'), findsOneWidget);
+      expect(find.text('Confirm Password'), findsNothing);
+      expect(find.text('Log In & Sync'), findsOneWidget);
+
+      await db.close();
+    });
+
     testWidgets('renders athlete profile card when authenticated', (
       WidgetTester tester,
     ) async {

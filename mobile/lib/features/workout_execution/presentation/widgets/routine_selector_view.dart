@@ -6,6 +6,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../auth/presentation/athlete_auth_screen.dart';
 import '../../controller/workout_execution_controller.dart';
+import '../../domain/routine_cycle_info.dart';
 import '../../domain/routine_model.dart';
 import '../routine_editor_screen.dart';
 import '../workout_history_screen.dart';
@@ -43,11 +44,22 @@ class RoutineSelectorView extends ConsumerWidget {
         );
 
         final sections = selectedRoutine.sections;
+        final completedSessionsAsync = ref.watch(completedSessionsStreamProvider);
+        final completedSessions = completedSessionsAsync.value ?? [];
+        final cycleInfo = RoutineCycleInfo.calculate(
+          sections: sections,
+          completedSessions: completedSessions,
+          workflowId: selectedRoutine.id,
+        );
+
         final selectedSectionId = ref.watch(selectedSectionIdProvider) ??
+            cycleInfo.nextSection?.id ??
             (sections.isNotEmpty ? sections.first.id : null);
         final selectedSection = sections.firstWhere(
           (s) => s.id == selectedSectionId,
-          orElse: () => sections.isNotEmpty ? sections.first : const RoutineSection(id: 'sec_1', title: 'Default Workout'),
+          orElse: () => sections.isNotEmpty
+              ? sections.first
+              : const RoutineSection(id: 'sec_1', title: 'Default Workout'),
         );
 
         return SingleChildScrollView(
@@ -320,9 +332,7 @@ class RoutineSelectorView extends ConsumerWidget {
                       selected: isSelected,
                       onSelected: (_) {
                         ref.read(selectedRoutineIdProvider.notifier).state = r.id;
-                        if (r.sections.isNotEmpty) {
-                          ref.read(selectedSectionIdProvider.notifier).state = r.sections.first.id;
-                        }
+                        ref.read(selectedSectionIdProvider.notifier).state = null;
                       },
                       selectedColor: AppColors.primaryContainer,
                       backgroundColor: AppColors.surfaceContainer,
@@ -336,8 +346,21 @@ class RoutineSelectorView extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
 
-              // Day / Section Selector
-              const Text('WORKOUT DAY / SECTION', style: AppTypography.labelSmall),
+              // Day / Section Selector Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('WORKOUT DAY / SECTION', style: AppTypography.labelSmall),
+                  if (cycleInfo.lastCompletedSection != null)
+                    Text(
+                      'Last: ${cycleInfo.lastCompletedSection!.title}',
+                      style: AppTypography.labelSmall.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                        fontSize: 10,
+                      ),
+                    ),
+                ],
+              ),
               const SizedBox(height: 10),
 
               // Horizontal chips for day selection
@@ -350,18 +373,23 @@ class RoutineSelectorView extends ConsumerWidget {
                   itemBuilder: (context, index) {
                     final section = sections[index];
                     final isSelected = section.id == selectedSection.id;
+                    final isNextInCycle = section.id == cycleInfo.nextSection?.id;
 
                     return GestureDetector(
                       onTap: () {
                         ref.read(selectedSectionIdProvider.notifier).state = section.id;
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
                           color: isSelected ? AppColors.primaryContainer : AppColors.surfaceContainer,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: isSelected ? AppColors.primary : AppColors.outlineVariant,
+                            color: isSelected
+                                ? AppColors.primary
+                                : (isNextInCycle
+                                    ? AppColors.primary.withValues(alpha: 0.4)
+                                    : AppColors.outlineVariant),
                             width: isSelected ? 1.5 : 1,
                           ),
                         ),
@@ -380,6 +408,25 @@ class RoutineSelectorView extends ConsumerWidget {
                                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                               ),
                             ),
+                            if (isNextInCycle) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                                ),
+                                child: Text(
+                                  'NEXT UP',
+                                  style: AppTypography.labelSmall.copyWith(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),

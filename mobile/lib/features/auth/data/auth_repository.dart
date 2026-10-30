@@ -152,6 +152,74 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     state = const AuthState(status: AuthStatus.guest);
   }
+
+  /// Registers a new athlete account on RepEngine and logs in automatically.
+  Future<bool> register({
+    required String email,
+    required String password,
+  }) async {
+    final cleanEmail = email.trim();
+    if (cleanEmail.isEmpty || password.isEmpty) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: 'Please enter an email and password.',
+      );
+      return false;
+    }
+
+    if (password.length < 6) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: 'Password must be at least 6 characters.',
+      );
+      return false;
+    }
+
+    state = state.copyWith(
+      status: AuthStatus.authenticating,
+      errorMessage: null,
+    );
+
+    final baseUrl =
+        ref.read(serverHostProvider).replaceAll(RegExp(r'/+$'), '');
+    final uri = Uri.parse('$baseUrl/api/v1/mobile/auth/register');
+
+    try {
+      final response = await _client.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({
+          'email': cleanEmail,
+          'password': password,
+        }),
+      ).timeout(const Duration(seconds: 8));
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        // Automatically log in with newly created credentials
+        return await login(email: cleanEmail, password: password);
+      } else {
+        final msg = data['error'] ??
+            data['message'] ??
+            'Registration failed. Please verify your details.';
+        state = state.copyWith(
+          status: AuthStatus.error,
+          errorMessage: msg.toString(),
+        );
+        return false;
+      }
+    } catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: 'Could not connect to server ($e).',
+      );
+      return false;
+    }
+  }
 }
 
 /// Track if the athlete opted to continue in guest mode without logging in.

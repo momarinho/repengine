@@ -205,5 +205,93 @@ void main() {
       expect(prefs.getInt('repengine_auth_user_id'), isNull);
       expect(prefs.getString('repengine_auth_email'), isNull);
     });
+
+    test('register calls /auth/register then logs in automatically on success', () async {
+      final fakeSync = FakeSyncEngine();
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+
+      final mockHttp = MockClient((request) async {
+        if (request.url.path == '/api/v1/mobile/auth/register') {
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          expect(body['email'], equals('new_athlete@repengine.com'));
+          expect(body['password'], equals('securepass123'));
+          return http.Response(
+            jsonEncode({'message': 'user created', 'user_id': 105}),
+            201,
+          );
+        } else if (request.url.path == '/api/v1/mobile/auth/login') {
+          return http.Response(
+            jsonEncode({
+              'message': 'logged in',
+              'user_id': 105,
+              'token': 'signed-jwt-token-105',
+            }),
+            200,
+          );
+        }
+        return http.Response('Not found', 404);
+      });
+
+      final container = ProviderContainer(
+        overrides: [
+          serverHostProvider.overrideWith((ref) => FakeServerConfigNotifier()),
+          syncEngineProvider.overrideWith((ref) => fakeSync),
+          appDatabaseProvider.overrideWithValue(db),
+        ],
+      );
+
+      final notifier = AuthNotifier(
+        container.read(Provider<Ref>((ref) => ref)),
+        client: mockHttp,
+        prefs: prefs,
+      );
+
+      final success = await notifier.register(
+        email: 'new_athlete@repengine.com',
+        password: 'securepass123',
+      );
+
+      expect(success, isTrue);
+      expect(notifier.state.status, equals(AuthStatus.authenticated));
+      expect(notifier.state.userId, equals(105));
+      expect(notifier.state.token, equals('signed-jwt-token-105'));
+      expect(fakeSync.syncNowCalled, isTrue);
+    });
+
+    test('register handles failure error status and message', () async {
+      final fakeSync = FakeSyncEngine();
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+
+      final mockHttp = MockClient((request) async {
+        return http.Response(
+          jsonEncode({'error': 'Email already exists'}),
+          409,
+        );
+      });
+
+      final container = ProviderContainer(
+        overrides: [
+          serverHostProvider.overrideWith((ref) => FakeServerConfigNotifier()),
+          syncEngineProvider.overrideWith((ref) => fakeSync),
+          appDatabaseProvider.overrideWithValue(db),
+        ],
+      );
+
+      final notifier = AuthNotifier(
+        container.read(Provider<Ref>((ref) => ref)),
+        client: mockHttp,
+        prefs: prefs,
+      );
+
+      final success = await notifier.register(
+        email: 'existing@repengine.com',
+        password: 'password123',
+      );
+
+      expect(success, isFalse);
+      expect(notifier.state.status, equals(AuthStatus.error));
+      expect(notifier.state.errorMessage, contains('Email already exists'));
+      expect(fakeSync.syncNowCalled, isFalse);
+    });
   });
 }

@@ -18,7 +18,9 @@ class AthleteAuthScreen extends ConsumerStatefulWidget {
 class _AthleteAuthScreenState extends ConsumerState<AthleteAuthScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _serverController = TextEditingController();
+  bool _isRegisterMode = false;
   bool _obscurePassword = true;
   bool _showAdvancedServer = false;
   bool _isSyncing = false;
@@ -34,6 +36,7 @@ class _AthleteAuthScreenState extends ConsumerState<AthleteAuthScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _serverController.dispose();
     super.dispose();
   }
@@ -79,6 +82,41 @@ class _AthleteAuthScreenState extends ConsumerState<AthleteAuthScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Logged in successfully as $email'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    }
+  }
+
+  Future<void> _handleRegister() async {
+    FocusScope.of(context).unfocus();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final confirmPassword = _confirmPasswordController.text;
+
+    if (password != confirmPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Passwords do not match'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    final success = await ref.read(authStateProvider.notifier).register(
+          email: email,
+          password: password,
+        );
+
+    if (success && mounted) {
+      ref.read(guestModeActiveProvider.notifier).state = false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Account created and logged in as $email'),
           backgroundColor: AppColors.success,
         ),
       );
@@ -325,6 +363,60 @@ class _AthleteAuthScreenState extends ConsumerState<AthleteAuthScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Segmented Mode Switcher (Log In vs Create Account)
+        Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.outlineVariant),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _isRegisterMode = false),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: !_isRegisterMode ? AppColors.primaryContainer : Colors.transparent,
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Text(
+                      'Log In',
+                      textAlign: TextAlign.center,
+                      style: AppTypography.labelLarge.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: !_isRegisterMode ? AppColors.onBackground : AppColors.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _isRegisterMode = true),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _isRegisterMode ? AppColors.primaryContainer : Colors.transparent,
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Text(
+                      'Create Account',
+                      textAlign: TextAlign.center,
+                      style: AppTypography.labelLarge.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: _isRegisterMode ? AppColors.onBackground : AppColors.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
         // Brand Header
         Container(
           padding: const EdgeInsets.all(20),
@@ -348,14 +440,16 @@ class _AthleteAuthScreenState extends ConsumerState<AthleteAuthScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              const Text(
-                'RepEngine Athlete',
+              Text(
+                _isRegisterMode ? 'Join RepEngine' : 'RepEngine Athlete',
                 style: AppTypography.titleLarge,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Sign in with your Web credentials to sync your training routines and history across all your devices.',
+              Text(
+                _isRegisterMode
+                    ? 'Create your athlete account to start syncing routines, progression curves, and PRs.'
+                    : 'Sign in with your Web credentials to sync your training routines and history across all your devices.',
                 style: AppTypography.bodyMedium,
                 textAlign: TextAlign.center,
               ),
@@ -442,6 +536,18 @@ class _AthleteAuthScreenState extends ConsumerState<AthleteAuthScreen> {
             border: const OutlineInputBorder(),
           ),
         ),
+        if (_isRegisterMode) ...[
+          const SizedBox(height: 14),
+          TextField(
+            controller: _confirmPasswordController,
+            obscureText: _obscurePassword,
+            decoration: const InputDecoration(
+              labelText: 'Confirm Password',
+              prefixIcon: Icon(Icons.lock_reset),
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
 
         const SizedBox(height: 16),
 
@@ -488,19 +594,22 @@ class _AthleteAuthScreenState extends ConsumerState<AthleteAuthScreen> {
 
         const SizedBox(height: 12),
 
-        // Sign In Button
+        // Primary Action Button (Sign In or Register)
         ElevatedButton(
           style: ElevatedButton.styleFrom(
             minimumSize: const Size.fromHeight(50),
           ),
-          onPressed: isAuthenticating ? null : _handleLogin,
+          onPressed: isAuthenticating ? null : (_isRegisterMode ? _handleRegister : _handleLogin),
           child: isAuthenticating
               ? const SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black87),
                 )
-              : const Text('Log In & Sync', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              : Text(
+                  _isRegisterMode ? 'Create Account & Sync' : 'Log In & Sync',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
         ),
 
         const SizedBox(height: 12),
