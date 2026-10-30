@@ -307,3 +307,42 @@ test('parseAndValidateRoutineJson and toWorkflowPayload cleanly handle superset 
 	assert.equal(exercisePayload.data.load_value, 0);
 	assert.equal((exercisePayload.data as any).target_load, undefined);
 });
+
+test('parseAndValidateRoutineJson preserves independent double progression ranges for superset A and B', () => {
+	const userJson = JSON.stringify({
+		name: 'Arm Day',
+		sections: [
+			{
+				title: 'Day 1',
+				blocks: [
+					{
+						type: 'superset',
+						node_type_slug: 'superset',
+						exercise_a_name: 'Bicep Curl',
+						exercise_b_name: 'Skull Crusher',
+						sets: 3,
+						reps_a: '8-12',
+						reps_b: '10-15',
+						start_load_a: 12,
+						start_load_b: 20
+					}
+				]
+			}
+		]
+	});
+
+	const result = parseAndValidateRoutineJson(userJson);
+	assert.ok(result.success);
+	assert.ok(result.draftBlocks);
+
+	const payload = toWorkflowPayload(result.draftBlocks);
+	const superset = payload[1];
+	assert.ok(superset?.data);
+	assert.equal(superset.node_type_slug, 'superset');
+	assert.equal(superset.data.min_reps_a, 8);
+	assert.equal(superset.data.max_reps_a, 12);
+	assert.equal(superset.data.progression_type_a, 'double');
+	assert.equal(superset.data.min_reps_b, 10);
+	assert.equal(superset.data.max_reps_b, 15);
+	assert.equal(superset.data.progression_type_b, 'double');
+});

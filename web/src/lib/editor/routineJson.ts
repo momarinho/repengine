@@ -365,24 +365,45 @@ export function parseAndValidateRoutineJson(jsonInput: string): ParseRoutineResu
 					rawBlockData?.load_value_b ??
 					null;
 
+				const repsAStr = String(rawBlock.reps_a ?? rawBlockData?.reps_a ?? '5-8');
+				const repsBStr = String(rawBlock.reps_b ?? rawBlockData?.reps_b ?? '5-8');
+				const matchA = repsAStr.match(/(\d+)\s*[-–]\s*(\d+)/);
+				const matchB = repsBStr.match(/(\d+)\s*[-–]\s*(\d+)/);
+
+				const minA = Number(rawBlock.min_reps_a ?? rawBlockData?.min_reps_a ?? (matchA ? matchA[1] : 5));
+				const maxA = Number(rawBlock.max_reps_a ?? rawBlockData?.max_reps_a ?? (matchA ? matchA[2] : 8));
+				const minB = Number(rawBlock.min_reps_b ?? rawBlockData?.min_reps_b ?? (matchB ? matchB[1] : 5));
+				const maxB = Number(rawBlock.max_reps_b ?? rawBlockData?.max_reps_b ?? (matchB ? matchB[2] : 8));
+
+				const progTypeA = String(
+					rawBlock.progression_type_a ??
+						rawBlockData?.progression_type_a ??
+						(matchA || (minA !== maxA && minA > 0 && maxA > 0) ? 'double' : 'none')
+				);
+				const progTypeB = String(
+					rawBlock.progression_type_b ??
+						rawBlockData?.progression_type_b ??
+						(matchB || (minB !== maxB && minB > 0 && maxB > 0) ? 'double' : 'none')
+				);
+
 				cleanData = {
 					exercise_a_name: rawBlock.exercise_a_name ?? rawBlockData?.exercise_a_name ?? '',
 					exercise_b_name: rawBlock.exercise_b_name ?? rawBlockData?.exercise_b_name ?? '',
 					sets: Number(rawBlock.sets || rawBlockData?.sets || 3),
-					reps_a: String(rawBlock.reps_a ?? rawBlockData?.reps_a ?? '5-8'),
-					reps_b: String(rawBlock.reps_b ?? rawBlockData?.reps_b ?? '5-8'),
-					progression_type_a: String(rawBlock.progression_type_a ?? rawBlockData?.progression_type_a ?? 'none'),
-					progression_type_b: String(rawBlock.progression_type_b ?? rawBlockData?.progression_type_b ?? 'none'),
+					reps_a: repsAStr,
+					reps_b: repsBStr,
+					progression_type_a: progTypeA,
+					progression_type_b: progTypeB,
 					start_load_a: startLoadA !== null && startLoadA !== '' ? Number(startLoadA) : null,
 					start_load_b: startLoadB !== null && startLoadB !== '' ? Number(startLoadB) : null,
 					increment_a: Number(rawBlock.increment_a ?? rawBlockData?.increment_a ?? 2.5),
 					increment_b: Number(rawBlock.increment_b ?? rawBlockData?.increment_b ?? 2.5),
 					load_unit_a: String(rawBlock.load_unit_a ?? rawBlockData?.load_unit_a ?? 'kg'),
 					load_unit_b: String(rawBlock.load_unit_b ?? rawBlockData?.load_unit_b ?? 'kg'),
-					min_reps_a: Number(rawBlock.min_reps_a ?? rawBlockData?.min_reps_a ?? 5),
-					max_reps_a: Number(rawBlock.max_reps_a ?? rawBlockData?.max_reps_a ?? 8),
-					min_reps_b: Number(rawBlock.min_reps_b ?? rawBlockData?.min_reps_b ?? 5),
-					max_reps_b: Number(rawBlock.max_reps_b ?? rawBlockData?.max_reps_b ?? 8),
+					min_reps_a: minA,
+					max_reps_a: maxA,
+					min_reps_b: minB,
+					max_reps_b: maxB,
 					progression_rule_a: String(rawBlock.progression_rule_a ?? rawBlockData?.progression_rule_a ?? 'add_each_session'),
 					progression_rule_b: String(rawBlock.progression_rule_b ?? rawBlockData?.progression_rule_b ?? 'add_each_session'),
 					rest_seconds: Number(rawBlock.rest_seconds ?? rawBlockData?.rest_seconds ?? 120),
