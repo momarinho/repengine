@@ -108,6 +108,13 @@ graph TD
 * **Crystal-Clear Auth Modes**: Distinct, dedicated Sign In (`/login`) and Register (`/register`) experiences with segmented navigation, explicit mode headers, and accessible password helpers.
 * **High-Contrast Theming & Autofill Resilience**: Atelier Kanagawa palette optimized with standardized `.btn-primary-gradient` tokens, dark/light contrast integrity, and styled `-webkit-autofill` states preventing browser text-color clashes.
 
+### 📸 10. Multi-Provider Multimodal AI Routine Vision & Smart Ingestion (Gemini & OpenAI)
+* **Direct Paper-to-Studio Vision**: Upload or photograph physical gym sheets, whiteboard routines, or handwritten workout notes directly from mobile camera or desktop file picker.
+* **Agnostic Multi-Provider Engine**: Supports both **Google Gemini** (`gemini-1.5-flash`) and **OpenAI** (`gpt-4o-mini`) via zero-configuration automatic key prefix detection (`AIzaSy...` vs. `sk-...` / `sk-proj-...`).
+* **Deterministic Structured Extraction**: Enforces strict schema compliance through native `responseSchema` (Gemini) and JSON object mode with rigorous schema prompting (OpenAI) at low temperature (`0.1`), outputting 100% valid canonical RepEngine routines (`sections`, `exercise`, `superset`, `exercise_timed`, `rest_seconds`, `load_value`).
+* **Unstructured Natural Language Parsing**: Converts messy pasted text (forum routines, coaches' messages, unstructured notes) into structured, editable workout canvas blocks without manual data entry.
+* **Zero-Leakage BYOK (Bring Your Own Key)**: Users can supply their personal API key (free Google AI Studio or OpenAI key) directly in the browser—persisted safely in local storage with live provider badge detection—or rely on the server's global environment keys (`GEMINI_API_KEY` / `OPENAI_API_KEY`).
+
 ---
 
 ## 🛠️ Tech Stack
@@ -119,6 +126,7 @@ graph TD
 | **Mobile BFF** | Dart Frog (:8081), JWT proxy, batch sync reconciliation, AI Copilot (Gemini) |
 | **Shared Sports Core** | Pure Dart package (`repengine_core`), Autoregulation, 1RM consensus, ACWR, INOL |
 | **Web Studio** | SvelteKit (Svelte 5 runes), TypeScript, TailwindCSS, Web Audio API, Screen Wake Lock API |
+| **AI & Vision** | Provider-Agnostic LLM Engine (Google Gemini 1.5 Flash & OpenAI GPT-4o mini, Multimodal Vision, Structured Ingestion, BYOK) |
 | **Database** | PostgreSQL 16 (Relational Core), SQLite 3 (Mobile Local-First) |
 | **DevOps & Containers** | Docker Compose, GitHub Actions, Alpine Linux minimal runtime |
 

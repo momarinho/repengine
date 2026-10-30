@@ -13,7 +13,7 @@
 	type Props = {
 		open: boolean;
 		mode?: 'dashboard' | 'editor';
-		initialTab?: 'export' | 'import' | 'prompt';
+		initialTab?: 'export' | 'import' | 'prompt' | 'scan';
 		workflow?: { id?: number; name: string; description?: string; is_public?: boolean };
 		blocks?: DraftBlock[];
 		onclose: () => void;
@@ -35,12 +35,52 @@
 		onapply
 	}: Props = $props();
 
-	let activeTab = $state<'export' | 'import' | 'prompt'>('import');
+	let activeTab = $state<'export' | 'import' | 'prompt' | 'scan'>('import');
 	let importText = $state('');
+	let scanText = $state('');
+	let fileInputRef = $state<HTMLInputElement>();
 	let copySuccess = $state(false);
 	let promptCopySuccess = $state(false);
 	let isSubmitting = $state(false);
+	let isScanning = $state(false);
+	let errorMessage = $state('');
 	let applyAction = $state<'replace' | 'append'>('replace');
+
+	let customApiKey = $state('');
+	let showCustomKey = $state(false);
+
+	$effect(() => {
+		if (typeof window !== 'undefined') {
+			customApiKey =
+				localStorage.getItem('repengine_ai_api_key') ||
+				localStorage.getItem('repengine_gemini_api_key') ||
+				localStorage.getItem('repengine_openai_api_key') ||
+				'';
+		}
+	});
+
+	function saveCustomApiKey(key: string): void {
+		customApiKey = key;
+		if (typeof window !== 'undefined') {
+			if (key.trim()) {
+				localStorage.setItem('repengine_ai_api_key', key.trim());
+				localStorage.setItem('repengine_gemini_api_key', key.trim());
+			} else {
+				localStorage.removeItem('repengine_ai_api_key');
+				localStorage.removeItem('repengine_gemini_api_key');
+				localStorage.removeItem('repengine_openai_api_key');
+			}
+		}
+	}
+
+	const detectedProvider = $derived.by(() => {
+		const k = customApiKey.trim();
+		if (!k) return null;
+		if (k.startsWith('sk-') || k.startsWith('org-') || k.startsWith('proj_')) {
+			return { name: 'OpenAI (GPT-4o mini)', icon: 'bolt', color: 'text-emerald-400' };
+		}
+		return { name: 'Google (Gemini 1.5 Flash)', icon: 'auto_awesome', color: 'text-primary' };
+	});
 
 	$effect(() => {
 		if (open) {
@@ -48,6 +88,8 @@
 			copySuccess = false;
 			promptCopySuccess = false;
 			isSubmitting = false;
+			isScanning = false;
+			errorMessage = '';
 			if (initialTab === 'export' && workflow) {
 				// formatted export ready
 			}
@@ -70,7 +112,7 @@
 	});
 
 	function handleBackdrop(event: MouseEvent): void {
-		if (event.target === event.currentTarget && !isSubmitting) {
+		if (event.target === event.currentTarget && !isSubmitting && !isScanning) {
 			onclose();
 		}
 	}
@@ -127,6 +169,64 @@
 			}
 		};
 		reader.readAsText(file);
+	}
+
+	async function handleImageUpload(event: Event): Promise<void> {
+		const target = event.target as HTMLInputElement;
+		const file = target.files?.[0];
+		if (!file) return;
+
+		await handleScanWithAi(file);
+		target.value = '';
+	}
+
+	async function handleScanWithAi(imageFile?: File, rawText?: string): Promise<void> {
+		const text = rawText?.trim() || scanText.trim();
+		if (!imageFile && !text) {
+			errorMessage = 'Selecione uma foto ou informe o texto da ficha.';
+			return;
+		}
+
+		isScanning = true;
+		errorMessage = '';
+
+		try {
+			const formData = new FormData();
+			if (imageFile) formData.append('file', imageFile);
+			if (text) formData.append('text', text);
+
+			const headers: Record<string, string> = {};
+			const localKey =
+				customApiKey.trim() ||
+				(typeof window !== 'undefined'
+					? localStorage.getItem('repengine_ai_api_key') ||
+						localStorage.getItem('repengine_gemini_api_key') ||
+						localStorage.getItem('repengine_openai_api_key') ||
+						''
+					: '');
+			if (localKey) {
+				headers['x-ai-api-key'] = localKey;
+				headers['x-gemini-api-key'] = localKey;
+			}
+
+			const res = await fetch('/api/ai/parse-routine', {
+				method: 'POST',
+				headers,
+				body: formData
+			});
+
+			const data = await res.json().catch(() => null);
+			if (!res.ok) {
+				throw new Error(data?.message || 'Falha no processamento');
+			}
+
+			importText = JSON.stringify(data, null, 2);
+			activeTab = 'import';
+		} catch (error: unknown) {
+			errorMessage = error instanceof Error ? error.message : 'Falha no processamento';
+		} finally {
+			isScanning = false;
+		}
 	}
 
 	async function handleConfirmImport(): Promise<void> {
@@ -187,7 +287,7 @@
 		tabindex="-1"
 		onclick={handleBackdrop}
 		onkeydown={(event) => {
-			if (event.key === 'Escape') onclose();
+			if (event.key === 'Escape' && !isSubmitting && !isScanning) onclose();
 		}}
 	>
 		<div
@@ -213,6 +313,7 @@
 					type="button"
 					class="flex h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
 					onclick={onclose}
+					disabled={isSubmitting || isScanning}
 				>
 					<span class="material-symbols-outlined">close</span>
 				</button>
@@ -251,6 +352,19 @@
 				<button
 					type="button"
 					class={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition-colors ${
+						activeTab === 'scan'
+							? 'border-primary text-primary'
+							: 'border-transparent text-on-surface-variant hover:text-on-surface'
+					}`}
+					onclick={() => (activeTab = 'scan')}
+				>
+					<span class="material-symbols-outlined text-base">document_scanner</span>
+					Scan com IA
+				</button>
+
+				<button
+					type="button"
+					class={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition-colors ${
 						activeTab === 'prompt'
 							? 'border-primary text-primary'
 							: 'border-transparent text-on-surface-variant hover:text-on-surface'
@@ -264,6 +378,13 @@
 
 			<!-- Modal Body -->
 			<div class="flex-1 overflow-y-auto p-6 space-y-6">
+				{#if errorMessage}
+					<div class="flex items-start gap-2.5 rounded-xl border border-error/30 bg-error/10 p-4 text-xs text-error">
+						<span class="material-symbols-outlined mt-0.5 shrink-0 text-base">error</span>
+						<p>{errorMessage}</p>
+					</div>
+				{/if}
+
 				<!-- TAB 1: EXPORT -->
 				{#if activeTab === 'export' && workflow}
 					<div class="space-y-4">
@@ -417,6 +538,115 @@
 							></textarea>
 						</div>
 					</div>
+
+				<!-- TAB 4: AI SCAN -->
+				{:else if activeTab === 'scan'}
+					<div class="space-y-5">
+						<div class="rounded-xl border border-primary/25 bg-primary/5 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+							<div>
+								<h3 class="text-sm font-bold text-on-surface">Scan com IA (Foto ou Texto)</h3>
+								<p class="mt-0.5 text-xs text-on-surface-variant">
+									Envie uma foto da ficha ou descreva o treino. O resultado é convertido diretamente para blocos do RepEngine.
+								</p>
+							</div>
+							{#if detectedProvider}
+								<span class={`self-start sm:self-auto rounded-full px-2.5 py-1 text-[11px] font-bold ${detectedProvider.color} bg-surface-container-high border border-outline-variant/30 flex items-center gap-1.5`}>
+									<span class="material-symbols-outlined text-sm">{detectedProvider.icon}</span>
+									{detectedProvider.name}
+								</span>
+							{/if}
+						</div>
+
+						<!-- BYOK Collapsible / Config -->
+						<div class="rounded-xl border border-outline-variant/20 bg-surface-container-low p-3.5 space-y-2">
+							<div class="flex items-center justify-between text-xs">
+								<button
+									type="button"
+									class="flex items-center gap-1.5 font-semibold text-on-surface hover:text-primary transition-colors text-left"
+									onclick={() => (showCustomKey = !showCustomKey)}
+								>
+									<span class="material-symbols-outlined text-sm text-primary">key</span>
+									<span>Chave de API Pessoal (BYOK)</span>
+									{#if detectedProvider}
+										<span class="ml-1 text-[11px] text-on-surface-variant font-normal">({detectedProvider.name})</span>
+									{:else if customApiKey.trim()}
+										<span class="ml-1 text-[11px] text-on-surface-variant font-normal">(Configurada)</span>
+									{:else}
+										<span class="ml-1 text-[11px] text-on-surface-variant/70 font-normal">(Opcional: Gemini ou OpenAI)</span>
+									{/if}
+								</button>
+								<button
+									type="button"
+									class="text-on-surface-variant hover:text-on-surface transition-colors"
+									onclick={() => (showCustomKey = !showCustomKey)}
+									aria-label="Expandir chave de API"
+								>
+									<span class="material-symbols-outlined text-base">
+										{showCustomKey ? 'expand_less' : 'expand_more'}
+									</span>
+								</button>
+							</div>
+
+							{#if showCustomKey}
+								<div class="pt-1.5 space-y-2">
+									<input
+										type="password"
+										class="w-full rounded-lg border border-outline-variant/30 bg-surface-container px-3 py-2 text-xs text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:outline-none font-mono"
+										placeholder="Insira sua chave: AIzaSy... (Gemini) ou sk-... (OpenAI)"
+										value={customApiKey}
+										oninput={(e) => saveCustomApiKey((e.currentTarget as HTMLInputElement).value)}
+									/>
+									<p class="text-[11px] text-on-surface-variant">
+										Detecta automaticamente chaves gratuitas do <strong>Google Gemini</strong> ou chaves da <strong>OpenAI (GPT-4o mini)</strong>. Salvo apenas localmente no seu navegador.
+									</p>
+								</div>
+							{/if}
+						</div>
+
+						<div class="flex flex-col items-center justify-center rounded-xl border border-dashed border-outline-variant/30 bg-surface-container-low p-6 text-center">
+							<span class="material-symbols-outlined text-3xl text-primary">add_a_photo</span>
+							<p class="mt-2 text-sm font-semibold text-on-surface">Fotografe ou selecione sua ficha</p>
+							<p class="mt-1 text-xs text-on-surface-variant">PNG, JPEG ou WebP</p>
+							<button
+								type="button"
+								class="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-on-primary-fixed shadow-lg shadow-primary/20 transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+								onclick={() => fileInputRef?.click()}
+								disabled={isScanning}
+							>
+								<span class="material-symbols-outlined text-base">upload_file</span>
+								{isScanning ? 'Processando...' : 'Selecionar imagem'}
+							</button>
+							<input
+								type="file"
+								accept="image/png, image/jpeg, image/webp"
+								class="hidden"
+								bind:this={fileInputRef}
+								onchange={handleImageUpload}
+							/>
+						</div>
+
+						<div class="space-y-2">
+							<label for="routine-ai-scan-text" class="text-xs font-semibold text-on-surface">
+								Ou cole/descreva o treino em texto
+							</label>
+							<textarea
+								id="routine-ai-scan-text"
+								bind:value={scanText}
+								placeholder="Ex.: Treino A: supino reto 4x8 com 60 kg, descanso de 90 segundos..."
+								class="h-40 w-full resize-none rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-4 text-sm text-on-surface outline-none focus:border-primary/50"
+								disabled={isScanning}
+							></textarea>
+							<button
+								type="button"
+								class="inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-40"
+								onclick={() => handleScanWithAi(undefined, scanText)}
+								disabled={!scanText.trim() || isScanning}
+							>
+								<span class="material-symbols-outlined text-base">{isScanning ? 'sync' : 'auto_awesome'}</span>
+								{isScanning ? 'Processando...' : 'Processar texto com IA'}
+							</button>
+						</div>
+					</div>
 				{/if}
 			</div>
 
@@ -426,7 +656,7 @@
 					type="button"
 					class="rounded-lg border border-outline-variant/25 px-4 py-2.5 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
 					onclick={onclose}
-					disabled={isSubmitting}
+					disabled={isSubmitting || isScanning}
 				>
 					Cancel
 				</button>
@@ -460,6 +690,16 @@
 					>
 						<span class="material-symbols-outlined text-base">content_copy</span>
 						{promptCopySuccess ? 'Prompt Copied!' : 'Copy AI Prompt'}
+					</button>
+				{:else if activeTab === 'scan'}
+					<button
+						type="button"
+						onclick={() => handleScanWithAi(undefined, scanText)}
+						disabled={!scanText.trim() || isScanning}
+						class="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-on-primary-fixed shadow-lg shadow-primary/20 transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+					>
+						<span class="material-symbols-outlined text-base">{isScanning ? 'sync' : 'auto_awesome'}</span>
+						{isScanning ? 'Processando...' : 'Processar texto'}
 					</button>
 				{/if}
 			</div>
