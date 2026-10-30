@@ -118,68 +118,86 @@ Regras:
 }
 
 async function callGemini(apiKey: string, parts: Array<Record<string, unknown>>, schema: Record<string, unknown>): Promise<any> {
-	const model = 'gemini-1.5-flash';
-	const url = new URL(
-		`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
-	);
-	url.searchParams.set('key', apiKey);
+	const candidateModels = [
+		process.env.GEMINI_MODEL,
+		'gemini-2.5-flash',
+		'gemini-2.0-flash',
+		'gemini-1.5-flash'
+	].filter(Boolean) as string[];
 
-	const response = await fetch(url, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({
-			contents: [{ parts }],
-			generationConfig: {
-				responseMimeType: 'application/json',
-				responseSchema: schema,
-				temperature: 0.1
+	let lastError: Error | null = null;
+
+	for (const model of candidateModels) {
+		const url = new URL(
+			`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
+		);
+		url.searchParams.set('key', apiKey);
+
+		const response = await fetch(url, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				contents: [{ parts }],
+				generationConfig: {
+					responseMimeType: 'application/json',
+					responseSchema: schema,
+					temperature: 0.1
+				}
+			})
+		});
+
+		if (!response.ok) {
+			const errorData: unknown = await response.json().catch(() => null);
+			const apiMessage =
+				typeof errorData === 'object' &&
+				errorData !== null &&
+				'error' in errorData &&
+				typeof errorData.error === 'object' &&
+				errorData.error !== null &&
+				'message' in errorData.error &&
+				typeof errorData.error.message === 'string'
+					? errorData.error.message
+					: null;
+
+			// If model is not found / 404, try next candidate
+			if (response.status === 404 || apiMessage?.includes('not found') || apiMessage?.includes('deprecated')) {
+				lastError = new Error(apiMessage || `Modelo ${model} indisponível (HTTP 404)`);
+				continue;
 			}
-		})
-	});
 
-	if (!response.ok) {
-		const errorData: unknown = await response.json().catch(() => null);
-		const apiMessage =
-			typeof errorData === 'object' &&
-			errorData !== null &&
-			'error' in errorData &&
-			typeof errorData.error === 'object' &&
-			errorData.error !== null &&
-			'message' in errorData.error &&
-			typeof errorData.error.message === 'string'
-				? errorData.error.message
+			throw new Error(apiMessage || `Erro da API do Gemini (HTTP ${response.status})`);
+		}
+
+		const result: unknown = await response.json();
+		const rawJsonText =
+			typeof result === 'object' &&
+			result !== null &&
+			'candidates' in result &&
+			Array.isArray(result.candidates) &&
+			result.candidates[0] &&
+			typeof result.candidates[0] === 'object' &&
+			'content' in result.candidates[0] &&
+			result.candidates[0].content &&
+			typeof result.candidates[0].content === 'object' &&
+			'parts' in result.candidates[0].content &&
+			Array.isArray(result.candidates[0].content.parts) &&
+			result.candidates[0].content.parts[0] &&
+			typeof result.candidates[0].content.parts[0] === 'object' &&
+			'text' in result.candidates[0].content.parts[0] &&
+			typeof result.candidates[0].content.parts[0].text === 'string'
+				? result.candidates[0].content.parts[0].text
 				: null;
 
-		throw new Error(apiMessage || `Erro da API do Gemini (HTTP ${response.status})`);
+		if (!rawJsonText?.trim()) {
+			throw new Error('A IA não retornou nenhum conteúdo válido.');
+		}
+
+		try {
+			return JSON.parse(rawJsonText);
+		} catch {
+			throw new Error('A IA retornou um formato que não é um JSON válido.');
+		}
 	}
 
-	const result: unknown = await response.json();
-	const rawJsonText =
-		typeof result === 'object' &&
-		result !== null &&
-		'candidates' in result &&
-		Array.isArray(result.candidates) &&
-		result.candidates[0] &&
-		typeof result.candidates[0] === 'object' &&
-		'content' in result.candidates[0] &&
-		result.candidates[0].content &&
-		typeof result.candidates[0].content === 'object' &&
-		'parts' in result.candidates[0].content &&
-		Array.isArray(result.candidates[0].content.parts) &&
-		result.candidates[0].content.parts[0] &&
-		typeof result.candidates[0].content.parts[0] === 'object' &&
-		'text' in result.candidates[0].content.parts[0] &&
-		typeof result.candidates[0].content.parts[0].text === 'string'
-			? result.candidates[0].content.parts[0].text
-			: null;
-
-	if (!rawJsonText?.trim()) {
-		throw new Error('A IA não retornou nenhum conteúdo válido.');
-	}
-
-	try {
-		return JSON.parse(rawJsonText);
-	} catch {
-		throw new Error('A IA retornou um formato que não é um JSON válido.');
-	}
+	throw lastError || new Error('Nenhum modelo Gemini compatível pôde responder.');
 }

@@ -156,17 +156,41 @@
 	let overrideLoads = $state<Record<string, string>>({});
 
 	$effect(() => {
-		if (data.sessionHistory && data.sessionHistory.length > 0) {
-			const localActive = sessionHistory.filter((s) => s.status === 'active');
-			const serverIds = new Set(data.sessionHistory.map((s) => s.id));
-			const missingLocal = localActive.filter((s) => !serverIds.has(s.id));
-			sessionHistory = [...missingLocal, ...data.sessionHistory];
+		const serverHistory = data.sessionHistory;
+		if (serverHistory && serverHistory.length > 0) {
+			untrack(() => {
+				const current = sessionHistory;
+				const localActive = current.filter((s) => s.status === 'active');
+				const serverIds = new Set(serverHistory.map((s) => s.id));
+				const missingLocal = localActive.filter((s) => !serverIds.has(s.id));
+				const merged = [...missingLocal, ...serverHistory];
+				const isSame =
+					current.length === merged.length &&
+					current.every((s, i) => s.id === merged[i].id && s.status === merged[i].status);
+				if (!isSame) {
+					sessionHistory = merged;
+				}
+			});
 		}
 	});
 
 	$effect(() => {
-		if (data.progressionStates && data.progressionStates.length > 0) {
-			progressionStates = data.progressionStates;
+		const serverProgression = data.progressionStates;
+		if (serverProgression && serverProgression.length > 0) {
+			untrack(() => {
+				const current = progressionStates;
+				const isSame =
+					current.length === serverProgression.length &&
+					current.every(
+						(p, i) =>
+							p.id === serverProgression[i].id &&
+							p.current_load === serverProgression[i].current_load &&
+							p.suggested_load === serverProgression[i].suggested_load
+					);
+				if (!isSame) {
+					progressionStates = serverProgression;
+				}
+			});
 		}
 	});
 

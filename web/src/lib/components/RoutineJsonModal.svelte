@@ -38,7 +38,10 @@
 	let activeTab = $state<'export' | 'import' | 'prompt' | 'scan'>('import');
 	let importText = $state('');
 	let scanText = $state('');
-	let fileInputRef = $state<HTMLInputElement>();
+	let cameraInputRef = $state<HTMLInputElement>();
+	let galleryInputRef = $state<HTMLInputElement>();
+	let selectedImagePreview = $state<string | null>(null);
+	let selectedImageName = $state<string>('');
 	let copySuccess = $state(false);
 	let promptCopySuccess = $state(false);
 	let isSubmitting = $state(false);
@@ -79,7 +82,7 @@
 		if (k.startsWith('sk-') || k.startsWith('org-') || k.startsWith('proj_')) {
 			return { name: 'OpenAI (GPT-4o mini)', icon: 'bolt', color: 'text-emerald-400' };
 		}
-		return { name: 'Google (Gemini 1.5 Flash)', icon: 'auto_awesome', color: 'text-primary' };
+		return { name: 'Google (Gemini 2.5 / 2.0 Flash)', icon: 'auto_awesome', color: 'text-primary' };
 	});
 
 	$effect(() => {
@@ -171,13 +174,74 @@
 		reader.readAsText(file);
 	}
 
+	async function compressAndPrepareImage(file: File): Promise<File> {
+		if (typeof window === 'undefined' || !file.type.startsWith('image/')) return file;
+		return new Promise((resolve) => {
+			const img = new Image();
+			const objectUrl = URL.createObjectURL(file);
+			img.onload = () => {
+				URL.revokeObjectURL(objectUrl);
+				const maxDimension = 1600;
+				let { width, height } = img;
+				if (width > maxDimension || height > maxDimension) {
+					if (width > height) {
+						height = Math.round((height * maxDimension) / width);
+						width = maxDimension;
+					} else {
+						width = Math.round((width * maxDimension) / height);
+						height = maxDimension;
+					}
+				}
+				const canvas = document.createElement('canvas');
+				canvas.width = width;
+				canvas.height = height;
+				const ctx = canvas.getContext('2d');
+				if (!ctx) {
+					resolve(file);
+					return;
+				}
+				ctx.drawImage(img, 0, 0, width, height);
+				canvas.toBlob(
+					(blob) => {
+						if (!blob) {
+							resolve(file);
+							return;
+						}
+						const processed = new File([blob], file.name.replace(/\.[^/.]+$/, '.jpg'), {
+							type: 'image/jpeg'
+						});
+						resolve(processed);
+					},
+					'image/jpeg',
+					0.85
+				);
+			};
+			img.onerror = () => {
+				URL.revokeObjectURL(objectUrl);
+				resolve(file);
+			};
+			img.src = objectUrl;
+		});
+	}
+
 	async function handleImageUpload(event: Event): Promise<void> {
 		const target = event.target as HTMLInputElement;
 		const file = target.files?.[0];
 		if (!file) return;
 
-		await handleScanWithAi(file);
-		target.value = '';
+		try {
+			const processed = await compressAndPrepareImage(file);
+			selectedImageName = file.name;
+			if (selectedImagePreview) {
+				URL.revokeObjectURL(selectedImagePreview);
+			}
+			selectedImagePreview = URL.createObjectURL(processed);
+			await handleScanWithAi(processed);
+		} catch (e: any) {
+			errorMessage = e?.message || 'Falha ao processar a imagem';
+		} finally {
+			target.value = '';
+		}
 	}
 
 	async function handleScanWithAi(imageFile?: File, rawText?: string): Promise<void> {
@@ -604,23 +668,64 @@
 						</div>
 
 						<div class="flex flex-col items-center justify-center rounded-xl border border-dashed border-outline-variant/30 bg-surface-container-low p-6 text-center">
-							<span class="material-symbols-outlined text-3xl text-primary">add_a_photo</span>
-							<p class="mt-2 text-sm font-semibold text-on-surface">Fotografe ou selecione sua ficha</p>
-							<p class="mt-1 text-xs text-on-surface-variant">PNG, JPEG ou WebP</p>
-							<button
-								type="button"
-								class="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-on-primary-fixed shadow-lg shadow-primary/20 transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
-								onclick={() => fileInputRef?.click()}
-								disabled={isScanning}
-							>
-								<span class="material-symbols-outlined text-base">upload_file</span>
-								{isScanning ? 'Processando...' : 'Selecionar imagem'}
-							</button>
+							{#if selectedImagePreview}
+								<div class="relative mb-3 max-h-48 overflow-hidden rounded-lg border border-outline-variant/30 shadow-md">
+									<img src={selectedImagePreview} alt="Ficha selecionada" class="max-h-48 object-contain" />
+									{#if isScanning}
+										<div class="absolute inset-0 flex items-center justify-center bg-surface-lowest/70 backdrop-blur-xs">
+											<span class="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-on-primary-fixed shadow">
+												<span class="material-symbols-outlined animate-spin text-sm">sync</span>
+												Analisando com IA...
+											</span>
+										</div>
+									{/if}
+								</div>
+								{#if selectedImageName}
+									<p class="text-xs text-on-surface-variant font-medium mb-3">{selectedImageName}</p>
+								{/if}
+							{:else}
+								<span class="material-symbols-outlined text-4xl text-primary">add_a_photo</span>
+								<p class="mt-2 text-sm font-semibold text-on-surface">Fotografe ou selecione sua ficha</p>
+								<p class="mt-1 text-xs text-on-surface-variant">Tire uma foto direta da câmera ou escolha uma imagem da galeria</p>
+							{/if}
+
+							<div class="mt-4 flex flex-wrap items-center justify-center gap-3">
+								<button
+									type="button"
+									class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-xs sm:text-sm font-bold text-on-primary-fixed shadow-lg shadow-primary/20 transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+									onclick={() => cameraInputRef?.click()}
+									disabled={isScanning}
+								>
+									<span class="material-symbols-outlined text-base">photo_camera</span>
+									{isScanning ? 'Processando...' : 'Tirar Foto (Câmera)'}
+								</button>
+								<button
+									type="button"
+									class="inline-flex items-center gap-2 rounded-lg border border-outline-variant/25 bg-surface-container-high px-4 py-2.5 text-xs sm:text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-highest disabled:cursor-not-allowed disabled:opacity-40"
+									onclick={() => galleryInputRef?.click()}
+									disabled={isScanning}
+								>
+									<span class="material-symbols-outlined text-base">photo_library</span>
+									Escolher da Galeria
+								</button>
+							</div>
+
+							<!-- Input 1: Direto da Câmera (capture=environment) -->
 							<input
 								type="file"
-								accept="image/png, image/jpeg, image/webp"
+								accept="image/*"
+								capture="environment"
 								class="hidden"
-								bind:this={fileInputRef}
+								bind:this={cameraInputRef}
+								onchange={handleImageUpload}
+							/>
+
+							<!-- Input 2: Galeria / Arquivos -->
+							<input
+								type="file"
+								accept="image/*"
+								class="hidden"
+								bind:this={galleryInputRef}
 								onchange={handleImageUpload}
 							/>
 						</div>
