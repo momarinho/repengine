@@ -1,4 +1,4 @@
-import type { AiGenerateInput, AiParseInput } from './types';
+import type { AiGenerateInput, AiModelOption, AiParseInput } from './types';
 
 const OPENAI_SCHEMA_PROMPT = `
 Você deve responder ESTRITAMENTE com um objeto JSON válido, sem texto explicativo antes ou depois.
@@ -89,10 +89,14 @@ ${input.text?.trim() ? `\nTexto fornecido pelo usuário:\n${input.text.trim()}` 
 		text: promptText
 	});
 
-	return callOpenAI(effectiveApiKey, [
-		{ role: 'system', content: OPENAI_SCHEMA_PROMPT },
-		{ role: 'user', content: userContent }
-	]);
+	return callOpenAI(
+		effectiveApiKey,
+		[
+			{ role: 'system', content: OPENAI_SCHEMA_PROMPT },
+			{ role: 'user', content: userContent }
+		],
+		input.model
+	);
 }
 
 export async function generateRoutineWithOpenAI(input: AiGenerateInput): Promise<any> {
@@ -119,14 +123,95 @@ Regras:
 3. Use nomes claros e padronizados para os exercícios.
 `;
 
-	return callOpenAI(effectiveApiKey, [
-		{ role: 'system', content: OPENAI_SCHEMA_PROMPT },
-		{ role: 'user', content: prompt }
-	]);
+	return callOpenAI(
+		effectiveApiKey,
+		[
+			{ role: 'system', content: OPENAI_SCHEMA_PROMPT },
+			{ role: 'user', content: prompt }
+		],
+		input.model
+	);
 }
 
-async function callOpenAI(apiKey: string, messages: Array<Record<string, unknown>>): Promise<any> {
-	const model = 'gpt-4o-mini';
+const DEFAULT_OPENAI_MODELS = ['gpt-4o-mini', 'gpt-4o', 'o1-mini', 'o3-mini'];
+
+export async function listOpenAIModels(apiKey: string): Promise<AiModelOption[]> {
+	let modelIds = DEFAULT_OPENAI_MODELS;
+
+	if (apiKey?.trim()) {
+		try {
+			const res = await fetch('https://api.openai.com/v1/models', {
+				method: 'GET',
+				headers: {
+					Authorization: `Bearer ${apiKey.trim()}`
+				},
+				signal: AbortSignal.timeout(3500)
+			});
+
+			if (res.ok) {
+				const data: any = await res.json();
+				if (Array.isArray(data?.data)) {
+					const available: string[] = data.data
+						.map((m: any) => m.id as string)
+						.filter((id: string) => {
+							const lower = id.toLowerCase();
+							return (
+								(lower.startsWith('gpt-4o') ||
+									lower.startsWith('o1') ||
+									lower.startsWith('o3') ||
+									lower.startsWith('chatgpt-4o')) &&
+								!lower.includes('realtime') &&
+								!lower.includes('audio') &&
+								!lower.includes('transcription')
+							);
+						});
+
+					if (available.length > 0) {
+						const sorted = available.sort((a, b) => {
+							const score = (m: string) => {
+								if (m === 'gpt-4o-mini') return 100;
+								if (m.startsWith('gpt-4o-mini')) return 90;
+								if (m === 'gpt-4o') return 80;
+								if (m.startsWith('gpt-4o')) return 70;
+								if (m.includes('o3-mini')) return 60;
+								if (m.includes('o1-mini')) return 50;
+								return 10;
+							};
+							return score(b) - score(a);
+						});
+
+						modelIds = Array.from(new Set([...sorted, ...DEFAULT_OPENAI_MODELS]));
+					}
+				}
+			}
+		} catch {
+			// Fallback to defaults
+		}
+	}
+
+	return modelIds.map((id) => {
+		let name = id;
+		if (id === 'gpt-4o-mini') name = 'GPT-4o mini (Padrão Recomendado)';
+		else if (id === 'gpt-4o') name = 'GPT-4o (Visão e Raciocínio Avançado)';
+		else if (id === 'o3-mini') name = 'o3-mini (Raciocínio STEM)';
+		else if (id === 'o1-mini') name = 'o1-mini';
+		else if (id === 'o1') name = 'o1 (Raciocínio Profundo)';
+
+		return {
+			id,
+			name,
+			provider: 'openai',
+			isVision: id.includes('4o')
+		};
+	});
+}
+
+async function callOpenAI(
+	apiKey: string,
+	messages: Array<Record<string, unknown>>,
+	explicitModel?: string
+): Promise<any> {
+	const model = explicitModel?.trim() || process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini';
 	const url = 'https://api.openai.com/v1/chat/completions';
 
 	const response = await fetch(url, {

@@ -1,4 +1,4 @@
-import type { AiGenerateInput, AiParseInput } from './types';
+import type { AiGenerateInput, AiModelOption, AiParseInput } from './types';
 
 // Strict schema for Google Gemini Structured Output
 const ROUTINE_SCHEMA = {
@@ -89,7 +89,7 @@ ${input.text?.trim() ? `\nTexto fornecido pelo usuário:\n${input.text.trim()}` 
 
 	parts.push({ text: promptText });
 
-	return callGemini(effectiveApiKey, parts, ROUTINE_SCHEMA);
+	return callGemini(effectiveApiKey, parts, ROUTINE_SCHEMA, input.model);
 }
 
 export async function generateRoutineWithGemini(input: AiGenerateInput): Promise<any> {
@@ -116,7 +116,7 @@ Regras:
 3. Use nomes claros e padronizados para os exercícios.
 `;
 
-	return callGemini(effectiveApiKey, [{ text: prompt }], ROUTINE_SCHEMA);
+	return callGemini(effectiveApiKey, [{ text: prompt }], ROUTINE_SCHEMA, input.model);
 }
 
 const DEFAULT_CANDIDATE_MODELS = [
@@ -189,8 +189,40 @@ export async function resolveGeminiModels(apiKey: string): Promise<string[]> {
 	return DEFAULT_CANDIDATE_MODELS;
 }
 
-async function callGemini(apiKey: string, parts: Array<Record<string, unknown>>, schema: Record<string, unknown>): Promise<any> {
-	const candidateModels = await resolveGeminiModels(apiKey);
+export async function listGeminiModels(apiKey: string): Promise<AiModelOption[]> {
+	const modelIds = await resolveGeminiModels(apiKey);
+	return modelIds.map((id) => {
+		let name = id;
+		if (id === 'gemini-2.5-flash') name = 'Gemini 2.5 Flash (Padrão Recomendado)';
+		else if (id === 'gemini-2.0-flash') name = 'Gemini 2.0 Flash';
+		else if (id === 'gemini-2.5-flash-lite') name = 'Gemini 2.5 Flash Lite (Mais rápido)';
+		else if (id === 'gemini-2.0-flash-lite') name = 'Gemini 2.0 Flash Lite';
+		else if (id === 'gemini-2.5-pro') name = 'Gemini 2.5 Pro (Raciocínio Avançado)';
+		else {
+			name = id
+				.replace(/-/g, ' ')
+				.replace(/\b\w/g, (c) => c.toUpperCase());
+		}
+
+		return {
+			id,
+			name,
+			provider: 'gemini',
+			isVision: true
+		};
+	});
+}
+
+async function callGemini(
+	apiKey: string,
+	parts: Array<Record<string, unknown>>,
+	schema: Record<string, unknown>,
+	explicitModel?: string
+): Promise<any> {
+	let candidateModels = await resolveGeminiModels(apiKey);
+	if (explicitModel?.trim()) {
+		candidateModels = [explicitModel.trim(), ...candidateModels.filter((m) => m !== explicitModel.trim())];
+	}
 
 	let lastError: Error | null = null;
 

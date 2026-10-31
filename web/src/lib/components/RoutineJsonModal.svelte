@@ -51,6 +51,9 @@
 
 	let customApiKey = $state('');
 	let showCustomKey = $state(false);
+	let selectedModel = $state('auto');
+	let availableModels = $state<Array<{ id: string; name: string; isVision?: boolean }>>([]);
+	let isLoadingModels = $state(false);
 
 	$effect(() => {
 		if (typeof window !== 'undefined') {
@@ -59,6 +62,7 @@
 				localStorage.getItem('repengine_gemini_api_key') ||
 				localStorage.getItem('repengine_openai_api_key') ||
 				'';
+			selectedModel = localStorage.getItem('repengine_ai_selected_model') || 'auto';
 		}
 	});
 
@@ -75,6 +79,50 @@
 			}
 		}
 	}
+
+	function saveSelectedModel(model: string): void {
+		selectedModel = model;
+		if (typeof window !== 'undefined') {
+			if (model && model !== 'auto') {
+				localStorage.setItem('repengine_ai_selected_model', model);
+			} else {
+				localStorage.removeItem('repengine_ai_selected_model');
+			}
+		}
+	}
+
+	async function loadAvailableModels(key: string): Promise<void> {
+		if (typeof window === 'undefined') return;
+		isLoadingModels = true;
+		try {
+			const res = await fetch('/api/ai/models', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ apiKey: key.trim() })
+			});
+			if (res.ok) {
+				const data = await res.json();
+				if (Array.isArray(data?.models)) {
+					availableModels = data.models;
+				}
+			}
+		} catch (e) {
+			console.error('Failed to load AI models', e);
+		} finally {
+			isLoadingModels = false;
+		}
+	}
+
+	let modelsDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+	$effect(() => {
+		const key = customApiKey.trim();
+		clearTimeout(modelsDebounceTimer);
+		if (open && activeTab === 'scan') {
+			modelsDebounceTimer = setTimeout(() => {
+				loadAvailableModels(key);
+			}, 300);
+		}
+	});
 
 	const detectedProvider = $derived.by(() => {
 		const k = customApiKey.trim();
@@ -279,6 +327,10 @@
 			if (localKey) {
 				headers['x-ai-api-key'] = localKey;
 				headers['x-gemini-api-key'] = localKey;
+			}
+			if (selectedModel && selectedModel !== 'auto') {
+				headers['x-ai-model'] = selectedModel;
+				formData.append('model', selectedModel);
 			}
 
 			const res = await fetch('/api/ai/parse-routine', {
@@ -658,6 +710,11 @@
 									{:else}
 										<span class="ml-1 text-[11px] text-primary font-medium">(Necessário para IA se não configurado no servidor)</span>
 									{/if}
+									{#if selectedModel && selectedModel !== 'auto'}
+										<span class="ml-1 text-[10px] text-primary font-bold bg-primary/10 px-1.5 py-0.5 rounded">
+											{selectedModel}
+										</span>
+									{/if}
 								</button>
 								<button
 									type="button"
@@ -672,17 +729,57 @@
 							</div>
 
 							{#if showCustomKey}
-								<div class="pt-1.5 space-y-2">
-									<input
-										type="password"
-										class="w-full rounded-lg border border-outline-variant/30 bg-surface-container px-3 py-2 text-xs text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:outline-none font-mono"
-										placeholder="Insira sua chave: AIzaSy... (Gemini) ou sk-... (OpenAI)"
-										value={customApiKey}
-										oninput={(e) => saveCustomApiKey((e.currentTarget as HTMLInputElement).value)}
-									/>
-									<p class="text-[11px] text-on-surface-variant">
-										Detecta automaticamente chaves gratuitas do <strong>Google Gemini</strong> ou chaves da <strong>OpenAI (GPT-4o mini)</strong>. Salvo apenas localmente no seu navegador.
-									</p>
+								<div class="pt-1.5 space-y-3">
+									<div>
+										<label for="byok-api-key-input" class="text-[11px] font-semibold text-on-surface-variant block mb-1">
+											Chave de API:
+										</label>
+										<input
+											id="byok-api-key-input"
+											type="password"
+											class="w-full rounded-lg border border-outline-variant/30 bg-surface-container px-3 py-2 text-xs text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:outline-none font-mono"
+											placeholder="Insira sua chave: AIzaSy... (Gemini) ou sk-... (OpenAI)"
+											value={customApiKey}
+											oninput={(e) => saveCustomApiKey((e.currentTarget as HTMLInputElement).value)}
+										/>
+										<p class="text-[11px] text-on-surface-variant mt-1">
+											Detecta automaticamente chaves gratuitas do <strong>Google Gemini</strong> ou chaves da <strong>OpenAI</strong>. Salvo apenas localmente no seu navegador.
+										</p>
+									</div>
+
+									<div class="pt-2 border-t border-outline-variant/15 space-y-1.5">
+										<div class="flex items-center justify-between">
+											<label for="byok-model-select" class="text-[11px] font-semibold text-on-surface-variant flex items-center gap-1.5">
+												<span class="material-symbols-outlined text-sm text-primary">tune</span>
+												Modelo de Inteligência Artificial:
+											</label>
+											{#if isLoadingModels}
+												<span class="text-[10px] text-primary flex items-center gap-1">
+													<span class="material-symbols-outlined text-xs animate-spin">sync</span>
+													Buscando modelos...
+												</span>
+											{/if}
+										</div>
+
+										<select
+											id="byok-model-select"
+											class="w-full rounded-lg border border-outline-variant/30 bg-surface-container px-3 py-2 text-xs text-on-surface focus:border-primary focus:outline-none"
+											value={selectedModel}
+											onchange={(e) => saveSelectedModel((e.currentTarget as HTMLSelectElement).value)}
+										>
+											<option value="auto">
+												Automático (Recomendado: seleção inteligente de melhor modelo)
+											</option>
+											{#each availableModels as model}
+												<option value={model.id}>
+													{model.name}
+												</option>
+											{/each}
+										</select>
+										<p class="text-[10px] text-on-surface-variant/80">
+											Filtro inteligente: apenas modelos com suporte a imagens/visão. No modo <strong>Automático</strong>, o sistema usa o modelo mais rápido e estável com fallback automático.
+										</p>
+									</div>
 								</div>
 							{/if}
 						</div>

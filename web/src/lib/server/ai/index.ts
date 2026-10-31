@@ -1,10 +1,29 @@
-import { detectProvider, type AiGenerateInput, type AiParseInput, type AiProvider } from './types';
-import { generateRoutineWithGemini, parseRoutineWithGemini } from './gemini';
-import { generateRoutineWithOpenAI, parseRoutineWithOpenAI } from './openai';
+import { detectProvider, type AiGenerateInput, type AiModelOption, type AiParseInput, type AiProvider } from './types.ts';
+import { generateRoutineWithGemini, listGeminiModels, parseRoutineWithGemini } from './gemini.ts';
+import { generateRoutineWithOpenAI, listOpenAIModels, parseRoutineWithOpenAI } from './openai.ts';
 
-export * from './types';
-export { parseRoutineWithGemini, generateRoutineWithGemini } from './gemini';
-export { parseRoutineWithOpenAI, generateRoutineWithOpenAI } from './openai';
+export * from './types.ts';
+export { parseRoutineWithGemini, generateRoutineWithGemini, listGeminiModels } from './gemini.ts';
+export { parseRoutineWithOpenAI, generateRoutineWithOpenAI, listOpenAIModels } from './openai.ts';
+
+export async function listAvailableAiModels(
+	apiKey?: string,
+	providerPref?: string
+): Promise<{ provider: AiProvider; models: AiModelOption[] }> {
+	const provider = detectProvider(apiKey, providerPref);
+	const key =
+		apiKey?.trim() ||
+		(provider === 'openai' ? process.env.OPENAI_API_KEY?.trim() : process.env.GEMINI_API_KEY?.trim()) ||
+		'';
+
+	if (provider === 'openai') {
+		const models = await listOpenAIModels(key);
+		return { provider: 'openai', models };
+	}
+
+	const models = await listGeminiModels(key);
+	return { provider: 'gemini', models };
+}
 
 export async function parseRoutineWithAi(input: AiParseInput): Promise<any> {
 	const provider = detectProvider(input.apiKey, input.provider);

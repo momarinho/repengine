@@ -1,11 +1,20 @@
 export type AiProvider = 'gemini' | 'openai';
 
+export type AiModelOption = {
+	id: string;
+	name: string;
+	provider: AiProvider;
+	isVision: boolean;
+	description?: string;
+};
+
 export type AiParseInput = {
 	text?: string;
 	imageBytesBase64?: string;
 	mimeType?: string;
 	apiKey?: string;
 	provider?: 'auto' | AiProvider;
+	model?: string;
 };
 
 export type AiGenerateInput = {
@@ -17,6 +26,7 @@ export type AiGenerateInput = {
 	constraints?: string;
 	apiKey?: string;
 	provider?: 'auto' | AiProvider;
+	model?: string;
 };
 
 export function detectProvider(apiKey?: string, explicitProvider?: string): AiProvider {

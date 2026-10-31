@@ -9,16 +9,21 @@ export const POST: RequestHandler = async ({ request }) => {
 		request.headers.get('x-openai-api-key') ||
 		undefined;
 	const clientProvider = request.headers.get('x-ai-provider') as 'gemini' | 'openai' | undefined;
+	const clientModel = request.headers.get('x-ai-model') || undefined;
 	const contentType = request.headers.get('content-type') || '';
 
 	try {
 		let text: string | undefined;
 		let imageBytesBase64: string | undefined;
 		let mimeType: string | undefined;
+		let requestedModel = clientModel;
 
 		if (contentType.includes('multipart/form-data')) {
 			const formData = await request.formData();
 			text = (formData.get('text') as string) || undefined;
+			if (!requestedModel) {
+				requestedModel = (formData.get('model') as string) || undefined;
+			}
 			const file = formData.get('file') as File | null;
 
 			if (file && file.size > 0) {
@@ -54,6 +59,9 @@ export const POST: RequestHandler = async ({ request }) => {
 			text = body.text;
 			imageBytesBase64 = body.imageBytesBase64;
 			mimeType = body.mimeType || (imageBytesBase64 ? 'image/jpeg' : undefined);
+			if (!requestedModel) {
+				requestedModel = body.model;
+			}
 		}
 
 		if (!text && !imageBytesBase64) {
@@ -83,7 +91,8 @@ export const POST: RequestHandler = async ({ request }) => {
 			imageBytesBase64,
 			mimeType,
 			apiKey: clientApiKey,
-			provider: clientProvider
+			provider: clientProvider,
+			model: requestedModel
 		});
 
 		return json(parsedRoutine);
