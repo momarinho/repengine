@@ -2780,32 +2780,32 @@
 {:else}
 <div class="min-h-screen overflow-hidden bg-background text-on-background">
 	{#if isChoosingSection}
-		<div class="min-h-screen px-6 py-10">
-			<div class="mx-auto max-w-5xl">
-				<div class="mb-8 flex flex-wrap items-center justify-between gap-4">
+		<div class="min-h-screen px-3 sm:px-6 py-4 sm:py-8">
+			<div class="mx-auto max-w-2xl">
+				<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
 					<div>
-						<div class="flex items-center gap-2 mb-1 text-xs font-bold uppercase tracking-[0.2em]">
+						<div class="flex items-center gap-2 mb-1 text-[10px] font-bold uppercase tracking-[0.2em]">
 							<a href="/dashboard" class="text-on-surface-variant hover:text-on-surface transition-colors">← Dashboard</a>
 							<span class="text-outline-variant/40">·</span>
 							<a href={`/workflows/${routine.id}/edit`} class="text-tertiary hover:underline">Edit routine</a>
 						</div>
-						<h1 class="mt-2 text-3xl font-bold tracking-tight text-on-background">{routine.name}</h1>
-						<p class="mt-2 text-sm text-on-surface-variant">{routine.description || 'Choose a day to train today or continue to the next scheduled day in your cycle.'}</p>
+						<h1 class="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-on-background break-words">{routine.name}</h1>
+						<p class="mt-1 text-xs sm:text-sm text-on-surface-variant">{routine.description || 'Choose a day to train today or continue to the next scheduled day in your cycle.'}</p>
 					</div>
 
-					<div class="flex flex-wrap items-center gap-2">
+					<div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
 						{#if hasActiveSavedRun}
 							<button
 								type="button"
-								class="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-xs sm:text-sm font-bold text-amber-400 transition-colors hover:bg-amber-500/20 cursor-pointer"
+								class="flex-1 sm:flex-initial rounded-xl border border-amber-500/40 bg-amber-500/10 px-3.5 py-2 text-xs sm:text-sm font-bold text-amber-400 transition-colors hover:bg-amber-500/20 cursor-pointer"
 								onclick={resumeSavedSession}
 							>
-								Resume in-progress workout
+								Resume workout
 							</button>
 						{/if}
 						<button
 							type="button"
-							class="rounded-xl border border-outline-variant/20 bg-surface-container px-4 py-2 text-xs sm:text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high cursor-pointer"
+							class="flex-1 sm:flex-initial rounded-xl border border-outline-variant/20 bg-surface-container px-3.5 py-2 text-xs sm:text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high cursor-pointer"
 							onclick={() => openLoadPreview(null)}
 							disabled={isSyncingSession}
 						>
@@ -2862,42 +2862,42 @@
 					{@const next = nextCycleInfo.nextSection}
 					{@const previews = getSectionExercisePreview(routine.blocks, next, 4)}
 					{@const nextProgressions = getSectionProgressionSummaries(routine.blocks, next, progressionStates)}
-					<div class="mb-8 rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-surface-container-high/90 to-surface-container p-6 shadow-xl shadow-primary/5">
+					<div class="mb-6 rounded-2xl border border-primary/40 bg-gradient-to-br from-surface-container-high/90 to-surface-container p-4 sm:p-5 shadow-xl shadow-primary/5">
 						<div class="flex flex-wrap items-center justify-between gap-2">
-							<span class="inline-flex items-center gap-1.5 rounded-md bg-primary/20 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-primary">
-								<span class="material-symbols-outlined text-sm">auto_awesome</span>
+							<span class="inline-flex items-center gap-1.5 rounded-md bg-primary/20 px-2 py-0.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-primary">
+								<span class="material-symbols-outlined text-xs sm:text-sm">auto_awesome</span>
 								Suggested Next in Cycle
 							</span>
 							{#if nextCycleInfo.lastCompletedSection && nextCycleInfo.lastCompletedSession}
-								<span class="text-xs text-on-surface-variant">
-									Last completed: <strong class="text-on-surface">{nextCycleInfo.lastCompletedSection.title}</strong> ({formatRelativeDate(nextCycleInfo.lastCompletedSession.completed_at || nextCycleInfo.lastCompletedSession.started_at)})
+								<span class="text-[11px] text-on-surface-variant">
+									Last: <strong class="text-on-surface">{nextCycleInfo.lastCompletedSection.title}</strong> ({formatRelativeDate(nextCycleInfo.lastCompletedSession.completed_at || nextCycleInfo.lastCompletedSession.started_at)})
 								</span>
 							{/if}
 						</div>
 
-						<div class="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-							<div>
-								<h2 class="font-headline text-2xl md:text-3xl font-bold text-on-surface">{next.title}</h2>
-								<p class="mt-1 text-sm text-on-surface-variant">
+						<div class="mt-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+							<div class="min-w-0 flex-1">
+								<h2 class="font-headline text-xl sm:text-2xl font-bold text-on-surface break-words">{next.title}</h2>
+								<p class="mt-0.5 text-xs text-on-surface-variant break-words">
 									{next.subtitle || `${next.blockCount} exercises & blocks`} · Starts at #{next.startBlockIndex + 1}
 								</p>
 
 								{#if nextProgressions.length > 0}
-									<div class="mt-3 flex flex-wrap gap-2">
+									<div class="mt-2.5 flex flex-wrap gap-1.5">
 										{#each nextProgressions as prog}
-											<span class="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-surface-container-lowest/80 px-2.5 py-1 text-xs text-on-surface">
-												<span class="text-on-surface-variant font-medium">{prog.title}:</span>
-												<strong class="text-primary font-bold">{prog.suggestedLoad || prog.currentLoad}</strong>
+											<span class="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-surface-container-lowest/80 px-2 py-0.5 text-xs text-on-surface">
+												<span class="text-on-surface-variant text-[11px] font-medium">{prog.title}:</span>
+												<strong class="text-primary font-bold text-xs">{prog.suggestedLoad || prog.currentLoad}</strong>
 												{#if prog.outcome === 'increase'}
-													<span class="rounded bg-primary/20 px-1 py-0.2 text-[9px] font-bold text-primary">↗ +Progression</span>
+													<span class="rounded bg-primary/20 px-1 text-[9px] font-bold text-primary">↗ +Progression</span>
 												{/if}
 											</span>
 										{/each}
 									</div>
 								{:else if previews.length > 0}
-									<div class="mt-3 flex flex-wrap gap-1.5">
+									<div class="mt-2.5 flex flex-wrap gap-1.5">
 										{#each previews as exercise}
-											<span class="rounded-lg border border-white/10 bg-surface-container-lowest/60 px-2.5 py-1 text-xs text-on-surface">
+											<span class="rounded-lg border border-white/10 bg-surface-container-lowest/60 px-2 py-0.5 text-xs text-on-surface">
 												{exercise}
 											</span>
 										{/each}
@@ -2910,15 +2910,15 @@
 								{/if}
 							</div>
 
-							<div class="flex-shrink-0">
+							<div class="shrink-0 w-full sm:w-auto">
 								<button
 									type="button"
-									class="btn-primary-gradient w-full md:w-auto text-on-primary-fixed font-headline font-bold text-base py-3.5 px-7 rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center gap-2 hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
+									class="btn-primary-gradient w-full sm:w-auto text-on-primary-fixed font-headline font-bold text-sm sm:text-base py-3 px-6 rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center gap-2 hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
 									onclick={() => openLoadPreview(next)}
 									disabled={isSyncingSession}
 								>
-									<span class="material-symbols-outlined text-2xl">play_arrow</span>
-									Continue to Next: {next.title}
+									<span class="material-symbols-outlined text-xl">play_arrow</span>
+									Continue: {next.title}
 								</button>
 							</div>
 						</div>
@@ -3007,38 +3007,38 @@
 			</div>
 		</div>
 	{:else if isPreviewingLoads}
-		<div class="min-h-screen px-4 sm:px-6 py-6 sm:py-10 bg-background text-on-background">
-			<div class="mx-auto max-w-3xl">
-				<div class="mb-6 sm:mb-8">
+		<div class="min-h-screen px-3 sm:px-6 py-4 sm:py-8 bg-background text-on-background">
+			<div class="mx-auto max-w-2xl">
+				<div class="mb-5 sm:mb-6">
 					<button
 						type="button"
-						class="text-xs font-bold uppercase tracking-[0.2em] text-tertiary hover:underline bg-transparent border-0 cursor-pointer inline-flex items-center gap-1"
+						class="text-[10px] font-bold uppercase tracking-[0.2em] text-tertiary hover:underline bg-transparent border-0 cursor-pointer inline-flex items-center gap-1"
 						onclick={() => {
 							isPreviewingLoads = false;
 							isChoosingSection = true;
 						}}
 					>
-						<span class="material-symbols-outlined text-sm">arrow_back</span>
+						<span class="material-symbols-outlined text-xs">arrow_back</span>
 						Back to sections
 					</button>
-					<div class="mt-2.5 flex items-center gap-2">
+					<div class="mt-2 flex items-center gap-2">
 						{#if previewSection}
-							<span class="rounded bg-surface-container-high px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-tertiary">
+							<span class="rounded bg-surface-container-high px-2 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.16em] text-tertiary">
 								{previewSection.kind} · {previewSection.title}
 							</span>
 						{/if}
 					</div>
-					<h1 class="mt-1.5 text-2xl sm:text-3xl font-bold tracking-tight text-on-background">Adjust Load Overrides</h1>
-					<p class="mt-1.5 text-xs sm:text-sm text-on-surface-variant">
+					<h1 class="mt-1 text-xl sm:text-2xl font-bold tracking-tight text-on-background">Adjust Load Overrides</h1>
+					<p class="mt-1 text-xs text-on-surface-variant">
 						Customize starting loads for weighted progression exercises. Remaining exercises (supersets, bodyweight, timed intervals) will execute as scheduled.
 					</p>
 				</div>
 
-				<div class="space-y-4 sm:space-y-6">
+				<div class="space-y-3 sm:space-y-4">
 					{#each previewBlocks as block}
 						{@const prevLogs = getLastSessionLogs(block)}
 						{@const suggested = getResolvedPrescribedLoad(block)}
-						<div class="rounded-2xl border border-white/5 bg-surface-container p-4 sm:p-6 shadow-md">
+						<div class="rounded-2xl border border-white/5 bg-surface-container p-3.5 sm:p-5 shadow-sm">
 							<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
 								<div class="min-w-0">
 									<p class="text-[10px] font-bold uppercase tracking-wider text-secondary">{block.node_type_slug.replaceAll('_', ' ')}</p>
@@ -3382,15 +3382,15 @@
 	</header>
 
 	<main class="flex h-screen overflow-hidden pt-14 sm:pt-[3.75rem] pb-[calc(5rem+env(safe-area-inset-bottom))]">
-		<section class="custom-scrollbar flex-1 overflow-y-auto px-3 sm:px-6 md:px-8">
-			<div class="mx-auto max-w-3xl py-2 sm:py-6">
+		<section class="custom-scrollbar flex-1 overflow-y-auto px-2 sm:px-4">
+			<div class="mx-auto max-w-2xl py-2 sm:py-4">
 				{#if sessionError}
-					<div class="mb-6 rounded-xl border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
+					<div class="mb-4 rounded-xl border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
 						{sessionError}
 					</div>
 				{/if}
 
-				<div class="rounded-2xl border border-white/5 bg-surface-container p-3.5 sm:p-6 md:p-8 shadow-xl">
+				<div class="rounded-2xl border border-white/5 bg-surface-container p-3 sm:p-5 shadow-xl">
 					<div class="mb-3 sm:mb-6 flex items-start justify-between gap-2 sm:gap-4">
 						<div class="min-w-0 flex-1">
 							<div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-tertiary">

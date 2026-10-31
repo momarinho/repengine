@@ -1094,7 +1094,7 @@
 						</div>
 					{/if}
 				{:else if activeTab === 'preview'}
-					<div class="space-y-3 sm:space-y-4">
+					<div class="space-y-3 sm:space-y-4 max-w-2xl mx-auto">
 						<div class="rounded-xl border border-outline-variant/20 bg-surface-container-low px-4 py-3">
 							<p class="text-sm font-semibold text-on-surface">Preview Routine</p>
 							<p class="text-xs text-on-surface-variant">Read-only overview of your routine sequence as structured on the canvas.</p>
