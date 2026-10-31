@@ -2296,6 +2296,26 @@
 		}
 	}
 
+	function copyPreviousSetValues(): void {
+		if (!currentBlock) return;
+		const prevLogs = getLastSessionLogs(currentBlock);
+		const prevLog = prevLogs.find((l) => l.set_index === currentExerciseSet) || (prevLogs.length > 0 ? prevLogs[0] : null);
+		if (!prevLog) return;
+		if (prevLog.actual_reps || prevLog.prescribed_reps) {
+			actualRepsByBlock = {
+				...actualRepsByBlock,
+				[currentBlock.id]: String(prevLog.actual_reps || prevLog.prescribed_reps)
+			};
+		}
+		const pLoad = prevLog.actual_load || prevLog.prescribed_load;
+		if (pLoad) {
+			actualLoadByBlock = {
+				...actualLoadByBlock,
+				[currentBlock.id]: String(pLoad)
+			};
+		}
+	}
+
 	function stepWaveLoad(amount: number): void {
 		if (!currentBlock) return;
 		const current =
@@ -2780,8 +2800,8 @@
 {:else}
 <div class="min-h-screen overflow-hidden bg-background text-on-background">
 	{#if isChoosingSection}
-		<div class="min-h-screen px-3 sm:px-6 py-4 sm:py-8">
-			<div class="mx-auto max-w-2xl">
+		<div class="min-h-screen px-3 sm:px-4 py-4 sm:py-6">
+			<div class="mx-auto max-w-md sm:max-w-lg">
 				<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
 					<div>
 						<div class="flex items-center gap-2 mb-1 text-[10px] font-bold uppercase tracking-[0.2em]">
@@ -3007,8 +3027,8 @@
 			</div>
 		</div>
 	{:else if isPreviewingLoads}
-		<div class="min-h-screen px-3 sm:px-6 py-4 sm:py-8 bg-background text-on-background">
-			<div class="mx-auto max-w-2xl">
+		<div class="min-h-screen px-3 sm:px-4 py-4 sm:py-6 bg-background text-on-background">
+			<div class="mx-auto max-w-md sm:max-w-lg">
 				<div class="mb-5 sm:mb-6">
 					<button
 						type="button"
@@ -3308,8 +3328,8 @@
 			</div>
 		</div>
 	{:else if currentBlock}
-	<header class="fixed top-0 z-40 flex w-full flex-col items-center border-b border-white/5 bg-background/80 backdrop-blur-xl">
-		<div class="flex h-14 w-full items-center justify-between px-3 sm:px-6">
+	<header class="fixed top-0 left-0 z-40 w-full border-b border-white/5 bg-background/90 backdrop-blur-xl">
+		<div class="mx-auto flex h-14 max-w-md sm:max-w-lg items-center justify-between px-3 sm:px-4">
 			<div class="flex items-center gap-2 sm:gap-3 min-w-0">
 				<p class="truncate text-xs sm:text-sm font-bold tracking-tight text-on-background max-w-[120px] sm:max-w-xs">{routine.name}</p>
 				{#if isDeloadActive}
@@ -3381,20 +3401,20 @@
 
 	</header>
 
-	<main class="flex h-screen overflow-hidden pt-14 sm:pt-[3.75rem] pb-[calc(5rem+env(safe-area-inset-bottom))]">
-		<section class="custom-scrollbar flex-1 overflow-y-auto px-2 sm:px-4">
-			<div class="mx-auto max-w-2xl py-2 sm:py-4">
+	<main class="flex min-h-screen justify-center overflow-x-hidden pt-14 pb-[calc(5rem+env(safe-area-inset-bottom))] bg-background">
+		<section class="custom-scrollbar w-full max-w-md sm:max-w-lg px-2.5 sm:px-4 py-2 sm:py-3">
+			<div class="w-full">
 				{#if sessionError}
 					<div class="mb-4 rounded-xl border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
 						{sessionError}
 					</div>
 				{/if}
 
-				<div class="rounded-2xl border border-white/5 bg-surface-container p-3 sm:p-5 shadow-xl">
-					<div class="mb-3 sm:mb-6 flex items-start justify-between gap-2 sm:gap-4">
+				<div class="rounded-2xl border border-white/5 bg-surface-container/90 p-3 sm:p-4 shadow-xl backdrop-blur-sm">
+					<div class="mb-2 sm:mb-2.5 flex items-start justify-between gap-2">
 						<div class="min-w-0 flex-1">
-							<div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-tertiary">
-								<span>{currentBlock.sectionTitle || routine.name}</span>
+							<div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-tertiary">
+								<span class="truncate max-w-[140px]">{currentBlock.sectionTitle || routine.name}</span>
 								<span>•</span>
 								<span class="text-primary font-bold">
 									{#if currentBlock.node_type_slug === 'exercise' || currentBlock.node_type_slug === 'linear_progression'}
@@ -3408,122 +3428,191 @@
 									{/if}
 								</span>
 							</div>
-							<h1 class="mt-0.5 text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-on-surface truncate">
+							<h1 class="mt-0.5 text-lg sm:text-xl font-black tracking-tight text-on-surface truncate">
 								{currentBlock.title}
 							</h1>
 							{#if currentBlock.subtitle}
-								<p class="mt-0.5 text-xs text-on-surface-variant line-clamp-1">{currentBlock.subtitle}</p>
+								<p class="text-xs text-on-surface-variant truncate">{currentBlock.subtitle}</p>
 							{/if}
 						</div>
 
 						<div class="flex items-center gap-1.5 shrink-0">
-							<span class={`rounded-full border px-2.5 py-0.5 text-[10px] font-black uppercase tracking-widest ${toneClasses(currentBlock.tone)}`}>
+							<span class={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${toneClasses(currentBlock.tone)}`}>
 								{typeLabel(currentBlock)}
 							</span>
 						</div>
 					</div>
 
-					{#if currentProgressionState}
-						<div class="mb-6 rounded-xl border border-secondary/20 bg-secondary/10 p-5">
-							<div class="flex flex-wrap items-start justify-between gap-4">
-								<div>
-									<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-secondary">Progression suggestion</p>
-									<p class="mt-2 text-lg font-semibold text-on-surface">{getProgressionSummary(currentProgressionState)}</p>
-									{#if getProgressionDetail(currentProgressionState)}
-										<p class="mt-2 text-sm text-on-surface-variant">{getProgressionDetail(currentProgressionState)}</p>
-									{/if}
-								</div>
-								<div class="text-right text-xs text-on-surface-variant">
-									<p class="uppercase tracking-[0.16em]">{currentProgressionState.state_type}</p>
-									{#if currentProgressionState.avg_actual_rpe || currentProgressionState.avg_actual_rir}
-										<p class="mt-2">
-											{currentProgressionState.avg_actual_rpe ? `RPE ${currentProgressionState.avg_actual_rpe}` : 'RPE -'}
-											{currentProgressionState.avg_actual_rir ? ` • RIR ${currentProgressionState.avg_actual_rir}` : ''}
-										</p>
-									{/if}
-								</div>
+					{#if currentProgressionState && getProgressionSummary(currentProgressionState)}
+						<div class="mb-2.5 rounded-xl border border-secondary/30 bg-secondary/10 px-3 py-1.5 text-xs flex items-center justify-between gap-2">
+							<div class="flex items-center gap-1.5 min-w-0">
+								<span class="material-symbols-outlined text-sm text-secondary shrink-0">trending_up</span>
+								<span class="font-bold text-on-surface truncate">{getProgressionSummary(currentProgressionState)}</span>
 							</div>
+							<span class="text-[9px] font-bold uppercase tracking-wider text-secondary shrink-0">{currentProgressionState.state_type}</span>
 						</div>
 					{/if}
 
 					{#if currentBlock.node_type_slug === 'exercise' || currentBlock.node_type_slug === 'linear_progression'}
-						<!-- 1. COMPACT HORIZONTAL SET MATRIX & TARGET STRIP (At the very top!) -->
-						<div class="mb-3 rounded-xl border border-white/5 bg-surface-container-lowest/80 p-2 sm:p-3">
-							<div class="flex items-center justify-between gap-2 mb-1.5">
-								<div class="flex items-center gap-1.5 min-w-0">
-									<span class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant shrink-0">Target:</span>
-									<span class="text-xs font-bold text-primary truncate">
-										{currentBlockReps} reps {getResolvedPrescribedLoad(currentBlock) ? `@ ${getResolvedPrescribedLoad(currentBlock)}` : ''}
+						{@const prevLogs = getLastSessionLogs(currentBlock)}
+						{@const prevLogForCurrentSet = prevLogs.find((l) => l.set_index === currentExerciseSet)}
+						{@const prevLoad = prevLogs.find((l) => l.actual_load || l.prescribed_load)?.actual_load || prevLogs.find((l) => l.actual_load || l.prescribed_load)?.prescribed_load}
+						{@const prevReps = prevLogs.find((l) => l.actual_reps || l.prescribed_reps)?.actual_reps || prevLogs.find((l) => l.actual_reps || l.prescribed_reps)?.prescribed_reps}
+						{@const currentPrescribedLoad = getResolvedPrescribedLoad(currentBlock)}
+						{@const progression = getBlockProgressionState(currentBlock)}
+						{@const isLinearIncrease = currentBlock.node_type_slug === 'linear_progression' && (progression?.outcome === 'increase' || (prevLoad && currentPrescribedLoad && prevLoad !== currentPrescribedLoad))}
+
+						<!-- 1. COMPACT CONTEXT STRIP (IMMEDIATELY VISIBLE AT THE TOP) -->
+						<div class="mb-2.5 rounded-xl border border-white/5 bg-surface-container-lowest/80 p-2 sm:p-2.5">
+							<div class="flex items-center justify-between gap-1.5 text-xs">
+								<!-- Previous session stats -->
+								<div class="flex items-center gap-1 min-w-0">
+									<span class="material-symbols-outlined text-xs text-tertiary shrink-0">history</span>
+									<span class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant shrink-0">Anterior:</span>
+									<span class="font-bold text-on-surface truncate">
+										{#if prevLogForCurrentSet}
+											{prevLogForCurrentSet.actual_reps || prevLogForCurrentSet.prescribed_reps}r {prevLogForCurrentSet.actual_load ? `@ ${prevLogForCurrentSet.actual_load}` : ''}
+										{:else if prevLogs.length > 0}
+											{prevReps}r {prevLoad ? `@ ${prevLoad}` : ''}
+										{:else}
+											1ª sessão
+										{/if}
 									</span>
 								</div>
-								<span class="text-[10px] font-semibold text-on-surface-variant flex items-center gap-1 shrink-0">
+
+								<!-- Target -->
+								<div class="flex items-center gap-1 shrink-0">
+									<span class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Meta:</span>
+									<span class="font-bold text-primary">
+										{currentBlockReps}r {currentPrescribedLoad ? `@ ${currentPrescribedLoad}` : ''}
+									</span>
+								</div>
+
+								<!-- Rest timer -->
+								<div class="flex items-center gap-1 text-[10px] font-semibold text-on-surface-variant shrink-0">
 									<span class="material-symbols-outlined text-xs">timer</span>
-									Rest: {formatClock(currentBlock.restSeconds ?? (currentBlock.node_type_slug === 'exercise' ? 90 : 120))}
-								</span>
+									<span>{formatClock(currentBlock.restSeconds ?? (currentBlock.node_type_slug === 'exercise' ? 90 : 120))}</span>
+								</div>
 							</div>
 
-							<!-- Horizontal Interactive Set Badges -->
-							<div class="flex items-center gap-1.5 overflow-x-auto py-0.5 custom-scrollbar">
+							{#if isLinearIncrease}
+								<div class="mt-1.5 flex items-center justify-between gap-2 rounded-lg bg-primary/10 border border-primary/20 px-2 py-0.5 text-[11px] text-primary">
+									<div class="flex items-center gap-1 font-bold">
+										<span class="material-symbols-outlined text-xs">trending_up</span>
+										<span>Progressão: +{currentBlock.increment ?? 2.5} {currentBlock.loadUnit ?? 'kg'}</span>
+									</div>
+									<span class="text-[10px] opacity-80">{prevLoad ? `${prevLoad} ➔ ` : ''}{currentPrescribedLoad}</span>
+								</div>
+							{/if}
+						</div>
+
+						<!-- 2. INTERACTIVE COMPARATIVE SET MATRIX -->
+						<div class="mb-3 rounded-xl border border-white/5 bg-surface-container-lowest/60 overflow-hidden">
+							<!-- Table Header -->
+							<div class="grid grid-cols-[32px_1fr_1fr_auto] items-center gap-1.5 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/70 border-b border-white/5">
+								<span>Set</span>
+								<span>Anterior</span>
+								<span>Meta</span>
+								<span class="text-right">Feito / Status</span>
+							</div>
+
+							<!-- Table Rows -->
+							<div class="divide-y divide-white/5">
 								{#each Array(currentBlockSets ?? 0) as _, index}
 									{@const setNum = index + 1}
 									{@const isPast = setNum < currentExerciseSet}
 									{@const isCurrent = setNum === currentExerciseSet}
-									{@const logged = currentBlockCompletedLogs.find((l) => l.set_index === setNum)}
-									<div class={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 ${
-										isPast
-											? 'bg-primary/20 text-primary border border-primary/30'
-											: isCurrent
-												? 'bg-primary text-on-primary-fixed shadow-md ring-2 ring-primary/40'
-												: 'bg-surface-container-high/60 text-on-surface-variant/50 border border-white/5'
+									{@const loggedSet = currentBlockCompletedLogs.find((l) => l.set_index === setNum)}
+									{@const setPrevLog = prevLogs.find((l) => l.set_index === setNum)}
+
+									<div class={`grid grid-cols-[32px_1fr_1fr_auto] items-center gap-1.5 px-2.5 py-1.5 text-xs transition-colors ${
+										isCurrent
+											? 'bg-primary/15 font-bold text-on-surface'
+											: isPast
+												? 'bg-transparent text-on-surface/90'
+												: 'opacity-50 text-on-surface-variant'
 									}`}>
-										{#if isPast}
-											<span class="material-symbols-outlined text-xs font-bold">check</span>
-											<span>S{setNum}: {logged?.actual_reps || currentBlockReps}r {logged?.actual_load ? `@ ${logged.actual_load}` : ''}</span>
-										{:else if isCurrent}
-											<span class="material-symbols-outlined text-xs animate-pulse">fitness_center</span>
-											<span>Set {setNum} (Now)</span>
-										{:else}
-											<span>Set {setNum}</span>
-										{/if}
+										<!-- Set number badge -->
+										<div class="flex items-center">
+											<span class={`flex h-5 w-5 items-center justify-center rounded-md text-[10px] font-bold ${
+												isPast
+													? 'bg-primary/20 text-primary'
+													: isCurrent
+														? 'bg-primary text-on-primary-fixed shadow-sm'
+														: 'bg-surface-variant/40 text-on-surface-variant'
+											}`}>
+												{#if isPast}
+													<span class="material-symbols-outlined text-xs">check</span>
+												{:else}
+													{setNum}
+												{/if}
+											</span>
+										</div>
+
+										<!-- Previous session -->
+										<span class="text-[11px] text-on-surface-variant truncate">
+											{setPrevLog ? `${setPrevLog.actual_reps || setPrevLog.prescribed_reps}r @ ${setPrevLog.actual_load || setPrevLog.prescribed_load || '-'}` : (prevLogs.length > 0 && prevLoad ? `— @ ${prevLoad}` : '—')}
+										</span>
+
+										<!-- Today target -->
+										<span class="text-[11px] truncate">
+											{currentBlockReps}r {currentPrescribedLoad ? `@ ${currentPrescribedLoad}` : ''}
+										</span>
+
+										<!-- Actual / Status -->
+										<div class="text-right min-w-[75px]">
+											{#if isPast && loggedSet}
+												<span class="font-bold text-primary text-[11px] inline-flex items-center gap-1">
+													<span>{loggedSet.actual_reps}r {loggedSet.actual_load ? `@ ${loggedSet.actual_load}` : ''}</span>
+													<span class="material-symbols-outlined text-xs">check_circle</span>
+												</span>
+											{:else if isCurrent}
+												<span class="rounded bg-primary/20 px-1.5 py-0.5 text-[9px] font-black uppercase text-primary border border-primary/30">
+													Atual
+												</span>
+											{:else}
+												<span class="text-[10px] text-on-surface-variant/40">Pendente</span>
+											{/if}
+										</div>
 									</div>
 								{/each}
 							</div>
 						</div>
 
-						<!-- 2. PRIMARY ACTIVE WORK ZONE (Zero Scrolling Needed!) -->
+						<!-- 3. PRIMARY ACTIVE WORK ZONE -->
 						{#if isRestingBetweenSets && intraSetRest}
 							<!-- High-Impact Rest HUD Card -->
-							<div class="mb-4 rounded-2xl border-2 border-primary/40 bg-gradient-to-b from-primary/15 via-surface-container-high/90 to-surface-container-low p-4 sm:p-6 shadow-2xl backdrop-blur-xl relative overflow-hidden">
+							<div class="mb-3 rounded-2xl border-2 border-primary/40 bg-gradient-to-b from-primary/15 via-surface-container-high/90 to-surface-container-low p-3.5 sm:p-5 shadow-xl backdrop-blur-xl relative overflow-hidden">
 								<div class="absolute -top-12 -right-12 h-44 w-44 rounded-full bg-primary/10 blur-3xl pointer-events-none"></div>
 
 								<div class="flex flex-col items-center text-center">
-									<div class="flex items-center gap-2 rounded-full bg-primary/20 border border-primary/30 px-3 py-1">
+									<div class="flex items-center gap-2 rounded-full bg-primary/20 border border-primary/30 px-3 py-0.5">
 										<span class={`flex h-2 w-2 rounded-full bg-primary ${intraSetRest.remainingSeconds <= 5 ? 'animate-ping' : ''}`}></span>
-										<span class="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Rest in Progress</span>
+										<span class="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Descanso Ativo</span>
 									</div>
 
 									<div class="mt-2 my-1">
-										<span class={`font-display font-mono text-5xl sm:text-6xl md:text-7xl font-black tabular-nums tracking-tight transition-colors ${
+										<span class={`font-display font-mono text-5xl sm:text-6xl font-black tabular-nums tracking-tight transition-colors ${
 											intraSetRest.remainingSeconds <= 5 ? 'text-amber-400 animate-pulse' : 'text-primary'
 										}`}>
 											{formatClock(intraSetRest.remainingSeconds)}
 										</span>
 									</div>
 
-									<div class="mt-2 w-full max-w-sm rounded-xl border border-white/10 bg-surface-container-lowest/80 p-2.5 text-center">
-										<span class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Up Next</span>
-										<p class="mt-0.5 text-sm sm:text-base font-bold text-on-surface truncate">
+									<div class="mt-2 w-full max-w-sm rounded-xl border border-white/10 bg-surface-container-lowest/80 p-2 text-center">
+										<span class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">A Seguir</span>
+										<p class="mt-0.5 text-xs sm:text-sm font-bold text-on-surface truncate">
 											{intraSetRest.nextLabel} • {currentBlock.title}
 										</p>
 										<p class="text-xs font-semibold text-primary mt-0.5">
-											Target: {actualRepsByBlock[currentBlock.id] || currentBlockReps} reps {getResolvedPrescribedLoad(currentBlock) ? `@ ${actualLoadByBlock[currentBlock.id] || getResolvedPrescribedLoad(currentBlock)}` : ''}
+											Meta: {actualRepsByBlock[currentBlock.id] || currentBlockReps}r {currentPrescribedLoad ? `@ ${actualLoadByBlock[currentBlock.id] || currentPrescribedLoad}` : ''}
 										</p>
 									</div>
 
-									<div class="mt-3 flex flex-wrap items-center justify-center gap-2.5 w-full max-w-md">
+									<div class="mt-2.5 flex items-center justify-center gap-2 w-full max-w-sm">
 										<button
 											type="button"
-											class="flex-1 min-w-[75px] h-10 flex items-center justify-center gap-1 rounded-xl border border-white/10 bg-surface-container hover:bg-surface-container-high active:scale-95 text-xs font-bold text-on-surface transition-all cursor-pointer"
+											class="flex-1 h-9 flex items-center justify-center gap-1 rounded-xl border border-white/10 bg-surface-container hover:bg-surface-container-high active:scale-95 text-xs font-bold text-on-surface transition-all cursor-pointer"
 											onclick={() => addIntraSetRestSeconds(-15)}
 											title="Subtract 15 seconds"
 										>
@@ -3532,7 +3621,7 @@
 										</button>
 										<button
 											type="button"
-											class="flex-1 min-w-[75px] h-10 flex items-center justify-center gap-1 rounded-xl border border-primary/30 bg-primary/15 hover:bg-primary/25 active:scale-95 text-xs font-bold text-primary transition-all cursor-pointer"
+											class="flex-1 h-9 flex items-center justify-center gap-1 rounded-xl border border-primary/30 bg-primary/15 hover:bg-primary/25 active:scale-95 text-xs font-bold text-primary transition-all cursor-pointer"
 											onclick={() => addIntraSetRestSeconds(30)}
 											title="Add 30 seconds"
 										>
@@ -3541,53 +3630,66 @@
 										</button>
 										<button
 											type="button"
-											class="flex-[1.4] min-w-[120px] h-10 flex items-center justify-center gap-1.5 rounded-xl bg-primary px-3 text-xs sm:text-sm font-black text-on-primary-fixed shadow-lg shadow-primary/25 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+											class="flex-[1.4] h-9 flex items-center justify-center gap-1 rounded-xl bg-primary px-3 text-xs font-black text-on-primary-fixed shadow-lg shadow-primary/25 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
 											onclick={() => clearIntraSetRest(true)}
 											title="Skip rest and start next set"
 										>
 											<span class="material-symbols-outlined text-base">play_arrow</span>
-											<span>Start Now</span>
+											<span>Iniciar Agora</span>
 										</button>
 									</div>
 								</div>
 							</div>
 						{:else}
-							<!-- Zero-Keyboard Tactile Stepper Controls for Active Set (FRONT AND CENTER!) -->
-							<div class="rounded-2xl border border-white/10 bg-surface-container-low/90 p-3 sm:p-5 shadow-xl backdrop-blur-md">
-								<div class="mb-3 flex items-center justify-between">
+							<!-- Zero-Keyboard Tactile Stepper Controls for Active Set -->
+							<div class="rounded-2xl border border-white/10 bg-surface-container-low/90 p-3 sm:p-4 shadow-xl backdrop-blur-md">
+								<div class="mb-2.5 flex items-center justify-between">
 									<div class="flex items-center gap-1.5">
-										<span class="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/20 text-primary">
-											<span class="material-symbols-outlined text-sm font-bold">fitness_center</span>
+										<span class="flex h-5 w-5 items-center justify-center rounded-lg bg-primary/20 text-primary">
+											<span class="material-symbols-outlined text-xs font-bold">fitness_center</span>
 										</span>
-										<span class="text-xs font-bold uppercase tracking-wider text-on-surface">Log Set {currentExerciseSet} of {currentBlockSets}</span>
+										<span class="text-xs font-bold uppercase tracking-wider text-on-surface">Registrar Set {currentExerciseSet} de {currentBlockSets}</span>
 									</div>
-									<button
-										type="button"
-										class="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary hover:bg-primary/20 active:scale-95 transition-all cursor-pointer"
-										onclick={fillTargetValues}
-										title="Fill with target reps and prescribed load"
-									>
-										<span class="material-symbols-outlined text-xs">bolt</span>
-										<span>Match Target</span>
-									</button>
+									<div class="flex items-center gap-1.5">
+										{#if prevLogs.length > 0}
+											<button
+												type="button"
+												class="flex items-center gap-1 rounded-lg border border-outline-variant/30 bg-surface-container px-2 py-0.5 text-[11px] font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high active:scale-95 transition-all cursor-pointer"
+												onclick={copyPreviousSetValues}
+												title="Copiar repetições e carga da última sessão"
+											>
+												<span class="material-symbols-outlined text-xs">history</span>
+												<span>Copiar Anterior</span>
+											</button>
+										{/if}
+										<button
+											type="button"
+											class="flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary hover:bg-primary/20 active:scale-95 transition-all cursor-pointer"
+											onclick={fillTargetValues}
+											title="Preencher com repetições e carga da meta"
+										>
+											<span class="material-symbols-outlined text-xs">bolt</span>
+											<span>Meta</span>
+										</button>
+									</div>
 								</div>
 
 								<!-- Steppers Grid -->
-								<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+								<div class="grid grid-cols-2 gap-2 sm:gap-3">
 									<!-- REPS STEPPER -->
-									<div class="rounded-xl border border-white/5 bg-surface-container-lowest p-3 flex flex-col justify-between">
-										<div class="flex items-center justify-between mb-1.5">
+									<div class="rounded-xl border border-white/5 bg-surface-container-lowest p-2.5 flex flex-col justify-between">
+										<div class="flex items-center justify-between mb-1">
 											<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Reps</span>
-											<span class="text-[11px] font-semibold text-primary">Target: {currentBlockReps}</span>
+											<span class="text-[10px] font-semibold text-primary">Meta: {currentBlockReps}</span>
 										</div>
-										<div class="flex items-center gap-2">
+										<div class="flex items-center gap-1.5">
 											<button
 												type="button"
-												class="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high active:scale-90 transition-transform cursor-pointer border border-white/5"
+												class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high active:scale-90 transition-transform cursor-pointer border border-white/5"
 												onclick={() => stepActiveBlockReps(-1)}
 												aria-label="Decrease reps"
 											>
-												<span class="material-symbols-outlined text-xl">remove</span>
+												<span class="material-symbols-outlined text-lg">remove</span>
 											</button>
 											<input
 												id="actual-reps"
@@ -3595,7 +3697,7 @@
 												inputmode="numeric"
 												autocomplete="off"
 												enterkeyhint="next"
-												class="w-full h-11 sm:h-12 rounded-xl border border-white/10 bg-surface-container/60 px-2 text-center text-[16px] sm:text-lg font-black text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-1 focus:ring-primary/50"
+												class="w-full h-10 rounded-xl border border-white/10 bg-surface-container/60 px-1 text-center text-[16px] sm:text-base font-black text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-1 focus:ring-primary/50"
 												placeholder={currentBlockReps ?? '10'}
 												value={actualRepsByBlock[currentBlock.id] ?? ''}
 												oninput={(event) => {
@@ -3607,29 +3709,29 @@
 											/>
 											<button
 												type="button"
-												class="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl bg-primary/20 text-primary hover:bg-primary/30 active:scale-90 transition-transform cursor-pointer border border-primary/25"
+												class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/20 text-primary hover:bg-primary/30 active:scale-90 transition-transform cursor-pointer border border-primary/25"
 												onclick={() => stepActiveBlockReps(1)}
 												aria-label="Increase reps"
 											>
-												<span class="material-symbols-outlined text-xl">add</span>
+												<span class="material-symbols-outlined text-lg">add</span>
 											</button>
 										</div>
 									</div>
 
 									<!-- LOAD STEPPER -->
-									<div class="rounded-xl border border-white/5 bg-surface-container-lowest p-3 flex flex-col justify-between">
-										<div class="flex items-center justify-between mb-1.5">
-											<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Load ({currentBlock.loadUnit || 'kg'})</span>
-											<span class="text-[11px] font-semibold text-secondary">Target: {getResolvedPrescribedLoad(currentBlock) || '-'}</span>
+									<div class="rounded-xl border border-white/5 bg-surface-container-lowest p-2.5 flex flex-col justify-between">
+										<div class="flex items-center justify-between mb-1">
+											<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Carga ({currentBlock.loadUnit || 'kg'})</span>
+											<span class="text-[10px] font-semibold text-secondary">Meta: {currentPrescribedLoad || '-'}</span>
 										</div>
-										<div class="flex items-center gap-2">
+										<div class="flex items-center gap-1.5">
 											<button
 												type="button"
-												class="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high active:scale-90 transition-transform cursor-pointer border border-white/5"
+												class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high active:scale-90 transition-transform cursor-pointer border border-white/5"
 												onclick={() => stepActiveBlockLoad(-2.5)}
 												aria-label="Decrease load by 2.5 kg"
 											>
-												<span class="material-symbols-outlined text-xl">remove</span>
+												<span class="material-symbols-outlined text-lg">remove</span>
 											</button>
 											<input
 												id="actual-load"
@@ -3637,8 +3739,8 @@
 												inputmode="decimal"
 												autocomplete="off"
 												enterkeyhint="next"
-												class="w-full h-11 sm:h-12 rounded-xl border border-white/10 bg-surface-container/60 px-2 text-center text-[16px] sm:text-lg font-black text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-1 focus:ring-primary/50"
-												placeholder={getResolvedPrescribedLoad(currentBlock) || '0 kg'}
+												class="w-full h-10 rounded-xl border border-white/10 bg-surface-container/60 px-1 text-center text-[16px] sm:text-base font-black text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-1 focus:ring-primary/50"
+												placeholder={currentPrescribedLoad || '0 kg'}
 												value={actualLoadByBlock[currentBlock.id] ?? ''}
 												oninput={(event) => {
 													const val = (event.currentTarget as HTMLInputElement).value;
@@ -3654,40 +3756,40 @@
 											/>
 											<button
 												type="button"
-												class="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl bg-secondary/20 text-secondary hover:bg-secondary/30 active:scale-90 transition-transform cursor-pointer border border-secondary/25"
+												class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary/20 text-secondary hover:bg-secondary/30 active:scale-90 transition-transform cursor-pointer border border-secondary/25"
 												onclick={() => stepActiveBlockLoad(2.5)}
 												aria-label="Increase load by 2.5 kg"
 											>
-												<span class="material-symbols-outlined text-xl">add</span>
+												<span class="material-symbols-outlined text-lg">add</span>
 											</button>
 										</div>
 
 										<!-- Quick Load Stepper Pills -->
-										<div class="mt-2 flex items-center justify-center gap-1.5">
+										<div class="mt-1.5 flex items-center justify-center gap-1">
 											<button
 												type="button"
-												class="flex-1 py-1 px-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-[11px] font-bold text-on-surface-variant active:scale-95 transition-all text-center cursor-pointer border border-white/5"
+												class="flex-1 py-0.5 rounded bg-surface-container hover:bg-surface-container-high text-[10px] font-bold text-on-surface-variant active:scale-95 transition-all text-center cursor-pointer border border-white/5"
 												onclick={() => stepActiveBlockLoad(-5)}
 											>
 												-5
 											</button>
 											<button
 												type="button"
-												class="flex-1 py-1 px-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-[11px] font-bold text-on-surface-variant active:scale-95 transition-all text-center cursor-pointer border border-white/5"
+												class="flex-1 py-0.5 rounded bg-surface-container hover:bg-surface-container-high text-[10px] font-bold text-on-surface-variant active:scale-95 transition-all text-center cursor-pointer border border-white/5"
 												onclick={() => stepActiveBlockLoad(-2.5)}
 											>
 												-2.5
 											</button>
 											<button
 												type="button"
-												class="flex-1 py-1 px-1 rounded-lg bg-secondary/15 hover:bg-secondary/25 text-[11px] font-bold text-secondary active:scale-95 transition-all text-center cursor-pointer border border-secondary/20"
+												class="flex-1 py-0.5 rounded bg-secondary/15 hover:bg-secondary/25 text-[10px] font-bold text-secondary active:scale-95 transition-all text-center cursor-pointer border border-secondary/20"
 												onclick={() => stepActiveBlockLoad(2.5)}
 											>
 												+2.5
 											</button>
 											<button
 												type="button"
-												class="flex-1 py-1 px-1 rounded-lg bg-secondary/15 hover:bg-secondary/25 text-[11px] font-bold text-secondary active:scale-95 transition-all text-center cursor-pointer border border-secondary/20"
+												class="flex-1 py-0.5 rounded bg-secondary/15 hover:bg-secondary/25 text-[10px] font-bold text-secondary active:scale-95 transition-all text-center cursor-pointer border border-secondary/20"
 												onclick={() => stepActiveBlockLoad(5)}
 											>
 												+5
@@ -3697,9 +3799,9 @@
 								</div>
 
 								<!-- Optional RIR Quick Chips, RPE & Notes Section -->
-								<div class="mt-3 pt-2.5 border-t border-white/5 flex flex-wrap items-center justify-between gap-2.5">
-									<div class="flex items-center gap-1.5">
-										<span class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">RIR:</span>
+								<div class="mt-2.5 pt-2 border-t border-white/5 flex flex-wrap items-center justify-between gap-2">
+									<div class="flex items-center gap-1">
+										<span class="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">RIR:</span>
 										{#each ['0', '1', '2', '3+'] as rirOpt}
 											<button
 												type="button"
@@ -3721,13 +3823,13 @@
 									</div>
 
 									<!-- Manual RPE & Notes Inputs -->
-									<div class="flex items-center gap-2">
+									<div class="flex items-center gap-1.5 flex-1 justify-end min-w-0">
 										<input
 											id="actual-rpe"
 											type="text"
 											inputmode="decimal"
 											autocomplete="off"
-											class="h-8 w-16 sm:w-20 rounded-lg border border-white/10 bg-surface-container/60 px-2 text-center text-[16px] sm:text-xs font-bold text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-1 focus:ring-primary/50"
+											class="h-7 w-14 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[13px] font-bold text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-1 focus:ring-primary/50"
 											placeholder="RPE"
 											value={actualRPEByBlock[currentBlock.id] ?? ''}
 											oninput={(event) => {
@@ -3741,8 +3843,8 @@
 											id="actual-notes"
 											type="text"
 											autocomplete="off"
-											class="h-8 w-28 sm:w-44 rounded-lg border border-white/10 bg-surface-container/60 px-2 text-[16px] sm:text-xs text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-1 focus:ring-primary/50 truncate"
-											placeholder="Note"
+											class="h-7 max-w-[120px] sm:max-w-[160px] flex-1 rounded-lg border border-white/10 bg-surface-container/60 px-2 text-[12px] text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-1 focus:ring-primary/50 truncate"
+											placeholder="Nota"
 											value={notesByBlock[currentBlock.id] ?? ''}
 											oninput={(event) => {
 												notesByBlock = {
@@ -3755,208 +3857,7 @@
 								</div>
 							</div>
 						{/if}
-
-						<!-- 3. DESKTOP EXTENDED OVERVIEW & HISTORY (Hidden on mobile for zero-scroll workout UX) -->
-						<div class="hidden sm:block mt-8 pt-6 border-t border-white/5 space-y-6">
-							<!-- 3-Column Quick Stats -->
-							<div class="grid grid-cols-2 gap-3 sm:gap-6 md:grid-cols-3">
-								<div class="space-y-1">
-									<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Current set</span>
-									<div class="flex items-baseline gap-1">
-										<span class="font-display text-3xl sm:text-4xl md:text-5xl font-bold text-primary">{currentExerciseSet}</span>
-										<span class="text-base sm:text-xl font-light text-on-surface-variant">/ {currentBlockSets}</span>
-									</div>
-								</div>
-
-								<div class="space-y-1">
-									<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Target reps</span>
-									<div class="font-display text-3xl sm:text-4xl md:text-5xl font-bold truncate">{currentBlockReps}</div>
-								</div>
-
-								<div class="col-span-2 space-y-1 md:col-span-1">
-									<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Load</span>
-									<div class="flex items-baseline gap-1">
-										<span class="font-display text-3xl sm:text-4xl md:text-5xl font-bold truncate">{getResolvedPrescribedLoad(currentBlock) || '-'}</span>
-									</div>
-								</div>
-							</div>
-
-							{#if currentBlock.node_type_slug === 'linear_progression'}
-								{@const progression = getBlockProgressionState(currentBlock)}
-								{@const prevLogs = getLastSessionLogs(currentBlock)}
-								{@const prevLoad = prevLogs.find((l) => l.actual_load || l.prescribed_load)?.actual_load || prevLogs.find((l) => l.actual_load || l.prescribed_load)?.prescribed_load}
-								{@const currentPrescribedLoad = getResolvedPrescribedLoad(currentBlock)}
-								{@const isIncrease = progression?.outcome === 'increase' || (prevLoad && currentPrescribedLoad && prevLoad !== currentPrescribedLoad)}
-
-								<div class="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/10 via-surface-container-high/60 to-surface-container p-5 shadow-md">
-									<div class="flex flex-wrap items-center justify-between gap-3">
-										<div class="flex items-center gap-2.5">
-											<span class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/20 text-primary">
-												<span class="material-symbols-outlined text-lg">trending_up</span>
-											</span>
-											<div>
-												<span class="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Linear Progression Tracker</span>
-												<h4 class="text-base font-bold text-on-surface">
-													{#if isIncrease}
-														Load increased: {prevLoad ? `${prevLoad} ➔ ` : ''}{currentPrescribedLoad} (+{currentBlock.increment ?? 0} {currentBlock.loadUnit ?? 'kg'})
-													{:else if progression?.outcome === 'reduce'}
-														Deload / Sequence reset: {currentPrescribedLoad}
-													{:else}
-														Current load: {currentPrescribedLoad}
-													{/if}
-												</h4>
-											</div>
-										</div>
-
-										{#if isIncrease}
-											<span class="inline-flex items-center gap-1 rounded-full bg-primary/20 border border-primary/30 px-3 py-1 text-xs font-bold text-primary">
-												<span class="material-symbols-outlined text-xs">check_circle</span>
-												Progression Active
-											</span>
-										{:else if prevLoad}
-											<span class="text-xs font-medium text-on-surface-variant">
-												Last session: {prevLoad}
-											</span>
-										{/if}
-									</div>
-
-									{#if progression?.summary}
-										<p class="mt-2 text-xs text-on-surface-variant/90 border-t border-white/5 pt-2">
-											{progression.summary}
-										</p>
-									{/if}
-
-									<div class="mt-3 grid grid-cols-2 gap-3 border-t border-white/5 pt-3 text-xs sm:grid-cols-3">
-										<div>
-											<span class="text-[10px] uppercase tracking-wider text-on-surface-variant">Rule</span>
-											<p class="font-semibold text-on-surface capitalize">{currentBlock.progressionRule?.replaceAll('_', ' ') ?? 'add each session'}</p>
-										</div>
-										<div>
-											<span class="text-[10px] uppercase tracking-wider text-on-surface-variant">Step Increment</span>
-											<p class="font-semibold text-primary">+{currentBlock.increment ?? 0} {currentBlock.loadUnit ?? 'kg'}</p>
-										</div>
-										{#if prevLoad}
-											<div>
-												<span class="text-[10px] uppercase tracking-wider text-on-surface-variant">Previous Session Load</span>
-												<p class="font-semibold text-on-surface">{prevLoad}</p>
-											</div>
-										{/if}
-									</div>
-								</div>
-							{/if}
-
-							<!-- Desktop Vertical Set Matrix Table -->
-							<div class="rounded-2xl border border-white/5 bg-surface-container-low p-4 sm:p-5 shadow-md">
-								<div class="mb-3 flex items-center justify-between">
-									<span class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Comparative Performance Matrix</span>
-									<span class="text-[10px] font-semibold text-on-surface-variant flex items-center gap-1">
-										<span class="material-symbols-outlined text-xs">timer</span>
-										Rest: {formatClock(currentBlock.restSeconds ?? (currentBlock.node_type_slug === 'exercise' ? 90 : 120))}
-									</span>
-								</div>
-
-								<div class="space-y-2">
-									{#each Array(currentBlockSets ?? 0) as _, index}
-										{@const setNum = index + 1}
-										{@const isPast = setNum < currentExerciseSet}
-										{@const isCurrent = setNum === currentExerciseSet}
-										{@const isUpcoming = setNum > currentExerciseSet}
-										{@const loggedSet = currentBlockCompletedLogs.find((l) => l.set_index === setNum)}
-										{@const prevLog = getLastSessionLogs(currentBlock).find((l) => l.set_index === setNum)}
-
-										<div class={`flex items-center justify-between rounded-xl p-2.5 sm:p-3 transition-all ${
-											isCurrent
-												? 'border-2 border-primary/50 bg-primary/10 shadow-md ring-1 ring-primary/20'
-												: isPast
-													? 'border border-white/5 bg-surface-container-lowest/70'
-													: 'border border-dashed border-white/10 bg-transparent opacity-60'
-										}`}>
-											<!-- Set Indicator -->
-											<div class="flex items-center gap-2.5 min-w-[75px]">
-												<div class={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
-													isPast
-														? 'bg-primary text-on-primary-fixed'
-														: isCurrent
-															? 'bg-primary/20 text-primary ring-2 ring-primary animate-pulse'
-															: 'bg-surface-variant/40 text-on-surface-variant'
-												}`}>
-													{#if isPast}
-														<span class="material-symbols-outlined text-xs font-bold">check</span>
-													{:else}
-														{setNum}
-													{/if}
-												</div>
-												<span class={`text-xs font-bold ${isCurrent ? 'text-primary' : 'text-on-surface'}`}>
-													Set {setNum}
-												</span>
-											</div>
-
-											<!-- Previous Session History (if exists) -->
-											<div class="hidden sm:flex flex-col text-right min-w-[90px]">
-												<span class="text-[9px] uppercase tracking-wider text-on-surface-variant/70">Previous</span>
-												<span class="text-xs font-medium text-on-surface-variant">
-													{prevLog ? `${prevLog.actual_reps || prevLog.prescribed_reps} reps @ ${prevLog.actual_load || prevLog.prescribed_load || '-'}` : '—'}
-												</span>
-											</div>
-
-											<!-- Target -->
-											<div class="flex flex-col text-center">
-												<span class="text-[9px] uppercase tracking-wider text-on-surface-variant/70">Target</span>
-												<span class="text-xs font-bold text-on-surface">
-													{currentBlockReps} reps {getResolvedPrescribedLoad(currentBlock) ? `@ ${getResolvedPrescribedLoad(currentBlock)}` : ''}
-												</span>
-											</div>
-
-											<!-- Actual / Status -->
-											<div class="flex items-center gap-2 min-w-[90px] justify-end">
-												{#if isPast && loggedSet}
-													<div class="text-right">
-														<span class="text-xs font-bold text-primary">{loggedSet.actual_reps} reps</span>
-														{#if loggedSet.actual_load}
-															<span class="block text-[10px] font-semibold text-secondary">{loggedSet.actual_load}</span>
-														{/if}
-													</div>
-													<span class="material-symbols-outlined text-primary text-base">check_circle</span>
-												{:else if isCurrent}
-													<span class="rounded-full bg-primary/20 border border-primary/40 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-primary">
-														Now
-													</span>
-												{:else}
-													<span class="text-[11px] text-on-surface-variant/50 font-medium">Pending</span>
-												{/if}
-											</div>
-										</div>
-									{/each}
-								</div>
-							</div>
-						</div>
 					{:else if currentBlock.node_type_slug === 'superset'}
-						<!-- Current Set & Rest Summary -->
-						<div class="mb-6 sm:mb-10 grid grid-cols-2 gap-3 sm:gap-6 md:grid-cols-3">
-							<div class="space-y-1">
-								<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Current set</span>
-								<div class="flex items-baseline gap-1">
-									<span class="font-display text-3xl sm:text-4xl md:text-5xl font-bold text-primary">{currentExerciseSet}</span>
-									<span class="text-base sm:text-xl font-light text-on-surface-variant">/ {currentBlock.data?.sets || 3}</span>
-								</div>
-							</div>
-
-							<div class="space-y-1 col-span-1">
-								<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Suggested rest</span>
-								<div class="font-display text-3xl sm:text-4xl md:text-5xl font-bold">{formatClock(Number(currentBlock.data?.rest_seconds ?? 120))}</div>
-							</div>
-
-							<div class="col-span-2 space-y-1 md:col-span-1">
-								<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Set completion</span>
-								<div class="mt-3 sm:mt-4 flex gap-2">
-									{#each Array(Number(currentBlock.data?.sets ?? 3)) as _, index}
-										<div class={`h-2 flex-1 rounded-full ${index < currentExerciseSet - 1 ? 'bg-primary' : 'bg-surface-variant'}`}></div>
-									{/each}
-								</div>
-							</div>
-						</div>
-
-						<!-- Two Exercises Side by Side -->
 						{@const meta = currentProgressionState?.metadata as Record<string, any> | undefined}
 						{@const lastSessionLogs = getLastSessionLogs(currentBlock)}
 						{@const lastLog = lastSessionLogs.length > 0 ? lastSessionLogs[lastSessionLogs.length - 1] : null}
@@ -3976,381 +3877,275 @@
 						{@const fallbackRepsB = lastRepsParts[1] && Number.parseInt(lastRepsParts[1]) >= minRepsB ? String(Math.min(Number.parseInt(lastRepsParts[1]) + (Number.parseInt(lastRepsParts[1]) >= maxRepsB ? 0 : 1), maxRepsB)) : null}
 						{@const targetRepsA = (typeof meta?.suggested_reps_a === 'string' ? meta.suggested_reps_a : null) ?? fallbackRepsA ?? currentBlock.data?.reps_a ?? '5'}
 						{@const targetRepsB = (typeof meta?.suggested_reps_b === 'string' ? meta.suggested_reps_b : null) ?? fallbackRepsB ?? currentBlock.data?.reps_b ?? '10'}
-						{@const progTypeA = (currentBlock.data?.progression_type_a && currentBlock.data.progression_type_a !== 'none') ? currentBlock.data.progression_type_a : (String(currentBlock.data?.reps_a ?? '').includes('-') ? 'double' : 'none')}
-						{@const progTypeB = (currentBlock.data?.progression_type_b && currentBlock.data.progression_type_b !== 'none') ? currentBlock.data.progression_type_b : (String(currentBlock.data?.reps_b ?? '').includes('-') ? 'double' : 'none')}
 
-						<div class="mb-6 sm:mb-8 grid gap-4 sm:gap-6 md:grid-cols-2">
-							<!-- Exercise A -->
-							<div class="rounded-xl border border-primary/20 bg-primary/5 p-4 sm:p-5">
-								<p class="text-[10px] font-bold uppercase tracking-widest text-primary">Exercise A (First)</p>
-								<h3 class="mt-1.5 sm:mt-2 text-lg sm:text-xl font-bold">{currentBlock.data?.exercise_a_name || 'Exercise A'}</h3>
-								<div class="mt-3 sm:mt-4 grid grid-cols-2 gap-3 sm:gap-4">
-									<div>
-										<p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Target Reps</p>
-										<p class="text-xl sm:text-2xl font-bold mt-1">
-											{targetRepsA}{typeof meta?.suggested_reps_a === 'string' && currentBlock.data?.reps_a && meta.suggested_reps_a !== currentBlock.data.reps_a ? ` (${currentBlock.data.reps_a})` : ''}
-										</p>
-									</div>
-									<div>
-										<p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Prescribed Load</p>
-										<p class="text-xl sm:text-2xl font-bold mt-1">
-											{prescribedLoadA}
-										</p>
-									</div>
+						<!-- Compact Superset Context Banner -->
+						<div class="mb-2.5 rounded-xl border border-white/5 bg-surface-container-lowest/80 p-2 sm:p-2.5 space-y-1.5">
+							<div class="flex items-center justify-between text-xs">
+								<div class="flex items-center gap-1.5">
+									<span class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Superset:</span>
+									<span class="font-bold text-primary">Set {currentExerciseSet} de {currentBlock.data?.sets || 3}</span>
 								</div>
-								{#if progTypeA === 'linear'}
-									<div class="mt-3 text-[10px] text-primary bg-primary/10 rounded px-2 py-1 inline-block font-semibold">
-										Linear: +{currentBlock.data?.increment_a || 2.5} {currentBlock.data?.load_unit_a || 'kg'}
-									</div>
-								{:else if progTypeA === 'double'}
-									<div class="mt-3 text-[10px] text-primary bg-primary/10 rounded px-2 py-1 inline-block font-semibold">
-										Double: {currentBlock.data?.min_reps_a ?? 5}-{currentBlock.data?.max_reps_a ?? 8} reps ➔ +{currentBlock.data?.increment_a || 2.5} {currentBlock.data?.load_unit_a || 'kg'}
-									</div>
-								{/if}
-							</div>
-
-							<!-- Exercise B -->
-							<div class="rounded-xl border border-secondary/20 bg-secondary/5 p-4 sm:p-5">
-								<p class="text-[10px] font-bold uppercase tracking-widest text-secondary">Exercise B (Second)</p>
-								<h3 class="mt-1.5 sm:mt-2 text-lg sm:text-xl font-bold">{currentBlock.data?.exercise_b_name || 'Exercise B'}</h3>
-								<div class="mt-3 sm:mt-4 grid grid-cols-2 gap-3 sm:gap-4">
-									<div>
-										<p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Target Reps</p>
-										<p class="text-xl sm:text-2xl font-bold mt-1">
-											{targetRepsB}{typeof meta?.suggested_reps_b === 'string' && currentBlock.data?.reps_b && meta.suggested_reps_b !== currentBlock.data.reps_b ? ` (${currentBlock.data.reps_b})` : ''}
-										</p>
-									</div>
-									<div>
-										<p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Prescribed Load</p>
-										<p class="text-xl sm:text-2xl font-bold mt-1">
-											{prescribedLoadB}
-										</p>
-									</div>
+								<div class="flex items-center gap-1 text-[10px] font-semibold text-on-surface-variant">
+									<span class="material-symbols-outlined text-xs">timer</span>
+									<span>Descanso: {formatClock(Number(currentBlock.data?.rest_seconds ?? 120))}</span>
 								</div>
-								{#if progTypeB === 'linear'}
-									<div class="mt-3 text-[10px] text-secondary bg-secondary/10 rounded px-2 py-1 inline-block font-semibold">
-										Linear: +{currentBlock.data?.increment_b || 2.5} {currentBlock.data?.load_unit_b || 'kg'}
-									</div>
-								{:else if progTypeB === 'double'}
-									<div class="mt-3 text-[10px] text-secondary bg-secondary/10 rounded px-2 py-1 inline-block font-semibold">
-										Double: {currentBlock.data?.min_reps_b ?? 5}-{currentBlock.data?.max_reps_b ?? 8} reps ➔ +{currentBlock.data?.increment_b || 2.5} {currentBlock.data?.load_unit_b || 'kg'}
-									</div>
-								{/if}
 							</div>
+							{#if lastLog}
+								<div class="flex items-center gap-1.5 text-[11px] text-on-surface-variant pt-1 border-t border-white/5">
+									<span class="material-symbols-outlined text-xs text-tertiary">history</span>
+									<span class="text-[10px] font-bold uppercase tracking-wider">Última sessão:</span>
+									<span class="font-bold text-on-surface truncate">
+										A: {lastRepsParts[0] || '-'}r @ {fallbackLoadA || '-'} • B: {lastRepsParts[1] || '-'}r @ {fallbackLoadB || '-'}
+									</span>
+								</div>
+							{/if}
 						</div>
 
 						{#if isRestingBetweenSets && intraSetRest}
-							<div class="mb-6 rounded-xl border border-primary/30 bg-primary/10 p-4 sm:p-5 shadow-lg">
-								<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-									<div>
-										<div class="flex items-center gap-2">
-											<span class="flex h-2 w-2 rounded-full bg-primary animate-ping"></span>
-											<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Resting Between Sets</p>
-										</div>
-										<p class="mt-1 text-xs sm:text-sm font-medium text-on-surface-variant">Next: {intraSetRest.nextLabel}</p>
+							<div class="mb-3 rounded-2xl border-2 border-primary/40 bg-gradient-to-b from-primary/15 via-surface-container-high/90 to-surface-container-low p-3.5 sm:p-5 shadow-xl backdrop-blur-xl relative overflow-hidden">
+								<div class="flex flex-col items-center text-center">
+									<div class="flex items-center gap-2 rounded-full bg-primary/20 border border-primary/30 px-3 py-0.5">
+										<span class={`flex h-2 w-2 rounded-full bg-primary ${intraSetRest.remainingSeconds <= 5 ? 'animate-ping' : ''}`}></span>
+										<span class="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Descanso Ativo</span>
 									</div>
-									<div class="flex items-center justify-between sm:justify-end gap-3">
-										<p class="font-display text-3xl sm:text-4xl font-bold text-primary font-mono tabular-nums">{formatClock(intraSetRest.remainingSeconds)}</p>
-										<div class="flex items-center gap-1.5">
-											<button
-												type="button"
-												class="rounded-lg border border-primary/30 bg-primary/20 px-2.5 py-1.5 text-xs font-bold text-primary hover:bg-primary/30 active:scale-95 transition-all cursor-pointer"
-												onclick={() => addIntraSetRestSeconds(30)}
-												title="Add 30 seconds"
-											>
-												+30s
-											</button>
-											<button
-												type="button"
-												class="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-on-primary-fixed shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-												onclick={() => clearIntraSetRest(true)}
-												title="Skip rest"
-											>
-												Skip Rest
-											</button>
-										</div>
+									<div class="mt-2 my-1">
+										<span class={`font-display font-mono text-5xl sm:text-6xl font-black tabular-nums tracking-tight ${
+											intraSetRest.remainingSeconds <= 5 ? 'text-amber-400 animate-pulse' : 'text-primary'
+										}`}>
+											{formatClock(intraSetRest.remainingSeconds)}
+										</span>
+									</div>
+									<p class="mt-1 text-xs text-on-surface-variant">A seguir: {intraSetRest.nextLabel}</p>
+									<div class="mt-2.5 flex items-center justify-center gap-2 w-full max-w-sm">
+										<button
+											type="button"
+											class="flex-1 h-9 flex items-center justify-center gap-1 rounded-xl border border-primary/30 bg-primary/15 text-xs font-bold text-primary active:scale-95 transition-all cursor-pointer"
+											onclick={() => addIntraSetRestSeconds(30)}
+										>
+											+30s
+										</button>
+										<button
+											type="button"
+											class="flex-[1.4] h-9 flex items-center justify-center gap-1 rounded-xl bg-primary text-xs font-black text-on-primary-fixed shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+											onclick={() => clearIntraSetRest(true)}
+										>
+											Iniciar Agora
+										</button>
 									</div>
 								</div>
 							</div>
 						{/if}
 
-						<!-- Superset Inputs -->
-						<div class="rounded-xl border border-white/5 bg-surface-container-low p-3.5 sm:p-5 space-y-4 sm:space-y-5">
+						<!-- Superset Inputs Card -->
+						<div class="rounded-2xl border border-white/10 bg-surface-container-low/90 p-3 sm:p-4 shadow-xl space-y-3">
 							<div class="flex items-center justify-between">
-								<p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-headline">Log Set {currentExerciseSet} Results</p>
+								<span class="text-xs font-bold uppercase tracking-wider text-on-surface">Registrar Série {currentExerciseSet}</span>
 								<button
 									type="button"
-									class="flex items-center gap-1 rounded-md border border-outline-variant/30 bg-surface-container px-2 py-1 text-[11px] font-semibold text-primary hover:bg-surface-container-high transition-colors cursor-pointer"
+									class="flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary hover:bg-primary/20 active:scale-95 transition-all cursor-pointer"
 									onclick={fillSupersetTargets}
-									title="Fill with target reps and loads"
+									title="Preencher com repetições e cargas da meta"
 								>
 									<span class="material-symbols-outlined text-xs">bolt</span>
-									<span>Match Target</span>
+									<span>Meta</span>
 								</button>
 							</div>
-							
-							<div class="grid gap-4 md:grid-cols-2 border-b border-outline-variant/10 pb-4">
-								<!-- Inputs for A -->
-								<div class="space-y-3 rounded-xl border border-white/5 bg-surface-container-lowest p-3.5">
-									<p class="text-xs font-bold text-primary font-headline">Exercise A: {currentBlock.data?.exercise_a_name || 'A'}</p>
-									<div class="grid grid-cols-2 gap-3">
-										<div>
-											<div class="flex items-center justify-between mb-1">
-												<label for="superset-actual-reps-a" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Reps A</label>
-												<span class="text-[10px] font-semibold text-primary">Target: {targetRepsA}</span>
-											</div>
-											<div class="flex items-center gap-1">
-												<button
-													type="button"
-													class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high active:scale-90 transition-transform cursor-pointer border border-white/5"
-													onclick={() => stepActiveBlockRepsA(-1)}
-													aria-label="Decrease reps A"
-												>
-													<span class="material-symbols-outlined text-lg">remove</span>
-												</button>
-												<input
-													id="superset-actual-reps-a"
-													type="text"
-													inputmode="numeric"
-													autocomplete="off"
-													enterkeyhint="next"
-													class="w-full h-10 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[16px] font-black text-on-surface focus:border-primary focus:ring-1 focus:ring-primary/50"
-													placeholder={`${targetRepsA}`}
-													value={actualRepsAByBlock[currentBlock.id] ?? ''}
-													oninput={(event) => {
-														actualRepsAByBlock = {
-															...actualRepsAByBlock,
-															[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-														};
-													}}
-												/>
-												<button
-													type="button"
-													class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/20 text-primary hover:bg-primary/30 active:scale-90 transition-transform cursor-pointer border border-primary/25"
-													onclick={() => stepActiveBlockRepsA(1)}
-													aria-label="Increase reps A"
-												>
-													<span class="material-symbols-outlined text-lg">add</span>
-												</button>
-											</div>
+
+							<!-- Inputs for Exercise A -->
+							<div class="rounded-xl border border-white/5 bg-surface-container-lowest p-2.5 space-y-1.5">
+								<div class="flex items-center justify-between">
+									<p class="text-xs font-bold text-primary truncate">A: {currentBlock.data?.exercise_a_name || 'Exercício A'}</p>
+									<span class="text-[10px] text-on-surface-variant font-semibold">Meta: {targetRepsA}r @ {prescribedLoadA}</span>
+								</div>
+								<div class="grid grid-cols-2 gap-2">
+									<div>
+										<label for="superset-actual-reps-a" class="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Reps A</label>
+										<div class="flex items-center gap-1">
+											<button
+												type="button"
+												class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high active:scale-90 transition-transform cursor-pointer border border-white/5"
+												onclick={() => stepActiveBlockRepsA(-1)}
+											>
+												<span class="material-symbols-outlined text-base">remove</span>
+											</button>
+											<input
+												id="superset-actual-reps-a"
+												type="text"
+												inputmode="numeric"
+												autocomplete="off"
+												enterkeyhint="next"
+												class="w-full h-9 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[15px] font-black text-on-surface focus:border-primary focus:ring-1 focus:ring-primary/50"
+												placeholder={`${targetRepsA}`}
+												value={actualRepsAByBlock[currentBlock.id] ?? ''}
+												oninput={(event) => {
+													actualRepsAByBlock = {
+														...actualRepsAByBlock,
+														[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+													};
+												}}
+											/>
+											<button
+												type="button"
+												class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/20 text-primary hover:bg-primary/30 active:scale-90 transition-transform cursor-pointer border border-primary/25"
+												onclick={() => stepActiveBlockRepsA(1)}
+											>
+												<span class="material-symbols-outlined text-base">add</span>
+											</button>
 										</div>
-										<div>
-											<div class="flex items-center justify-between mb-1">
-												<label for="superset-actual-load-a" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Load A</label>
-												<span class="text-[10px] font-semibold text-primary">{prescribedLoadA !== '-' ? prescribedLoadA : 'BW'}</span>
-											</div>
-											<div class="flex items-center gap-1">
-												<button
-													type="button"
-													class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high active:scale-90 transition-transform cursor-pointer border border-white/5"
-													onclick={() => stepActiveBlockLoadA(-2.5)}
-													aria-label="Decrease load A"
-												>
-													<span class="material-symbols-outlined text-lg">remove</span>
-												</button>
-												<input
-													id="superset-actual-load-a"
-													type="text"
-													inputmode="decimal"
-													autocomplete="off"
-													enterkeyhint="next"
-													class="w-full h-10 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[16px] font-black text-on-surface focus:border-primary focus:ring-1 focus:ring-primary/50"
-													placeholder={prescribedLoadA !== '-' ? prescribedLoadA.replace(/[^\d.]/g, '') : '0'}
-													value={actualLoadAByBlock[currentBlock.id] ?? ''}
-													oninput={(event) => {
-														actualLoadAByBlock = {
-															...actualLoadAByBlock,
-															[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-														};
-													}}
-												/>
-												<button
-													type="button"
-													class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/20 text-primary hover:bg-primary/30 active:scale-90 transition-transform cursor-pointer border border-primary/25"
-													onclick={() => stepActiveBlockLoadA(2.5)}
-													aria-label="Increase load A"
-												>
-													<span class="material-symbols-outlined text-lg">add</span>
-												</button>
-											</div>
+									</div>
+									<div>
+										<label for="superset-actual-load-a" class="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Carga A ({currentBlock.data?.load_unit_a || 'kg'})</label>
+										<div class="flex items-center gap-1">
+											<button
+												type="button"
+												class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high active:scale-90 transition-transform cursor-pointer border border-white/5"
+												onclick={() => stepActiveBlockLoadA(-2.5)}
+											>
+												<span class="material-symbols-outlined text-base">remove</span>
+											</button>
+											<input
+												id="superset-actual-load-a"
+												type="text"
+												inputmode="decimal"
+												autocomplete="off"
+												enterkeyhint="next"
+												class="w-full h-9 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[15px] font-black text-on-surface focus:border-primary focus:ring-1 focus:ring-primary/50"
+												placeholder={prescribedLoadA !== '-' ? prescribedLoadA.replace(/[^\d.]/g, '') : '0'}
+												value={actualLoadAByBlock[currentBlock.id] ?? ''}
+												oninput={(event) => {
+													actualLoadAByBlock = {
+														...actualLoadAByBlock,
+														[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+													};
+												}}
+											/>
+											<button
+												type="button"
+												class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/20 text-primary hover:bg-primary/30 active:scale-90 transition-transform cursor-pointer border border-primary/25"
+												onclick={() => stepActiveBlockLoadA(2.5)}
+											>
+												<span class="material-symbols-outlined text-base">add</span>
+											</button>
 										</div>
 									</div>
 								</div>
+							</div>
 
-								<!-- Inputs for B -->
-								<div class="space-y-3 rounded-xl border border-white/5 bg-surface-container-lowest p-3.5">
-									<p class="text-xs font-bold text-secondary font-headline">Exercise B: {currentBlock.data?.exercise_b_name || 'B'}</p>
-									<div class="grid grid-cols-2 gap-3">
-										<div>
-											<div class="flex items-center justify-between mb-1">
-												<label for="superset-actual-reps-b" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Reps B</label>
-												<span class="text-[10px] font-semibold text-secondary">Target: {targetRepsB}</span>
-											</div>
-											<div class="flex items-center gap-1">
-												<button
-													type="button"
-													class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high active:scale-90 transition-transform cursor-pointer border border-white/5"
-													onclick={() => stepActiveBlockRepsB(-1)}
-													aria-label="Decrease reps B"
-												>
-													<span class="material-symbols-outlined text-lg">remove</span>
-												</button>
-												<input
-													id="superset-actual-reps-b"
-													type="text"
-													inputmode="numeric"
-													autocomplete="off"
-													enterkeyhint="next"
-													class="w-full h-10 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[16px] font-black text-on-surface focus:border-secondary focus:ring-1 focus:ring-secondary/50"
-													placeholder={`${targetRepsB}`}
-													value={actualRepsBByBlock[currentBlock.id] ?? ''}
-													oninput={(event) => {
-														actualRepsBByBlock = {
-															...actualRepsBByBlock,
-															[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-														};
-													}}
-												/>
-												<button
-													type="button"
-													class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary/20 text-secondary hover:bg-secondary/30 active:scale-90 transition-transform cursor-pointer border border-secondary/25"
-													onclick={() => stepActiveBlockRepsB(1)}
-													aria-label="Increase reps B"
-												>
-													<span class="material-symbols-outlined text-lg">add</span>
-												</button>
-											</div>
+							<!-- Inputs for Exercise B -->
+							<div class="rounded-xl border border-white/5 bg-surface-container-lowest p-2.5 space-y-1.5">
+								<div class="flex items-center justify-between">
+									<p class="text-xs font-bold text-secondary truncate">B: {currentBlock.data?.exercise_b_name || 'Exercício B'}</p>
+									<span class="text-[10px] text-on-surface-variant font-semibold">Meta: {targetRepsB}r @ {prescribedLoadB}</span>
+								</div>
+								<div class="grid grid-cols-2 gap-2">
+									<div>
+										<label for="superset-actual-reps-b" class="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Reps B</label>
+										<div class="flex items-center gap-1">
+											<button
+												type="button"
+												class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high active:scale-90 transition-transform cursor-pointer border border-white/5"
+												onclick={() => stepActiveBlockRepsB(-1)}
+											>
+												<span class="material-symbols-outlined text-base">remove</span>
+											</button>
+											<input
+												id="superset-actual-reps-b"
+												type="text"
+												inputmode="numeric"
+												autocomplete="off"
+												enterkeyhint="next"
+												class="w-full h-9 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[15px] font-black text-on-surface focus:border-secondary focus:ring-1 focus:ring-secondary/50"
+												placeholder={`${targetRepsB}`}
+												value={actualRepsBByBlock[currentBlock.id] ?? ''}
+												oninput={(event) => {
+													actualRepsBByBlock = {
+														...actualRepsBByBlock,
+														[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+													};
+												}}
+											/>
+											<button
+												type="button"
+												class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary/20 text-secondary hover:bg-secondary/30 active:scale-90 transition-transform cursor-pointer border border-secondary/25"
+												onclick={() => stepActiveBlockRepsB(1)}
+											>
+												<span class="material-symbols-outlined text-base">add</span>
+											</button>
 										</div>
-										<div>
-											<div class="flex items-center justify-between mb-1">
-												<label for="superset-actual-load-b" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Load B</label>
-												<span class="text-[10px] font-semibold text-secondary">{prescribedLoadB !== '-' ? prescribedLoadB : 'BW'}</span>
-											</div>
-											<div class="flex items-center gap-1">
-												<button
-													type="button"
-													class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high active:scale-90 transition-transform cursor-pointer border border-white/5"
-													onclick={() => stepActiveBlockLoadB(-2.5)}
-													aria-label="Decrease load B"
-												>
-													<span class="material-symbols-outlined text-lg">remove</span>
-												</button>
-												<input
-													id="superset-actual-load-b"
-													type="text"
-													inputmode="decimal"
-													autocomplete="off"
-													enterkeyhint="next"
-													class="w-full h-10 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[16px] font-black text-on-surface focus:border-secondary focus:ring-1 focus:ring-secondary/50"
-													placeholder={prescribedLoadB !== '-' ? prescribedLoadB.replace(/[^\d.]/g, '') : '0'}
-													value={actualLoadBByBlock[currentBlock.id] ?? ''}
-													oninput={(event) => {
-														actualLoadBByBlock = {
-															...actualLoadBByBlock,
-															[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-														};
-													}}
-												/>
-												<button
-													type="button"
-													class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary/20 text-secondary hover:bg-secondary/30 active:scale-90 transition-transform cursor-pointer border border-secondary/25"
-													onclick={() => stepActiveBlockLoadB(2.5)}
-													aria-label="Increase load B"
-												>
-													<span class="material-symbols-outlined text-lg">add</span>
-												</button>
-											</div>
+									</div>
+									<div>
+										<label for="superset-actual-load-b" class="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Carga B ({currentBlock.data?.load_unit_b || 'kg'})</label>
+										<div class="flex items-center gap-1">
+											<button
+												type="button"
+												class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high active:scale-90 transition-transform cursor-pointer border border-white/5"
+												onclick={() => stepActiveBlockLoadB(-2.5)}
+											>
+												<span class="material-symbols-outlined text-base">remove</span>
+											</button>
+											<input
+												id="superset-actual-load-b"
+												type="text"
+												inputmode="decimal"
+												autocomplete="off"
+												enterkeyhint="next"
+												class="w-full h-9 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[15px] font-black text-on-surface focus:border-secondary focus:ring-1 focus:ring-secondary/50"
+												placeholder={prescribedLoadB !== '-' ? prescribedLoadB.replace(/[^\d.]/g, '') : '0'}
+												value={actualLoadBByBlock[currentBlock.id] ?? ''}
+												oninput={(event) => {
+													actualLoadBByBlock = {
+														...actualLoadBByBlock,
+														[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+													};
+												}}
+											/>
+											<button
+												type="button"
+												class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary/20 text-secondary hover:bg-secondary/30 active:scale-90 transition-transform cursor-pointer border border-secondary/25"
+												onclick={() => stepActiveBlockLoadB(2.5)}
+											>
+												<span class="material-symbols-outlined text-base">add</span>
+											</button>
 										</div>
 									</div>
 								</div>
 							</div>
 
 							<!-- Shared RPE/RIR -->
-							<div class="grid grid-cols-2 gap-4">
-								<div>
-									<label for="superset-actual-rpe" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RPE</label>
-									<input
-										id="superset-actual-rpe"
-										type="text"
-										inputmode="decimal"
-										autocomplete="off"
-										enterkeyhint="next"
-										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-[16px] sm:text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
-										placeholder="e.g. 8"
-										value={actualRPEByBlock[currentBlock.id] ?? ''}
-										oninput={(event) => {
-											actualRPEByBlock = {
-												...actualRPEByBlock,
-												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-											};
-										}}
-									/>
-								</div>
-								<div>
-									<label for="superset-actual-rir" class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Actual RIR</label>
-									<input
-										id="superset-actual-rir"
-										type="text"
-										inputmode="decimal"
-										autocomplete="off"
-										enterkeyhint="done"
-										class="mt-2 w-full rounded-lg border-0 bg-surface-container-lowest p-3 text-[16px] sm:text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
-										placeholder="e.g. 2"
-										value={actualRIRByBlock[currentBlock.id] ?? ''}
-										oninput={(event) => {
-											actualRIRByBlock = {
-												...actualRIRByBlock,
-												[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
-											};
-										}}
-									/>
-								</div>
+							<div class="grid grid-cols-2 gap-2 pt-1 border-t border-white/5">
+								<input
+									id="superset-actual-rpe"
+									type="text"
+									inputmode="decimal"
+									autocomplete="off"
+									enterkeyhint="next"
+									class="w-full h-8 rounded-lg border border-white/10 bg-surface-container/60 px-2 text-center text-xs text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-1 focus:ring-primary/50"
+									placeholder="RPE (ex: 8)"
+									value={actualRPEByBlock[currentBlock.id] ?? ''}
+									oninput={(event) => {
+										actualRPEByBlock = {
+											...actualRPEByBlock,
+											[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+										};
+									}}
+								/>
+								<input
+									id="superset-actual-rir"
+									type="text"
+									inputmode="decimal"
+									autocomplete="off"
+									enterkeyhint="done"
+									class="w-full h-8 rounded-lg border border-white/10 bg-surface-container/60 px-2 text-center text-xs text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-1 focus:ring-primary/50"
+									placeholder="RIR (ex: 2)"
+									value={actualRIRByBlock[currentBlock.id] ?? ''}
+									oninput={(event) => {
+										actualRIRByBlock = {
+											...actualRIRByBlock,
+											[currentBlock.id]: (event.currentTarget as HTMLInputElement).value
+										};
+									}}
+								/>
 							</div>
-
-							{#if getLastSessionLogs(currentBlock).length > 0}
-								<div class="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-4">
-									<div class="mb-3 flex items-center justify-between">
-										<span class="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Previous performance</span>
-										<span class="text-[10px] font-medium text-on-surface-variant">Last session</span>
-									</div>
-									<div class="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-										{#each getLastSessionLogs(currentBlock) as log}
-											{@const repsParts = log.actual_reps.split('/')}
-											{@const loadParts = log.actual_load.split('/')}
-											<div class="rounded-lg border border-white/5 bg-surface-container-lowest p-3">
-												<p class="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant text-center border-b border-white/5 pb-1 mb-2">Set {log.set_index}</p>
-												<div class="space-y-1.5">
-													<div class="flex justify-between text-xs">
-														<span class="text-on-surface-variant">Ex A:</span>
-														<span class="font-bold text-on-surface">
-															{repsParts[0] || '-'} reps
-															{#if loadParts[0] && loadParts[0] !== '0'}
-																• {loadParts[0]}
-															{/if}
-														</span>
-													</div>
-													<div class="flex justify-between text-xs">
-														<span class="text-on-surface-variant">Ex B:</span>
-														<span class="font-bold text-on-surface">
-															{repsParts[1] || '-'} reps
-															{#if loadParts[1] && loadParts[1] !== '0'}
-																• {loadParts[1]}
-															{/if}
-														</span>
-													</div>
-												</div>
-												{#if log.actual_rpe || log.actual_rir}
-													<p class="mt-2 text-center text-[9px] text-on-surface-variant/60">
-														{log.actual_rpe ? `RPE ${log.actual_rpe}` : ''}
-														{log.actual_rpe && log.actual_rir ? ' • ' : ''}
-														{log.actual_rir ? `RIR ${log.actual_rir}` : ''}
-													</p>
-												{/if}
-											</div>
-										{/each}
-									</div>
-								</div>
-							{/if}
 						</div>
 					{:else if currentBlock.node_type_slug === 'rest' || currentBlock.node_type_slug === 'exercise_timed'}
 						<div class="flex flex-col items-center justify-center py-4">
@@ -5235,13 +5030,13 @@
 						</div>
 					{/if}
 
-					<div class="mt-8">
-						<label for="session-notes" class="mb-2 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+					<div class="mt-4">
+						<label for="session-notes" class="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
 							Block notes
 						</label>
 						<input
 							id="session-notes"
-							class="w-full rounded-lg border-0 bg-surface-container-lowest p-4 text-[16px] sm:text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+							class="w-full rounded-xl border border-white/5 bg-surface-container-lowest px-3 py-2 text-[13px] text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
 							placeholder={currentBlock.notePlaceholder ?? 'Add execution notes, cues, or fatigue markers...'}
 							value={notesByBlock[currentBlock.id] ?? ''}
 							oninput={(event) => {
@@ -5255,221 +5050,73 @@
 				</div>
 			</div>
 		</section>
-
-		<aside class="custom-scrollbar hidden w-80 flex-col overflow-y-auto border-l border-white/5 bg-surface-container-lowest px-6 py-8 lg:flex">
-			<div class="mb-10">
-				<h3 class="mb-4 text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Up next</h3>
-				<div class="space-y-3">
-					{#each upcomingBlocks as block}
-						<button
-							type="button"
-							class="flex w-full items-center gap-3 rounded-xl border border-white/5 bg-surface-container-low p-3 text-left transition-colors hover:bg-surface-container"
-							onclick={() => goToBlock(routine.blocks.findIndex((candidate) => candidate.id === block.id))}
-						>
-							<div class={`h-8 w-1 rounded-full ${queueBarTone(block.tone)}`}></div>
-							<div class="min-w-0 flex-1">
-								<p class="truncate text-xs font-bold text-on-surface">{block.title}</p>
-								<p class="mt-1 text-[9px] uppercase text-on-surface-variant">
-									{typeLabel(block)}{#if block.reps} • {block.reps}{/if}
-								</p>
-							</div>
-						</button>
-					{/each}
-				</div>
-			</div>
-
-			<div class="mb-10">
-				<h3 class="mb-4 text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Completed</h3>
-				<div class="space-y-3">
-					{#if completedBlocks.length === 0}
-						<div class="rounded-xl border border-white/5 bg-surface-container-low/50 p-3 text-xs text-on-surface-variant">
-							No blocks completed yet.
-						</div>
-					{:else}
-						{#each completedBlocks as block}
-							<div class="flex items-center gap-3 rounded-xl border border-white/5 bg-surface-container-low/50 p-3">
-								<div class={`h-8 w-1 rounded-full ${queueBarTone(block.tone)}`}></div>
-								<div class="min-w-0 flex-1">
-									<p class="truncate text-xs font-bold text-on-surface-variant line-through">{block.title}</p>
-									<div class="mt-1 flex items-center gap-1">
-										<span class="material-symbols-outlined text-[10px] text-primary">check_circle</span>
-										<span class="text-[9px] uppercase text-on-surface-variant">{typeLabel(block)}</span>
-									</div>
-								</div>
-							</div>
-						{/each}
-					{/if}
-				</div>
-			</div>
-
-			<div>
-				<h3 class="mb-4 text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Session log</h3>
-				<div class="space-y-2 text-[11px] font-medium text-on-surface-variant">
-					<div class="flex justify-between gap-4">
-						<span>Elapsed</span>
-						<span class="text-on-background">{formatClock(sessionElapsedSeconds)}</span>
-					</div>
-					<div class="flex justify-between gap-4">
-						<span>Blocks complete</span>
-						<span class="text-on-background">{completedBlockCount}</span>
-					</div>
-					<div class="flex justify-between gap-4">
-						<span>Sets logged</span>
-						<span class="text-on-background">{loggedSetCount}</span>
-					</div>
-					<div class="flex justify-between gap-4">
-						<span>Rounds logged</span>
-						<span class="text-on-background">{loggedRoundCount}</span>
-					</div>
-					<div class="flex justify-between gap-4">
-						<span>Notes captured</span>
-						<span class="text-on-background">{noteCount}</span>
-					</div>
-				</div>
-				<div class="mt-5 rounded-xl border border-white/5 bg-surface-container-low p-4">
-					<div class="flex items-center justify-between gap-3">
-						<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Session sync</p>
-						<button
-							type="button"
-							class="text-[10px] font-bold uppercase tracking-[0.18em] text-tertiary transition-colors hover:text-primary"
-							onclick={() => clearLocalSession()}
-						>
-							Reset
-						</button>
-					</div>
-					<p class="mt-2 text-xs text-on-surface-variant">
-						{#if activePersistedSession}
-							Persisted session {getPersistedSessionLabel(activePersistedSession)} is receiving new logs.
-						{:else if completedSessionSummary}
-							Last completed session {getPersistedSessionLabel(completedSessionSummary)} has been saved.
-						{:else}
-							Start a section to create a persisted workout session.
-						{/if}
-					</p>
-					<div class="mt-4 flex flex-wrap gap-2">
-						<a
-							href={`/workflows/${routine.id}/history`}
-							class="rounded-md border border-outline-variant/20 px-3 py-2 text-[11px] font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
-						>
-							Open history
-						</a>
-						{#if activePersistedSession}
-							<button
-								type="button"
-								class="rounded-md border border-error/20 bg-error/10 px-3 py-2 text-[11px] font-semibold text-error transition-colors hover:bg-error/20"
-								onclick={() => void abandonPersistedSession()}
-								disabled={isSyncingSession}
-							>
-								Abandon session
-							</button>
-						{/if}
-					</div>
-				</div>
-				{#if recentActivity.length > 0}
-					<div class="mt-5">
-						<h4 class="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Recent activity</h4>
-						<div class="space-y-3">
-							{#each recentActivity.slice(0, 4) as entry}
-								<div class="rounded-xl border border-white/5 bg-surface-container-low/50 p-3">
-									<div class="flex items-center justify-between gap-3">
-										<p class="truncate text-xs font-bold text-on-surface">{entry.blockTitle}</p>
-										<span class="text-[9px] uppercase tracking-[0.16em] text-on-surface-variant">{formatActivityTime(entry.createdAt)}</span>
-									</div>
-									<p class="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-primary">{entry.label}</p>
-									<p class="mt-1 text-[11px] text-on-surface-variant">{entry.detail}</p>
-								</div>
-							{/each}
-						</div>
-					</div>
-				{/if}
-				<div class="mt-5">
-					<h4 class="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Recent sessions</h4>
-					<div class="space-y-3">
-						{#if recentSessionHistory.length === 0}
-							<div class="rounded-xl border border-white/5 bg-surface-container-low/50 p-3 text-xs text-on-surface-variant">
-								No persisted sessions for this workflow yet.
-							</div>
-						{:else}
-							{#each recentSessionHistory as session}
-								<div class="rounded-xl border border-white/5 bg-surface-container-low/50 p-3">
-									<div class="flex items-center justify-between gap-3">
-										<p class="truncate text-xs font-bold text-on-surface">{session.section_title || routine.name}</p>
-										<span class="text-[9px] uppercase tracking-[0.16em] text-on-surface-variant">{session.status}</span>
-									</div>
-									<p class="mt-1 text-[11px] text-on-surface-variant">{formatSessionDate(session.started_at)}</p>
-									<div class="mt-2 flex items-center justify-between gap-3 text-[11px] text-on-surface-variant">
-										<span>{session.log_count} logs</span>
-										<span>{formatSessionDuration(session)}</span>
-									</div>
-								</div>
-							{/each}
-						{/if}
-					</div>
-				</div>
-			</div>
-		</aside>
 	</main>
 
-	<footer class="fixed bottom-0 left-0 z-50 flex h-[calc(4.75rem+env(safe-area-inset-bottom))] sm:h-[calc(5rem+env(safe-area-inset-bottom))] w-full items-center justify-between border-t border-white/5 bg-background/95 px-2 sm:px-6 pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_30px_rgba(0,0,0,0.3)] backdrop-blur-2xl">
-		<div class="flex gap-1.5 sm:gap-2 shrink-0">
-			<button
-				type="button"
-				class="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-surface-variant/20 text-on-surface-variant transition-all hover:bg-surface-variant/40 disabled:opacity-40 cursor-pointer"
-				onclick={goToPreviousBlock}
-				disabled={isFirstBlock || isSyncingSession}
-				title="Previous block"
-			>
-				<span class="material-symbols-outlined text-xl sm:text-2xl">skip_previous</span>
-			</button>
-			<button
-				type="button"
-				class="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-surface-variant/20 text-on-surface-variant transition-all hover:bg-surface-variant/40 lg:hidden cursor-pointer"
-				onclick={() => (mobileQueueOpen = !mobileQueueOpen)}
-				title="View queue"
-			>
-				<span class="material-symbols-outlined text-xl sm:text-2xl">format_list_bulleted</span>
-			</button>
-		</div>
-
-		<div class="flex max-w-lg flex-1 gap-2 sm:gap-3 px-1.5 sm:px-4 min-w-0">
-			{#if secondaryActionLabel}
+	<footer class="fixed bottom-0 left-0 z-50 w-full border-t border-white/5 bg-background/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_30px_rgba(0,0,0,0.3)] backdrop-blur-2xl">
+		<div class="mx-auto flex h-[calc(4.25rem+env(safe-area-inset-bottom))] sm:h-[calc(4.75rem+env(safe-area-inset-bottom))] max-w-md sm:max-w-lg items-center justify-between px-3 sm:px-4 gap-2">
+			<div class="flex gap-1.5 shrink-0">
 				<button
 					type="button"
-					class="h-11 sm:h-14 flex-1 min-w-0 rounded-xl sm:rounded-2xl border border-white/10 bg-surface-bright/20 px-2 sm:px-4 text-xs sm:text-sm font-bold text-on-background transition-all hover:bg-surface-bright/40 truncate cursor-pointer active:scale-[0.98]"
-					onclick={runSecondaryAction}
+					class="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-surface-variant/20 text-on-surface-variant transition-all hover:bg-surface-variant/40 disabled:opacity-40 cursor-pointer"
+					onclick={goToPreviousBlock}
+					disabled={isFirstBlock || isSyncingSession}
+					title="Previous block"
+				>
+					<span class="material-symbols-outlined text-xl">skip_previous</span>
+				</button>
+				<button
+					type="button"
+					class="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-surface-variant/20 text-on-surface-variant transition-all hover:bg-surface-variant/40 cursor-pointer"
+					onclick={() => (mobileQueueOpen = !mobileQueueOpen)}
+					title="View queue and session stats"
+				>
+					<span class="material-symbols-outlined text-xl">format_list_bulleted</span>
+				</button>
+			</div>
+
+			<div class="flex flex-1 gap-2 min-w-0">
+				{#if secondaryActionLabel}
+					<button
+						type="button"
+						class="h-10 sm:h-11 flex-1 min-w-0 rounded-xl border border-white/10 bg-surface-bright/20 px-2 sm:px-3 text-xs sm:text-sm font-bold text-on-background transition-all hover:bg-surface-bright/40 truncate cursor-pointer active:scale-[0.98]"
+						onclick={runSecondaryAction}
+						disabled={isSyncingSession}
+					>
+						{secondaryActionLabel}
+					</button>
+				{/if}
+				<button
+					type="button"
+					class="h-10 sm:h-11 flex-[1.4] min-w-0 rounded-xl bg-primary px-3 sm:px-4 text-xs sm:text-sm font-bold text-on-primary-fixed shadow-lg shadow-primary/20 transition-all hover:brightness-110 active:scale-[0.98] truncate cursor-pointer"
+					onclick={runPrimaryAction}
 					disabled={isSyncingSession}
 				>
-					{secondaryActionLabel}
+					{isSyncingSession ? 'Saving...' : primaryActionLabel}
 				</button>
-			{/if}
-			<button
-				type="button"
-				class="h-11 sm:h-14 flex-[1.4] min-w-0 rounded-xl sm:rounded-2xl bg-primary px-2 sm:px-4 text-xs sm:text-sm font-bold text-on-primary-fixed shadow-lg shadow-primary/20 transition-all hover:brightness-110 active:scale-[0.98] truncate cursor-pointer"
-				onclick={runPrimaryAction}
-				disabled={isSyncingSession}
-			>
-				{isSyncingSession ? 'Saving...' : primaryActionLabel}
-			</button>
-		</div>
+			</div>
 
-		<div class="flex gap-1.5 sm:gap-2 shrink-0">
-			<button
-				type="button"
-				class="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-surface-variant/20 text-on-surface-variant transition-all hover:bg-surface-variant/40 disabled:opacity-40 cursor-pointer"
-				onclick={goToNextBlock}
-				disabled={isSyncingSession}
-				title="Next block"
-			>
-				<span class="material-symbols-outlined text-xl sm:text-2xl">skip_next</span>
-			</button>
+			<div class="flex gap-1.5 shrink-0">
+				<button
+					type="button"
+					class="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-surface-variant/20 text-on-surface-variant transition-all hover:bg-surface-variant/40 disabled:opacity-40 cursor-pointer"
+					onclick={goToNextBlock}
+					disabled={isSyncingSession}
+					title="Next block"
+				>
+					<span class="material-symbols-outlined text-xl">skip_next</span>
+				</button>
+			</div>
 		</div>
 	</footer>
 
 	{#if mobileQueueOpen}
-		<div class="fixed inset-0 z-30 bg-black/45 lg:hidden" role="presentation" onclick={() => (mobileQueueOpen = false)}></div>
-		<section class="custom-scrollbar fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 max-h-[62vh] overflow-y-auto rounded-t-[1.75rem] border-t border-white/10 bg-surface-container px-6 py-6 shadow-2xl lg:hidden">
-			<div class="mb-6 flex items-center justify-between">
-				<h3 class="text-sm font-bold text-on-surface">Queue</h3>
+		<div class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" role="presentation" onclick={() => (mobileQueueOpen = false)}></div>
+		<section class="custom-scrollbar fixed inset-x-0 bottom-0 z-50 max-h-[80vh] max-w-md sm:max-w-lg mx-auto overflow-y-auto rounded-t-3xl border-t border-white/10 bg-surface-container px-4 sm:px-6 py-5 shadow-2xl">
+			<div class="mb-4 flex items-center justify-between">
+				<h3 class="text-sm font-bold text-on-surface flex items-center gap-1.5">
+					<span class="material-symbols-outlined text-primary text-base">format_list_bulleted</span>
+					<span>Fila & Histórico da Sessão</span>
+				</h3>
 				<div class="flex items-center gap-2">
 					<button
 						type="button"
@@ -5480,55 +5127,109 @@
 						}}
 					>
 						<span class="material-symbols-outlined text-sm">flag</span>
-						Finish
+						Finalizar
 					</button>
 					<button
 						type="button"
-						class="flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+						class="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface cursor-pointer"
 						onclick={() => (mobileQueueOpen = false)}
 					>
-						<span class="material-symbols-outlined">close</span>
+						<span class="material-symbols-outlined text-base">close</span>
 					</button>
 				</div>
 			</div>
 
-			<div class="space-y-6">
+			<div class="space-y-4">
 				<div>
-					<p class="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Up next</p>
-					<div class="space-y-3">
-						{#each upcomingBlocks as block}
-							<button
-								type="button"
-								class="flex w-full items-center gap-3 rounded-xl border border-white/5 bg-surface-container-low p-3 text-left"
-								onclick={() => goToBlock(routine.blocks.findIndex((candidate) => candidate.id === block.id))}
-							>
-								<div class={`h-8 w-1 rounded-full ${queueBarTone(block.tone)}`}></div>
-								<div class="min-w-0 flex-1">
-									<p class="truncate text-sm font-semibold text-on-surface">{block.title}</p>
-									<p class="mt-1 text-[10px] uppercase text-on-surface-variant">{typeLabel(block)}</p>
-								</div>
-							</button>
-						{/each}
+					<p class="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Próximos Blocos</p>
+					<div class="space-y-1.5">
+						{#if upcomingBlocks.length === 0}
+							<div class="rounded-xl border border-white/5 bg-surface-container-low/50 p-2.5 text-xs text-on-surface-variant">
+								Nenhum bloco restante nesta seção.
+							</div>
+						{:else}
+							{#each upcomingBlocks as block}
+								<button
+									type="button"
+									class="flex w-full items-center gap-2.5 rounded-xl border border-white/5 bg-surface-container-low p-2.5 text-left transition-colors hover:bg-surface-container cursor-pointer"
+									onclick={() => {
+										mobileQueueOpen = false;
+										goToBlock(routine.blocks.findIndex((candidate) => candidate.id === block.id));
+									}}
+								>
+									<div class={`h-7 w-1 rounded-full ${queueBarTone(block.tone)}`}></div>
+									<div class="min-w-0 flex-1">
+										<p class="truncate text-xs font-bold text-on-surface">{block.title}</p>
+										<p class="mt-0.5 text-[10px] uppercase text-on-surface-variant">
+											{typeLabel(block)}{#if block.reps} • {block.reps}{/if}
+										</p>
+									</div>
+								</button>
+							{/each}
+						{/if}
 					</div>
 				</div>
 
 				<div>
-					<p class="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Completed</p>
-					<div class="space-y-3">
+					<p class="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Concluídos</p>
+					<div class="space-y-1.5">
 						{#if completedBlocks.length === 0}
-							<div class="rounded-xl border border-white/5 bg-surface-container-low/50 p-3 text-sm text-on-surface-variant">
-								No blocks completed yet.
+							<div class="rounded-xl border border-white/5 bg-surface-container-low/50 p-2.5 text-xs text-on-surface-variant">
+								Nenhum bloco concluído ainda nesta sessão.
 							</div>
 						{:else}
 							{#each completedBlocks as block}
-								<div class="flex items-center gap-3 rounded-xl border border-white/5 bg-surface-container-low/50 p-3">
-									<div class={`h-8 w-1 rounded-full ${queueBarTone(block.tone)}`}></div>
+								<div class="flex items-center gap-2.5 rounded-xl border border-white/5 bg-surface-container-low/50 p-2.5">
+									<div class={`h-7 w-1 rounded-full ${queueBarTone(block.tone)}`}></div>
 									<div class="min-w-0 flex-1">
-										<p class="truncate text-sm font-semibold text-on-surface-variant line-through">{block.title}</p>
-										<p class="mt-1 text-[10px] uppercase text-on-surface-variant">{typeLabel(block)}</p>
+										<p class="truncate text-xs font-semibold text-on-surface-variant line-through">{block.title}</p>
+										<div class="mt-0.5 flex items-center gap-1">
+											<span class="material-symbols-outlined text-[10px] text-primary">check_circle</span>
+											<span class="text-[10px] uppercase text-on-surface-variant">{typeLabel(block)}</span>
+										</div>
 									</div>
 								</div>
 							{/each}
+						{/if}
+					</div>
+				</div>
+
+				<!-- Session Stats & Sync in Drawer -->
+				<div class="rounded-2xl border border-white/5 bg-surface-container-low p-3 space-y-2.5">
+					<div class="flex items-center justify-between text-xs">
+						<span class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Estatísticas do Treino</span>
+						<span class="font-mono text-primary font-bold">{formatClock(sessionElapsedSeconds)}</span>
+					</div>
+					<div class="grid grid-cols-3 gap-2 text-center text-xs">
+						<div class="rounded-lg bg-surface-container-lowest p-1.5">
+							<span class="text-[9px] uppercase text-on-surface-variant block">Blocos</span>
+							<span class="font-bold text-on-surface">{completedBlockCount}</span>
+						</div>
+						<div class="rounded-lg bg-surface-container-lowest p-1.5">
+							<span class="text-[9px] uppercase text-on-surface-variant block">Séries</span>
+							<span class="font-bold text-on-surface">{loggedSetCount}</span>
+						</div>
+						<div class="rounded-lg bg-surface-container-lowest p-1.5">
+							<span class="text-[9px] uppercase text-on-surface-variant block">Rounds</span>
+							<span class="font-bold text-on-surface">{loggedRoundCount}</span>
+						</div>
+					</div>
+					<div class="flex items-center justify-between gap-2 pt-2 border-t border-white/5 text-xs">
+						<a
+							href={`/workflows/${routine.id}/history`}
+							class="text-xs font-semibold text-tertiary hover:underline"
+						>
+							Ver Histórico
+						</a>
+						{#if activePersistedSession}
+							<button
+								type="button"
+								class="text-xs font-semibold text-error hover:underline cursor-pointer"
+								onclick={() => void abandonPersistedSession()}
+								disabled={isSyncingSession}
+							>
+								Abandonar treino
+							</button>
 						{/if}
 					</div>
 				</div>
