@@ -82,7 +82,7 @@
 		if (k.startsWith('sk-') || k.startsWith('org-') || k.startsWith('proj_')) {
 			return { name: 'OpenAI (GPT-4o mini)', icon: 'bolt', color: 'text-emerald-400' };
 		}
-		return { name: 'Google (Gemini 1.5 / 2.0 Flash)', icon: 'auto_awesome', color: 'text-primary' };
+		return { name: 'Google (Gemini 2.5 / 2.0 Flash)', icon: 'auto_awesome', color: 'text-primary' };
 	});
 
 	$effect(() => {

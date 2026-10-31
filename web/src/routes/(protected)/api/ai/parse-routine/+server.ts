@@ -88,6 +88,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		return json(parsedRoutine);
 	} catch (err: any) {
+		console.error('[AI Parse Error]', err);
 		return json(
 			{ message: err?.message || 'Falha ao processar treino com IA' },
 			{ status: 500 }

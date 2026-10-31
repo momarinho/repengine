@@ -119,13 +119,78 @@ Regras:
 	return callGemini(effectiveApiKey, [{ text: prompt }], ROUTINE_SCHEMA);
 }
 
+const DEFAULT_CANDIDATE_MODELS = [
+	'gemini-2.5-flash',
+	'gemini-2.0-flash',
+	'gemini-2.5-flash-lite',
+	'gemini-2.0-flash-lite',
+	'gemini-2.5-pro'
+];
+
+export async function resolveGeminiModels(apiKey: string): Promise<string[]> {
+	const customModel = process.env.GEMINI_MODEL?.trim();
+	if (customModel) {
+		return [customModel, ...DEFAULT_CANDIDATE_MODELS.filter((m) => m !== customModel)];
+	}
+
+	try {
+		const url = new URL('https://generativelanguage.googleapis.com/v1beta/models');
+		url.searchParams.set('key', apiKey);
+		const res = await fetch(url.toString(), {
+			method: 'GET',
+			headers: { 'Content-Type': 'application/json' },
+			signal: AbortSignal.timeout(3500)
+		});
+
+		if (res.ok) {
+			const data: any = await res.json();
+			if (Array.isArray(data?.models)) {
+				const available: string[] = data.models
+					.filter(
+						(m: any) =>
+							Array.isArray(m?.supportedGenerationMethods) &&
+							m.supportedGenerationMethods.includes('generateContent')
+					)
+					.map((m: any) => (m.name || '').replace(/^models\//, ''))
+					.filter(
+						(name: string) =>
+							Boolean(name) &&
+							!name.includes('embedding') &&
+							!name.includes('aqa') &&
+							!name.includes('tts') &&
+							!name.includes('imagen') &&
+							!name.startsWith('gemini-1.0') &&
+							!name.startsWith('gemini-1.5')
+					);
+
+				// Prioritize Flash models (2.5 > 3.x > 2.0), then Pro models
+				const sorted = available.sort((a: string, b: string) => {
+					const score = (m: string) => {
+						let s = 0;
+						if (m.includes('flash')) s += 100;
+						if (m.includes('2.5')) s += 50;
+						else if (m.includes('3.')) s += 40;
+						else if (m.includes('2.0')) s += 30;
+						if (m.includes('lite')) s -= 5;
+						return s;
+					};
+					return score(b) - score(a);
+				});
+
+				if (sorted.length > 0) {
+					return Array.from(new Set([...sorted, ...DEFAULT_CANDIDATE_MODELS]));
+				}
+			}
+		}
+	} catch {
+		// Ignore discovery errors and fall back to defaults
+	}
+
+	return DEFAULT_CANDIDATE_MODELS;
+}
+
 async function callGemini(apiKey: string, parts: Array<Record<string, unknown>>, schema: Record<string, unknown>): Promise<any> {
-	const candidateModels = [
-		process.env.GEMINI_MODEL,
-		'gemini-1.5-flash',
-		'gemini-2.0-flash',
-		'gemini-1.5-pro'
-	].filter(Boolean) as string[];
+	const candidateModels = await resolveGeminiModels(apiKey);
 
 	let lastError: Error | null = null;
 
@@ -135,7 +200,8 @@ async function callGemini(apiKey: string, parts: Array<Record<string, unknown>>,
 		);
 		url.searchParams.set('key', apiKey);
 
-		const response = await fetch(url, {
+		// First try with structured responseSchema
+		let response = await fetch(url, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
@@ -147,6 +213,43 @@ async function callGemini(apiKey: string, parts: Array<Record<string, unknown>>,
 				}
 			})
 		});
+
+		// If 400 error possibly caused by strict schema validation, retry without responseSchema (plain JSON mode)
+		if (!response.ok && response.status === 400) {
+			const errorData: unknown = await response.clone().json().catch(() => null);
+			const apiMessage =
+				typeof errorData === 'object' &&
+				errorData !== null &&
+				'error' in errorData &&
+				typeof errorData.error === 'object' &&
+				errorData.error !== null &&
+				'message' in errorData.error &&
+				typeof errorData.error.message === 'string'
+					? errorData.error.message
+					: '';
+
+			const msgLower = apiMessage.toLowerCase();
+			if (
+				msgLower.includes('responseschema') ||
+				msgLower.includes('schema') ||
+				msgLower.includes('invalid argument')
+			) {
+				const fallbackResponse = await fetch(url, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						contents: [{ parts }],
+						generationConfig: {
+							responseMimeType: 'application/json',
+							temperature: 0.1
+						}
+					})
+				});
+				if (fallbackResponse.ok) {
+					response = fallbackResponse;
+				}
+			}
+		}
 
 		if (!response.ok) {
 			const errorData: unknown = await response.json().catch(() => null);
