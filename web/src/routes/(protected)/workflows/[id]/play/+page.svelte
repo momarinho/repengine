@@ -2801,7 +2801,7 @@
 <div class="min-h-screen overflow-hidden bg-background text-on-background">
 	{#if isChoosingSection}
 		<div class="min-h-screen px-3 sm:px-4 py-4 sm:py-6">
-			<div class="mx-auto max-w-md sm:max-w-lg">
+			<div class="mx-auto max-w-2xl">
 				<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
 					<div>
 						<div class="flex items-center gap-2 mb-1 text-[10px] font-bold uppercase tracking-[0.2em]">
@@ -3028,7 +3028,7 @@
 		</div>
 	{:else if isPreviewingLoads}
 		<div class="min-h-screen px-3 sm:px-4 py-4 sm:py-6 bg-background text-on-background">
-			<div class="mx-auto max-w-md sm:max-w-lg">
+			<div class="mx-auto max-w-2xl">
 				<div class="mb-5 sm:mb-6">
 					<button
 						type="button"
@@ -3328,35 +3328,50 @@
 			</div>
 		</div>
 	{:else if currentBlock}
-	<header class="fixed top-0 left-0 z-40 w-full border-b border-white/5 bg-background/90 backdrop-blur-xl">
-		<div class="mx-auto flex h-14 max-w-md sm:max-w-lg items-center justify-between px-3 sm:px-4">
-			<div class="flex items-center gap-2 sm:gap-3 min-w-0">
-				<p class="truncate text-xs sm:text-sm font-bold tracking-tight text-on-background max-w-[120px] sm:max-w-xs">{routine.name}</p>
-				{#if isDeloadActive}
-					<span class="rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shrink-0">
-						<span class="material-symbols-outlined text-xs">battery_charging_full</span>
-						<span>Deload</span>
-					</span>
-				{/if}
+	<header class="fixed top-0 left-0 z-40 w-full border-b border-white/5 bg-background/95 backdrop-blur-xl">
+		<div class="mx-auto flex h-14 max-w-2xl items-center justify-between px-3 sm:px-4 gap-2">
+			<!-- Left: Back button + Section/Routine pill -->
+			<div class="flex items-center gap-1.5 sm:gap-2 min-w-0">
+				<a
+					href={`/workflows/${routine.id}`}
+					class="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shrink-0"
+					title="Back to routine overview"
+				>
+					<span class="material-symbols-outlined text-lg sm:text-xl">arrow_back</span>
+				</a>
+
 				{#if routine.sections.length > 1}
 					<button
 						type="button"
-						class="flex items-center gap-1 rounded-lg border border-outline-variant/20 bg-surface-container px-2 py-1 text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors flex-shrink-0 cursor-pointer"
+						class="flex items-center gap-1 rounded-lg border border-outline-variant/20 bg-surface-container px-2 py-1 text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors min-w-0 max-w-[130px] sm:max-w-[220px] cursor-pointer"
 						onclick={() => (isChoosingSection = true)}
 						title="Switch Day or Section"
 					>
-						<span class="material-symbols-outlined text-xs text-tertiary">calendar_today</span>
-						<span class="hidden sm:inline">{activeSection?.title || 'Change Day'}</span>
-						<span class="material-symbols-outlined text-xs">arrow_drop_down</span>
+						<span class="material-symbols-outlined text-xs text-primary shrink-0">calendar_today</span>
+						<span class="truncate">{activeSection?.title || 'Change Day'}</span>
+						<span class="material-symbols-outlined text-xs shrink-0">arrow_drop_down</span>
 					</button>
+				{:else}
+					<span class="truncate text-xs sm:text-sm font-bold text-on-surface max-w-[130px] sm:max-w-[220px]">
+						{routine.name}
+					</span>
+				{/if}
+
+				{#if isDeloadActive}
+					<span class="hidden sm:inline-flex rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider items-center gap-0.5 shrink-0">
+						<span class="material-symbols-outlined text-[10px]">battery_charging_full</span>
+						<span>Deload</span>
+					</span>
 				{/if}
 			</div>
 
-			<div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
-				<div class="flex items-center gap-1 text-xs sm:text-sm font-bold text-primary font-mono tabular-nums">
-					<span class="material-symbols-outlined text-xs sm:text-sm">schedule</span>
-					{formatClock(sessionElapsedSeconds)}
+			<!-- Right: Timer + Sound + Finish + Edit -->
+			<div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+				<div class="flex items-center gap-1 text-xs font-mono font-bold text-primary tabular-nums px-2 py-1 rounded-lg bg-primary/10 border border-primary/20">
+					<span class="material-symbols-outlined text-xs">schedule</span>
+					<span>{formatClock(sessionElapsedSeconds)}</span>
 				</div>
+
 				<button
 					type="button"
 					class={`flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg transition-colors cursor-pointer ${
@@ -3365,44 +3380,48 @@
 					onclick={() => (intervalSoundEnabled = !intervalSoundEnabled)}
 					title={intervalSoundEnabled ? 'Sound cues ON' : 'Sound cues MUTED'}
 				>
-					<span class="material-symbols-outlined text-base sm:text-lg">
+					<span class="material-symbols-outlined text-base">
 						{intervalSoundEnabled ? 'volume_up' : 'volume_off'}
 					</span>
 				</button>
+
 				<button
 					type="button"
-					class="flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-2 sm:px-3 py-1 sm:py-1.5 text-xs font-bold text-primary hover:bg-primary/20 hover:border-primary/50 transition-all cursor-pointer"
+					class="flex items-center gap-1 rounded-lg border border-primary/40 bg-primary/15 px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-bold text-primary hover:bg-primary/25 hover:border-primary/60 transition-all cursor-pointer shrink-0"
 					onclick={() => (showFinishConfirmModal = true)}
 					title="Finish workout and record progress"
 				>
-					<span class="material-symbols-outlined text-xs sm:text-sm">flag</span>
-					<span class="hidden sm:inline">Finish Workout</span>
+					<span class="material-symbols-outlined text-sm">flag</span>
+					<span class="hidden sm:inline">Finalizar</span>
 				</button>
+
 				<a
 					href={`/workflows/${routine.id}/edit`}
-					class="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-variant/40 hover:text-on-surface"
+					class="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-variant/40 hover:text-on-surface shrink-0"
 					title="Edit routine"
 				>
-					<span class="material-symbols-outlined text-base sm:text-lg">edit</span>
+					<span class="material-symbols-outlined text-base">edit</span>
 				</a>
 			</div>
 		</div>
 
-		<div class="h-1 w-full bg-surface-container-lowest">
-			<div class="h-full bg-primary transition-all duration-300" style={`width: ${progressPercent}%`}></div>
+		<!-- Progress Bar inside max-w-2xl -->
+		<div class="mx-auto max-w-2xl w-full px-3 sm:px-4">
+			<div class="h-1 w-full overflow-hidden rounded-full bg-surface-container-lowest">
+				<div class="h-full bg-primary transition-all duration-300 rounded-full" style={`width: ${progressPercent}%`}></div>
+			</div>
 		</div>
 
 		{#if syncQueue.length > 0}
-			<div class="w-full bg-amber-400/10 border-t border-white/5 text-amber-400 px-3 sm:px-6 py-2 text-center text-xs font-semibold flex items-center justify-center gap-2">
-				<span class="material-symbols-outlined text-sm">cloud_off</span>
+			<div class="mx-auto max-w-2xl w-full bg-amber-400/10 border-t border-white/5 text-amber-400 px-3 py-1 text-center text-xs font-semibold flex items-center justify-center gap-1.5">
+				<span class="material-symbols-outlined text-xs">cloud_off</span>
 				Offline: {syncQueue.length} set(s) pending sync. Saving automatically.
 			</div>
 		{/if}
-
 	</header>
 
-	<main class="flex min-h-screen justify-center overflow-x-hidden pt-14 pb-[calc(5rem+env(safe-area-inset-bottom))] bg-background">
-		<section class="custom-scrollbar w-full max-w-md sm:max-w-lg px-2.5 sm:px-4 py-2 sm:py-3">
+	<main class="flex min-h-screen justify-center overflow-x-hidden pt-16 sm:pt-18 pb-[calc(5.25rem+env(safe-area-inset-bottom))] bg-background">
+		<section class="custom-scrollbar w-full max-w-2xl px-3 sm:px-4 py-2 sm:py-3">
 			<div class="w-full">
 				{#if sessionError}
 					<div class="mb-4 rounded-xl border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
@@ -3414,7 +3433,7 @@
 					<div class="mb-2 sm:mb-2.5 flex items-start justify-between gap-2">
 						<div class="min-w-0 flex-1">
 							<div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-tertiary">
-								<span class="truncate max-w-[140px]">{currentBlock.sectionTitle || routine.name}</span>
+								<span class="truncate max-w-[200px] sm:max-w-md">{currentBlock.sectionTitle || routine.name}</span>
 								<span>•</span>
 								<span class="text-primary font-bold">
 									{#if currentBlock.node_type_slug === 'exercise' || currentBlock.node_type_slug === 'linear_progression'}
@@ -3428,11 +3447,11 @@
 									{/if}
 								</span>
 							</div>
-							<h1 class="mt-0.5 text-lg sm:text-xl font-black tracking-tight text-on-surface truncate">
+							<h1 class="mt-0.5 text-lg sm:text-xl font-black tracking-tight text-on-surface break-words leading-tight">
 								{currentBlock.title}
 							</h1>
 							{#if currentBlock.subtitle}
-								<p class="text-xs text-on-surface-variant truncate">{currentBlock.subtitle}</p>
+								<p class="mt-0.5 text-xs text-on-surface-variant line-clamp-2 leading-relaxed">{currentBlock.subtitle}</p>
 							{/if}
 						</div>
 
@@ -5030,14 +5049,15 @@
 						</div>
 					{/if}
 
-					<div class="mt-4">
-						<label for="session-notes" class="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-							Block notes
-						</label>
+					<div class="mt-3 pt-2.5 border-t border-white/5">
+						<div class="flex items-center gap-1.5 mb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+							<span class="material-symbols-outlined text-xs">edit_note</span>
+							<span>Notas do bloco (opcional)</span>
+						</div>
 						<input
 							id="session-notes"
-							class="w-full rounded-xl border border-white/5 bg-surface-container-lowest px-3 py-2 text-[13px] text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-							placeholder={currentBlock.notePlaceholder ?? 'Add execution notes, cues, or fatigue markers...'}
+							class="w-full rounded-xl border border-white/5 bg-surface-container-lowest px-3 py-1.5 text-xs text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+							placeholder={currentBlock.notePlaceholder ?? 'Anotações sobre técnica, fadiga ou ajuste...'}
 							value={notesByBlock[currentBlock.id] ?? ''}
 							oninput={(event) => {
 								notesByBlock = {
@@ -5053,7 +5073,7 @@
 	</main>
 
 	<footer class="fixed bottom-0 left-0 z-50 w-full border-t border-white/5 bg-background/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_30px_rgba(0,0,0,0.3)] backdrop-blur-2xl">
-		<div class="mx-auto flex h-[calc(4.25rem+env(safe-area-inset-bottom))] sm:h-[calc(4.75rem+env(safe-area-inset-bottom))] max-w-md sm:max-w-lg items-center justify-between px-3 sm:px-4 gap-2">
+		<div class="mx-auto flex h-[calc(4.25rem+env(safe-area-inset-bottom))] sm:h-[calc(4.75rem+env(safe-area-inset-bottom))] max-w-2xl items-center justify-between px-3 sm:px-4 gap-2">
 			<div class="flex gap-1.5 shrink-0">
 				<button
 					type="button"
@@ -5111,7 +5131,7 @@
 
 	{#if mobileQueueOpen}
 		<div class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" role="presentation" onclick={() => (mobileQueueOpen = false)}></div>
-		<section class="custom-scrollbar fixed inset-x-0 bottom-0 z-50 max-h-[80vh] max-w-md sm:max-w-lg mx-auto overflow-y-auto rounded-t-3xl border-t border-white/10 bg-surface-container px-4 sm:px-6 py-5 shadow-2xl">
+		<section class="custom-scrollbar fixed inset-x-0 bottom-0 z-50 max-h-[80vh] max-w-2xl mx-auto overflow-y-auto rounded-t-3xl border-t border-white/10 bg-surface-container px-4 sm:px-6 py-5 shadow-2xl">
 			<div class="mb-4 flex items-center justify-between">
 				<h3 class="text-sm font-bold text-on-surface flex items-center gap-1.5">
 					<span class="material-symbols-outlined text-primary text-base">format_list_bulleted</span>
