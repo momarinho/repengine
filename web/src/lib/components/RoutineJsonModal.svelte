@@ -341,7 +341,18 @@
 
 			const data = await res.json().catch(() => null);
 			if (!res.ok) {
-				const errMsg = data?.message || 'Falha no processamento';
+				let errMsg = data?.message;
+				if (!errMsg) {
+					if (res.status === 404) {
+						errMsg = 'Endpoint de IA não encontrado (HTTP 404). As rotas de IA no Nginx precisam apontar para o web.';
+					} else if (res.status === 413) {
+						errMsg = 'Foto muito pesada para o servidor (HTTP 413). O limite de upload do Nginx foi atingido.';
+					} else if (res.status === 502 || res.status === 504) {
+						errMsg = `Tempo limite esgotado no servidor (HTTP ${res.status}). A IA demorou para responder.`;
+					} else {
+						errMsg = `Falha no processamento (HTTP ${res.status})`;
+					}
+				}
 				const msgLower = errMsg.toLowerCase();
 				if (
 					res.status === 400 ||
