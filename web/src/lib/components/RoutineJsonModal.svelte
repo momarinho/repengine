@@ -82,7 +82,7 @@
 		if (k.startsWith('sk-') || k.startsWith('org-') || k.startsWith('proj_')) {
 			return { name: 'OpenAI (GPT-4o mini)', icon: 'bolt', color: 'text-emerald-400' };
 		}
-		return { name: 'Google (Gemini 2.5 / 2.0 Flash)', icon: 'auto_awesome', color: 'text-primary' };
+		return { name: 'Google (Gemini 1.5 / 2.0 Flash)', icon: 'auto_awesome', color: 'text-primary' };
 	});
 
 	$effect(() => {
@@ -175,7 +175,14 @@
 	}
 
 	async function compressAndPrepareImage(file: File): Promise<File> {
-		if (typeof window === 'undefined' || !file.type.startsWith('image/')) return file;
+		if (typeof window === 'undefined') return file;
+		// Some mobile cameras output empty file.type or application/octet-stream
+		const isLikelyImage =
+			!file.type ||
+			file.type.startsWith('image/') ||
+			/\.(jpe?g|png|webp|heic|bmp|tiff)$/i.test(file.name || '');
+		if (!isLikelyImage) return file;
+
 		return new Promise((resolve) => {
 			const img = new Image();
 			const objectUrl = URL.createObjectURL(file);
@@ -207,7 +214,8 @@
 							resolve(file);
 							return;
 						}
-						const processed = new File([blob], file.name.replace(/\.[^/.]+$/, '.jpg'), {
+						const cleanName = (file.name || 'workout_scan.jpg').replace(/\.[^/.]+$/, '.jpg');
+						const processed = new File([blob], cleanName, {
 							type: 'image/jpeg'
 						});
 						resolve(processed);
@@ -281,7 +289,19 @@
 
 			const data = await res.json().catch(() => null);
 			if (!res.ok) {
-				throw new Error(data?.message || 'Falha no processamento');
+				const errMsg = data?.message || 'Falha no processamento';
+				const msgLower = errMsg.toLowerCase();
+				if (
+					res.status === 400 ||
+					res.status === 401 ||
+					res.status === 403 ||
+					msgLower.includes('chave') ||
+					msgLower.includes('api key') ||
+					msgLower.includes('byok')
+				) {
+					showCustomKey = true;
+				}
+				throw new Error(errMsg);
 			}
 
 			importText = JSON.stringify(data, null, 2);
@@ -636,7 +656,7 @@
 									{:else if customApiKey.trim()}
 										<span class="ml-1 text-[11px] text-on-surface-variant font-normal">(Configurada)</span>
 									{:else}
-										<span class="ml-1 text-[11px] text-on-surface-variant/70 font-normal">(Opcional: Gemini ou OpenAI)</span>
+										<span class="ml-1 text-[11px] text-primary font-medium">(Necessário para IA se não configurado no servidor)</span>
 									{/if}
 								</button>
 								<button

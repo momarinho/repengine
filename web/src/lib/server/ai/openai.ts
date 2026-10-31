@@ -59,11 +59,13 @@ export async function parseRoutineWithOpenAI(input: AiParseInput): Promise<any> 
 
 	const userContent: Array<Record<string, unknown>> = [];
 
-	if (input.imageBytesBase64 && input.mimeType) {
+	if (input.imageBytesBase64) {
+		const rawMime = input.mimeType?.toLowerCase().trim();
+		const mime = rawMime && rawMime.startsWith('image/') ? rawMime : 'image/jpeg';
 		userContent.push({
 			type: 'image_url',
 			image_url: {
-				url: `data:${input.mimeType};base64,${input.imageBytesBase64}`
+				url: `data:${mime};base64,${input.imageBytesBase64}`
 			}
 		});
 	}

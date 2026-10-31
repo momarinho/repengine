@@ -22,21 +22,57 @@ export const POST: RequestHandler = async ({ request }) => {
 			const file = formData.get('file') as File | null;
 
 			if (file && file.size > 0) {
-				mimeType = file.type;
 				const arrayBuffer = await file.arrayBuffer();
-				imageBytesBase64 = Buffer.from(arrayBuffer).toString('base64');
+				const buffer = Buffer.from(arrayBuffer);
+				imageBytesBase64 = buffer.toString('base64');
+
+				// Defensive MIME type detection: check magic bytes or file extension
+				let detectedMime = file.type?.toLowerCase().trim();
+				if (!detectedMime || detectedMime === 'application/octet-stream') {
+					if (buffer.length > 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+						detectedMime = 'image/jpeg';
+					} else if (
+						buffer.length > 4 &&
+						buffer[0] === 0x89 &&
+						buffer[1] === 0x50 &&
+						buffer[2] === 0x4e &&
+						buffer[3] === 0x47
+					) {
+						detectedMime = 'image/png';
+					} else if (file.name.toLowerCase().endsWith('.png')) {
+						detectedMime = 'image/png';
+					} else if (file.name.toLowerCase().endsWith('.webp')) {
+						detectedMime = 'image/webp';
+					} else {
+						detectedMime = 'image/jpeg';
+					}
+				}
+				mimeType = detectedMime;
 			}
 		} else {
 			const body = await request.json();
 			text = body.text;
 			imageBytesBase64 = body.imageBytesBase64;
-			mimeType = body.mimeType;
+			mimeType = body.mimeType || (imageBytesBase64 ? 'image/jpeg' : undefined);
 		}
 
 		if (!text && !imageBytesBase64) {
 			return json(
 				{
 					message: 'Envie uma imagem da ficha ou um texto para ser analisado.'
+				},
+				{ status: 400 }
+			);
+		}
+
+		const hasServerKey = Boolean(
+			process.env.GEMINI_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim()
+		);
+		if (!clientApiKey && !hasServerKey) {
+			return json(
+				{
+					message:
+						'Nenhuma chave de API configurada. Por favor, insira sua chave gratuita do Google Gemini no campo "Chave de API Pessoal (BYOK)" no topo do modal.'
 				},
 				{ status: 400 }
 			);

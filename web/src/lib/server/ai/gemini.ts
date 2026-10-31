@@ -61,10 +61,12 @@ export async function parseRoutineWithGemini(input: AiParseInput): Promise<any> 
 
 	const parts: Array<Record<string, unknown>> = [];
 
-	if (input.imageBytesBase64 && input.mimeType) {
+	if (input.imageBytesBase64) {
+		const rawMime = input.mimeType?.toLowerCase().trim();
+		const safeMime = rawMime && rawMime.startsWith('image/') ? rawMime : 'image/jpeg';
 		parts.push({
 			inlineData: {
-				mimeType: input.mimeType,
+				mimeType: safeMime,
 				data: input.imageBytesBase64
 			}
 		});
@@ -120,9 +122,9 @@ Regras:
 async function callGemini(apiKey: string, parts: Array<Record<string, unknown>>, schema: Record<string, unknown>): Promise<any> {
 	const candidateModels = [
 		process.env.GEMINI_MODEL,
-		'gemini-2.5-flash',
+		'gemini-1.5-flash',
 		'gemini-2.0-flash',
-		'gemini-1.5-flash'
+		'gemini-1.5-pro'
 	].filter(Boolean) as string[];
 
 	let lastError: Error | null = null;
@@ -159,9 +161,28 @@ async function callGemini(apiKey: string, parts: Array<Record<string, unknown>>,
 					? errorData.error.message
 					: null;
 
-			// If model is not found / 404, try next candidate
-			if (response.status === 404 || apiMessage?.includes('not found') || apiMessage?.includes('deprecated')) {
-				lastError = new Error(apiMessage || `Modelo ${model} indisponível (HTTP 404)`);
+			const msgLower = (apiMessage || '').toLowerCase();
+
+			// If key is invalid or quota exceeded, fail fast with a friendly message
+			if (msgLower.includes('api key not valid') || msgLower.includes('invalid api key') || (response.status === 400 && msgLower.includes('api key'))) {
+				throw new Error('Chave de API do Gemini inválida. Por favor, verifique sua chave no campo BYOK.');
+			}
+			if (response.status === 429 || msgLower.includes('quota') || msgLower.includes('resource exhausted')) {
+				throw new Error('Limite de requisições excedido na sua chave Gemini (Quota Exceeded). Aguarde alguns instantes ou use outra chave.');
+			}
+
+			// Check if error is related to model availability or unsupported version, so we try the next candidate
+			const isModelError =
+				response.status === 404 ||
+				(response.status === 400 &&
+					(msgLower.includes('not found') ||
+						msgLower.includes('not supported') ||
+						msgLower.includes('deprecated') ||
+						msgLower.includes('invalid argument') ||
+						msgLower.includes('model')));
+
+			if (isModelError) {
+				lastError = new Error(apiMessage || `Modelo ${model} indisponível (HTTP ${response.status})`);
 				continue;
 			}
 
@@ -192,10 +213,17 @@ async function callGemini(apiKey: string, parts: Array<Record<string, unknown>>,
 			throw new Error('A IA não retornou nenhum conteúdo válido.');
 		}
 
+		let cleanJsonText = rawJsonText.trim();
+		if (cleanJsonText.startsWith('```json')) {
+			cleanJsonText = cleanJsonText.replace(/^```json\s*/, '').replace(/```\s*$/, '').trim();
+		} else if (cleanJsonText.startsWith('```')) {
+			cleanJsonText = cleanJsonText.replace(/^```\s*/, '').replace(/```\s*$/, '').trim();
+		}
+
 		try {
-			return JSON.parse(rawJsonText);
+			return JSON.parse(cleanJsonText);
 		} catch {
-			throw new Error('A IA retornou um formato que não é um JSON válido.');
+			throw new Error('A IA retornou um formato que não pôde ser convertido para JSON válido.');
 		}
 	}
 
