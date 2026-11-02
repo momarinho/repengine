@@ -1475,3 +1475,136 @@ func TestApplySessionProgression_Superset_Dips5RepsMaintainsLoad(t *testing.T) {
 		t.Fatalf("expected suggested_reps_b to advance to '6', got %v", gotState.Metadata["suggested_reps_b"])
 	}
 }
+
+func TestApplySessionProgression_ProgressesFromActualLoggedLoad(t *testing.T) {
+	ctx := context.Background()
+	var gotState UpsertProgressionStateInput
+
+	repo := &fakeRepo{
+		userOwnsWorkflowFunc: func(ctx context.Context, userID, workflowID int) (bool, error) {
+			return true, nil
+		},
+		listWorkflowBlocksFunc: func(ctx context.Context, workflowID int) ([]workflowBlockConfig, error) {
+			return []workflowBlockConfig{
+				{
+					ID:           18,
+					NodeTypeSlug: "linear_progression",
+					Position:     0,
+					Data: map[string]any{
+						"exercise_name": "Overhead Press",
+						"sets":          3,
+						"reps":          "5",
+						"start_load":    0.0, // initial config was 0 kg
+						"load_unit":     "kg",
+						"increment":     2.5,
+					},
+				},
+			}, nil
+		},
+		listProgressionStatesFunc: func(ctx context.Context, userID, workflowID int) ([]ProgressionState, error) {
+			return nil, nil
+		},
+		upsertProgressionStateFunc: func(ctx context.Context, in UpsertProgressionStateInput) (ProgressionState, error) {
+			gotState = in
+			return ProgressionState{}, nil
+		},
+	}
+
+	service := NewService(repo)
+
+	// User logged 5 kg instead of 0 kg, and completed all 5 reps
+	err := service.ApplySessionProgression(ctx, ApplySessionProgressionInput{
+		UserID:     1,
+		WorkflowID: 1,
+		SessionID:  14,
+		Logs: []CompletedSetLog{
+			{WorkflowBlockID: intPtr(18), Completed: true, SetIndex: 1, ActualReps: "5", ActualLoad: "5 kg"},
+			{WorkflowBlockID: intPtr(18), Completed: true, SetIndex: 2, ActualReps: "5", ActualLoad: "5 kg"},
+			{WorkflowBlockID: intPtr(18), Completed: true, SetIndex: 3, ActualReps: "5", ActualLoad: "5 kg"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if gotState.Outcome != OutcomeIncrease {
+		t.Fatalf("expected OutcomeIncrease, got %s", gotState.Outcome)
+	}
+	// Progression MUST be based on the 5 kg logged, so next session is 5 + 2.5 = 7.5 kg
+	if gotState.SuggestedLoad != "7.5 kg" {
+		t.Fatalf("expected suggested load to be 7.5 kg (5 kg + 2.5 kg), got %s", gotState.SuggestedLoad)
+	}
+}
+
+func TestApplySessionProgression_Superset_ProgressesFromActualLoggedLoad(t *testing.T) {
+	ctx := context.Background()
+	var gotState UpsertProgressionStateInput
+
+	repo := &fakeRepo{
+		userOwnsWorkflowFunc: func(ctx context.Context, userID, workflowID int) (bool, error) {
+			return true, nil
+		},
+		listWorkflowBlocksFunc: func(ctx context.Context, workflowID int) ([]workflowBlockConfig, error) {
+			return []workflowBlockConfig{
+				{
+					ID:           19,
+					NodeTypeSlug: "superset",
+					Position:     0,
+					Data: map[string]any{
+						"exercise_a_name":    "Parallel Bar Dips",
+						"exercise_b_name":    "Romanian Deadlift (RDL)",
+						"sets":               3,
+						"reps_a":             "5-8",
+						"reps_b":             "5-8",
+						"min_reps_a":         5,
+						"max_reps_a":         8,
+						"min_reps_b":         5,
+						"max_reps_b":         8,
+						"start_load_a":       0.0, // Configured as 0 kg
+						"start_load_b":       30.0,
+						"increment_a":        2.5,
+						"increment_b":        2.5,
+						"load_unit_a":        "kg",
+						"load_unit_b":        "kg",
+						"progression_type_a": "double",
+						"progression_type_b": "double",
+					},
+				},
+			}, nil
+		},
+		listProgressionStatesFunc: func(ctx context.Context, userID, workflowID int) ([]ProgressionState, error) {
+			return nil, nil
+		},
+		upsertProgressionStateFunc: func(ctx context.Context, in UpsertProgressionStateInput) (ProgressionState, error) {
+			gotState = in
+			return ProgressionState{}, nil
+		},
+	}
+
+	service := NewService(repo)
+
+	// User logged 5 kg on Dips (instead of 0) and hit the ceiling of 8 reps!
+	// RDL logged 30 kg and hit 5 reps (under ceiling).
+	err := service.ApplySessionProgression(ctx, ApplySessionProgressionInput{
+		UserID:     1,
+		WorkflowID: 1,
+		SessionID:  15,
+		Logs: []CompletedSetLog{
+			{WorkflowBlockID: intPtr(19), Completed: true, SetIndex: 1, ActualReps: "8/5", ActualLoad: "5/30 kg"},
+			{WorkflowBlockID: intPtr(19), Completed: true, SetIndex: 2, ActualReps: "8/5", ActualLoad: "5/30 kg"},
+			{WorkflowBlockID: intPtr(19), Completed: true, SetIndex: 3, ActualReps: "8/5", ActualLoad: "5/30 kg"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Dips hit 8 reps at 5 kg with +2.5 kg increment -> Suggested Load A must be 7.5 kg!
+	if gotState.Metadata["suggested_load_a"] != "7.5 kg" {
+		t.Fatalf("expected suggested_load_a to be '7.5 kg' (5 kg + 2.5 kg), got %v", gotState.Metadata["suggested_load_a"])
+	}
+	// RDL hit 5 reps at 30 kg -> Suggested Load B must be maintained at 30 kg!
+	if gotState.Metadata["suggested_load_b"] != "30 kg" {
+		t.Fatalf("expected suggested_load_b to be '30 kg', got %v", gotState.Metadata["suggested_load_b"])
+	}
+}
