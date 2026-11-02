@@ -1354,7 +1354,13 @@
 
 	async function persistSetLog(block: PlayerBlock, payload: Record<string, unknown>): Promise<WorkoutSetLog> {
 		if (!activePersistedSession) {
-			throw new Error('No active workout session.');
+			const targetSection = activeSection ?? (routine?.sections.find((s) => s.id === currentBlock?.sectionID) ?? null);
+			try {
+				activePersistedSession = await createPersistedSession(targetSection);
+				sessionError = null;
+			} catch {
+				throw new Error('No active workout session.');
+			}
 		}
 
 		const setIndex = typeof payload.set_index === 'number' ? payload.set_index : 1;
@@ -2478,6 +2484,8 @@
 							void restorePersistedSession(targetBackendID).catch(() => {
 								sessionError = 'Unable to restore workout session.';
 							});
+						} else {
+							void startSection(initialSection);
 						}
 					}
 				} catch {
