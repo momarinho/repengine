@@ -235,6 +235,9 @@ func (s *Service) buildNextState(
 	case "wave":
 		return buildWaveProgressionState(block, logs, existing, hasExisting, session), true
 	case "exercise", "exercise_timed":
+		if looksLikeSkillProgression(block) {
+			return buildSkillProgressionState(block, logs, existing, hasExisting, session), true
+		}
 		if prog, ok := block.Data["progression"].(map[string]any); ok && prog != nil {
 			progType := asString(prog["type"])
 			if progType == "double" {
@@ -244,10 +247,11 @@ func (s *Service) buildNextState(
 				return buildLinearProgressionState(block, logs, existing, hasExisting, session), true
 			}
 		}
-		if !looksLikeSkillProgression(block) {
-			return UpsertProgressionStateInput{}, false
+		minR, maxR := parseRepsMinMax(asString(block.Data["reps"]))
+		if minR < maxR && minR > 0 {
+			return buildDoubleProgressionState(block, logs, existing, hasExisting, session), true
 		}
-		return buildSkillProgressionState(block, logs, existing, hasExisting, session), true
+		return UpsertProgressionStateInput{}, false
 	case "superset":
 		return buildSupersetProgressionState(block, logs, existing, hasExisting, session), true
 	default:
@@ -416,7 +420,9 @@ func buildLinearProgressionState(
 	if repsPrescribed == "" && len(logs) > 0 {
 		repsPrescribed = logs[0].PrescribedReps
 	}
-	lowerTarget, _ := parseRepRange(repsPrescribed)
+	lowerTarget, upperTarget := parseRepRange(repsPrescribed)
+	isRepRange := upperTarget > lowerTarget
+	isAMRAP := strings.Contains(repsPrescribed, "+")
 
 	increment := parseNumberValue(block.Data["increment"])
 	if increment == 0 {
@@ -432,7 +438,8 @@ func buildLinearProgressionState(
 	avgRIR, avgRIRLabel, hasRIR := averageMetric(logs, func(log CompletedSetLog) string { return log.ActualRIR })
 
 	allSetsCompleted := len(logs) >= setsPlanned
-	missedTarget := anyRepTargetMiss(logs, lowerTarget)
+	missedFloor := anyRepTargetMiss(logs, lowerTarget)
+	hitCeiling := !anyRepTargetMiss(logs, upperTarget)
 
 	outcome := OutcomeMaintain
 	suggestedLoad := currentLoad
@@ -440,7 +447,7 @@ func buildLinearProgressionState(
 	summary := "Keep the current load next session."
 
 	switch {
-	case missedTarget || !allSetsCompleted || isLinearTooHard(hasRPE, avgRPE, hasRIR, avgRIR):
+	case missedFloor || !allSetsCompleted || isLinearTooHard(hasRPE, avgRPE, hasRIR, avgRIR):
 		outcome = OutcomeReduce
 		sessionCount = 0 // reset consecutive sessions on failure
 		if len(steps) > 0 {
@@ -472,6 +479,24 @@ func buildLinearProgressionState(
 			summary = "Reduce the load next session. Reps fell off or effort ran too high."
 		}
 
+	case isRepRange && !hitCeiling:
+		// Rep range (e.g. 5-8 reps): user achieved at least lowerTarget, but hasn't reached upperTarget across all sets yet
+		outcome = OutcomeMaintain
+		suggestedLoad = currentLoad
+		minActual := int(lowerTarget)
+		if len(logs) > 0 {
+			minActual = 999
+			for _, l := range logs {
+				if r, ok := parseFirstInt(l.ActualReps); ok && r < minActual {
+					minActual = r
+				}
+			}
+			if minActual == 999 {
+				minActual = int(lowerTarget)
+			}
+		}
+		summary = fmt.Sprintf("Completed %d reps across sets (target range %d-%d). Kept %s; aim for %d reps across all sets before adding load.", minActual, int(lowerTarget), int(upperTarget), currentLoad, int(upperTarget))
+
 	case isLinearEasy(hasRPE, avgRPE, hasRIR, avgRIR):
 		outcome = OutcomeIncrease
 		sessionCount++
@@ -493,7 +518,22 @@ func buildLinearProgressionState(
 				}
 				suggestedLoad = formatLoad(rawIncrease, loadUnit)
 			}
-			summary = "Add load next session. The work stayed within a manageable effort."
+			if isAMRAP && len(logs) > 0 {
+				amrapReps := 0
+				lastLog := logs[len(logs)-1]
+				if r, ok := parseFirstInt(lastLog.ActualReps); ok {
+					amrapReps = r
+				}
+				if amrapReps > int(lowerTarget) {
+					summary = fmt.Sprintf("Hit %d reps on the AMRAP set (target was %d+)! Adding load next session (%s).", amrapReps, int(lowerTarget), suggestedLoad)
+				} else {
+					summary = fmt.Sprintf("Completed all %d sets of %s. Adding load next session (%s).", setsPlanned, repsPrescribed, suggestedLoad)
+				}
+			} else if isRepRange {
+				summary = fmt.Sprintf("Hit ceiling of %d reps across all %d sets! Adding load: %s -> %s.", int(upperTarget), setsPlanned, currentLoad, suggestedLoad)
+			} else {
+				summary = "Add load next session. The work stayed within a manageable effort."
+			}
 		}
 
 	default:
@@ -523,6 +563,7 @@ func buildLinearProgressionState(
 			"sets_planned":           setsPlanned,
 			"reps_planned":           repsPrescribed,
 			"target_reps_lower":      lowerTarget,
+			"target_reps_upper":      upperTarget,
 			"current_sequence_index": suggestedSeqIndex,
 			"fail_sequence":          failSequenceStr,
 			"session_count":          sessionCount,
@@ -921,6 +962,10 @@ func evalSingleExerciseProgression(
 		}
 	}
 
+	if minReps < maxReps {
+		progType = "double"
+	}
+
 	switch progType {
 	case "double":
 		if allSetsCompleted && minActualReps >= maxReps {
@@ -1145,7 +1190,9 @@ func buildSupersetProgressionState(
 	minB, maxB := parseMinMaxConfig(block.Data["min_reps_b"], block.Data["max_reps_b"], repsBStr)
 
 	progTypeA := asString(block.Data["progression_type_a"])
-	if progTypeA == "" || progTypeA == "none" {
+	if minA < maxA && minA > 0 {
+		progTypeA = "double"
+	} else if progTypeA == "" || progTypeA == "none" {
 		if minA != maxA && minA > 0 && maxA > 0 {
 			progTypeA = "double"
 		} else {
@@ -1153,7 +1200,9 @@ func buildSupersetProgressionState(
 		}
 	}
 	progTypeB := asString(block.Data["progression_type_b"])
-	if progTypeB == "" || progTypeB == "none" {
+	if minB < maxB && minB > 0 {
+		progTypeB = "double"
+	} else if progTypeB == "" || progTypeB == "none" {
 		if minB != maxB && minB > 0 && maxB > 0 {
 			progTypeB = "double"
 		} else {
@@ -1497,8 +1546,10 @@ func parseNumberString(value string) (float64, bool) {
 	return number, true
 }
 
+var positiveNumberPattern = regexp.MustCompile(`\d+(?:\.\d+)?`)
+
 func parseRepRange(value string) (float64, float64) {
-	matches := numberPattern.FindAllString(value, -1)
+	matches := positiveNumberPattern.FindAllString(value, -1)
 	if len(matches) == 0 {
 		return 0, 0
 	}
@@ -1508,6 +1559,9 @@ func parseRepRange(value string) (float64, float64) {
 	}
 	first, _ := strconv.ParseFloat(matches[0], 64)
 	last, _ := strconv.ParseFloat(matches[len(matches)-1], 64)
+	if last < first {
+		last = first
+	}
 	return first, last
 }
 

@@ -805,19 +805,30 @@
 		actualRIR: string;
 	} {
 		if (currentBlock && currentBlock.node_type_slug === 'superset') {
-			const repsA = actualRepsAByBlock[blockID]?.trim() ?? '';
-			const repsB = actualRepsBByBlock[blockID]?.trim() ?? '';
-			const loadA = actualLoadAByBlock[blockID]?.trim() ?? '';
-			const loadB = actualLoadBByBlock[blockID]?.trim() ?? '';
+			const { repsA: targetA, repsB: targetB, loadA: targetLoadA, loadB: targetLoadB } = getSupersetTargetValues();
+			const cleanTargetLoadA = targetLoadA !== '-' ? targetLoadA.replace(/[^\d.]/g, '') : '0';
+			const cleanTargetLoadB = targetLoadB !== '-' ? targetLoadB.replace(/[^\d.]/g, '') : '0';
+			const cleanTargetRepsA = targetA.includes('-') ? targetA.split('-')[0] : targetA.replace(/[^\d]/g, '');
+			const cleanTargetRepsB = targetB.includes('-') ? targetB.split('-')[0] : targetB.replace(/[^\d]/g, '');
+
+			const repsA = actualRepsAByBlock[blockID]?.trim() || cleanTargetRepsA || '5';
+			const repsB = actualRepsBByBlock[blockID]?.trim() || cleanTargetRepsB || '5';
+			const loadA = actualLoadAByBlock[blockID]?.trim() || cleanTargetLoadA || '0';
+			const loadB = actualLoadBByBlock[blockID]?.trim() || cleanTargetLoadB || '0';
 			return {
-				actualReps: repsA || repsB ? `${repsA || '0'}/${repsB || '0'}` : '',
-				actualLoad: loadA || loadB ? `${loadA || '0'}/${loadB || '0'}` : '',
+				actualReps: `${repsA}/${repsB}`,
+				actualLoad: `${loadA}/${loadB}`,
 				actualRPE: actualRPEByBlock[blockID]?.trim() ?? '',
 				actualRIR: actualRIRByBlock[blockID]?.trim() ?? ''
 			};
 		}
-		const actualReps = actualRepsByBlock[blockID]?.trim() ?? '';
-		const actualLoad = actualLoadByBlock[blockID]?.trim() ?? '';
+		const targetReps = currentBlock ? getResolvedPrescribedReps(currentBlock) : '';
+		const targetLoad = currentBlock ? getResolvedPrescribedLoad(currentBlock) : '';
+		const cleanTargetLoad = targetLoad !== '-' ? targetLoad.replace(/[^\d.]/g, '') : '';
+		const cleanTargetReps = targetReps.includes('-') ? targetReps.split('-')[0] : targetReps.replace(/[^\d]/g, '');
+
+		const actualReps = actualRepsByBlock[blockID]?.trim() || cleanTargetReps || '';
+		const actualLoad = actualLoadByBlock[blockID]?.trim() || cleanTargetLoad || '';
 		const actualRPE = actualRPEByBlock[blockID]?.trim() ?? '';
 		const actualRIR = actualRIRByBlock[blockID]?.trim() ?? '';
 
@@ -1314,8 +1325,9 @@
 		}
 		let load = getResolvedPrescribedLoad(block) || '';
 		if (block.node_type_slug === 'superset') {
-			reps = `${block.data?.reps_a || '0'}/${block.data?.reps_b || '0'}`;
-			load = `${block.data?.start_load_a !== null && block.data?.start_load_a !== undefined ? block.data.start_load_a : '0'}/${block.data?.start_load_b !== null && block.data?.start_load_b !== undefined ? block.data.start_load_b : '0'}`;
+			const { repsA, repsB, loadA, loadB } = getSupersetTargetValues();
+			reps = `${repsA}/${repsB}`;
+			load = `${loadA}/${loadB}`;
 		}
 
 		const defaultCompletedReps = reps.replace(/\+$/, '').trim();
@@ -2233,8 +2245,11 @@
 		const fallbackRepsA = lastReps[0] && Number.parseInt(lastReps[0]) >= minA ? String(Math.min(Number.parseInt(lastReps[0]) + (Number.parseInt(lastReps[0]) >= maxA ? 0 : 1), maxA)) : null;
 		const fallbackRepsB = lastReps[1] && Number.parseInt(lastReps[1]) >= minB ? String(Math.min(Number.parseInt(lastReps[1]) + (Number.parseInt(lastReps[1]) >= maxB ? 0 : 1), maxB)) : null;
 
-		const repsA = (typeof meta?.suggested_reps_a === 'string' ? meta.suggested_reps_a : null) ?? fallbackRepsA ?? (currentBlock.data?.reps_a ? String(currentBlock.data.reps_a) : '5');
-		const repsB = (typeof meta?.suggested_reps_b === 'string' ? meta.suggested_reps_b : null) ?? fallbackRepsB ?? (currentBlock.data?.reps_b ? String(currentBlock.data.reps_b) : '5');
+		const rawRepsA = (typeof meta?.suggested_reps_a === 'string' ? meta.suggested_reps_a : null) ?? fallbackRepsA ?? (currentBlock.data?.reps_a ? String(currentBlock.data.reps_a) : '5');
+		const rawRepsB = (typeof meta?.suggested_reps_b === 'string' ? meta.suggested_reps_b : null) ?? fallbackRepsB ?? (currentBlock.data?.reps_b ? String(currentBlock.data.reps_b) : '5');
+
+		const repsA = rawRepsA.includes('-') ? rawRepsA.split('-')[0].trim() : rawRepsA.trim();
+		const repsB = rawRepsB.includes('-') ? rawRepsB.split('-')[0].trim() : rawRepsB.trim();
 
 		return { repsA, repsB, loadA, loadB };
 	}
@@ -3718,7 +3733,7 @@
 												enterkeyhint="next"
 												class="w-full h-10 rounded-xl border border-white/10 bg-surface-container/60 px-1 text-center text-[16px] sm:text-base font-black text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-1 focus:ring-primary/50"
 												placeholder={currentBlockReps ?? '10'}
-												value={actualRepsByBlock[currentBlock.id] ?? ''}
+												value={actualRepsByBlock[currentBlock.id] ?? (currentBlockReps ? String(currentBlockReps).replace(/\+$/, '') : '')}
 												oninput={(event) => {
 													actualRepsByBlock = {
 														...actualRepsByBlock,
@@ -3760,7 +3775,7 @@
 												enterkeyhint="next"
 												class="w-full h-10 rounded-xl border border-white/10 bg-surface-container/60 px-1 text-center text-[16px] sm:text-base font-black text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-1 focus:ring-primary/50"
 												placeholder={currentPrescribedLoad || '0 kg'}
-												value={actualLoadByBlock[currentBlock.id] ?? ''}
+												value={actualLoadByBlock[currentBlock.id] ?? (currentPrescribedLoad ? currentPrescribedLoad.replace(/[^\d.]/g, '') : '')}
 												oninput={(event) => {
 													const val = (event.currentTarget as HTMLInputElement).value;
 													actualLoadByBlock = {
@@ -3995,7 +4010,7 @@
 												enterkeyhint="next"
 												class="w-full h-9 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[15px] font-black text-on-surface focus:border-primary focus:ring-1 focus:ring-primary/50"
 												placeholder={`${targetRepsA}`}
-												value={actualRepsAByBlock[currentBlock.id] ?? ''}
+												value={actualRepsAByBlock[currentBlock.id] ?? `${targetRepsA}`}
 												oninput={(event) => {
 													actualRepsAByBlock = {
 														...actualRepsAByBlock,
@@ -4030,7 +4045,7 @@
 												enterkeyhint="next"
 												class="w-full h-9 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[15px] font-black text-on-surface focus:border-primary focus:ring-1 focus:ring-primary/50"
 												placeholder={prescribedLoadA !== '-' ? prescribedLoadA.replace(/[^\d.]/g, '') : '0'}
-												value={actualLoadAByBlock[currentBlock.id] ?? ''}
+												value={actualLoadAByBlock[currentBlock.id] ?? (prescribedLoadA !== '-' ? prescribedLoadA.replace(/[^\d.]/g, '') : '0')}
 												oninput={(event) => {
 													actualLoadAByBlock = {
 														...actualLoadAByBlock,
@@ -4075,7 +4090,7 @@
 												enterkeyhint="next"
 												class="w-full h-9 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[15px] font-black text-on-surface focus:border-secondary focus:ring-1 focus:ring-secondary/50"
 												placeholder={`${targetRepsB}`}
-												value={actualRepsBByBlock[currentBlock.id] ?? ''}
+												value={actualRepsBByBlock[currentBlock.id] ?? `${targetRepsB}`}
 												oninput={(event) => {
 													actualRepsBByBlock = {
 														...actualRepsBByBlock,
@@ -4110,7 +4125,7 @@
 												enterkeyhint="next"
 												class="w-full h-9 rounded-lg border border-white/10 bg-surface-container/60 px-1 text-center text-[15px] font-black text-on-surface focus:border-secondary focus:ring-1 focus:ring-secondary/50"
 												placeholder={prescribedLoadB !== '-' ? prescribedLoadB.replace(/[^\d.]/g, '') : '0'}
-												value={actualLoadBByBlock[currentBlock.id] ?? ''}
+												value={actualLoadBByBlock[currentBlock.id] ?? (prescribedLoadB !== '-' ? prescribedLoadB.replace(/[^\d.]/g, '') : '0')}
 												oninput={(event) => {
 													actualLoadBByBlock = {
 														...actualLoadBByBlock,
