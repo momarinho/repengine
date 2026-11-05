@@ -902,7 +902,7 @@ func TestApplySession_ExerciseWithLinearProgressionObject(t *testing.T) {
 		t.Fatalf("expected linear state, got %q", gotState.StateType)
 	}
 	if gotState.Outcome != OutcomeIncrease {
-		t.Fatalf("expected OutcomeIncrease, got %s", gotState.Outcome)
+		t.Fatalf("expected OutcomeIncrease, got %s (summary: %s)", gotState.Outcome, gotState.Summary)
 	}
 	if gotState.SuggestedLoad != "82.5 kg" {
 		t.Fatalf("expected SuggestedLoad 82.5 kg, got %s", gotState.SuggestedLoad)
@@ -1528,7 +1528,7 @@ func TestApplySessionProgression_ProgressesFromActualLoggedLoad(t *testing.T) {
 	}
 
 	if gotState.Outcome != OutcomeIncrease {
-		t.Fatalf("expected OutcomeIncrease, got %s", gotState.Outcome)
+		t.Fatalf("expected OutcomeIncrease, got %s (summary: %s)", gotState.Outcome, gotState.Summary)
 	}
 	// Progression MUST be based on the 5 kg logged, so next session is 5 + 2.5 = 7.5 kg
 	if gotState.SuggestedLoad != "7.5 kg" {
@@ -1607,4 +1607,349 @@ func TestApplySessionProgression_Superset_ProgressesFromActualLoggedLoad(t *test
 	if gotState.Metadata["suggested_load_b"] != "30 kg" {
 		t.Fatalf("expected suggested_load_b to be '30 kg', got %v", gotState.Metadata["suggested_load_b"])
 	}
+}
+
+func TestApplySessionProgression_GZCLP_Hypertrophy_T1_BounceToBase(t *testing.T) {
+	ctx := context.Background()
+	var gotState UpsertProgressionStateInput
+
+	repo := &fakeRepo{
+		userOwnsWorkflowFunc: func(ctx context.Context, userID, workflowID int) (bool, error) {
+			return true, nil
+		},
+		listWorkflowBlocksFunc: func(ctx context.Context, workflowID int) ([]workflowBlockConfig, error) {
+			return []workflowBlockConfig{
+				{
+					ID:           20,
+					NodeTypeSlug: "linear_progression",
+					Position:     0,
+					Data: map[string]any{
+						"exercise_name":    "Barbell Squat",
+						"fail_sequence":    "5x3+ -> 6x2+",
+						"bounce_to_base":   true,
+						"start_load":       80.0,
+						"load_unit":        "kg",
+						"increment":        2.5,
+						"progression_rule": "gzclp_hypertrophy_t1",
+					},
+				},
+			}, nil
+		},
+		listProgressionStatesFunc: func(ctx context.Context, userID, workflowID int) ([]ProgressionState, error) {
+			return []ProgressionState{
+				{
+					WorkflowBlockID: 20,
+					CurrentLoad:     "80 kg",
+					SuggestedLoad:   "80 kg",
+					Metadata: map[string]any{
+						"current_sequence_index": 1, // Currently on 6x2+ rescue step
+						"sets_planned":           6,
+						"reps_planned":           "2+",
+						"bounce_to_base":         true,
+						"fail_sequence":          "5x3+ -> 6x2+",
+					},
+				},
+			}, nil
+		},
+		upsertProgressionStateFunc: func(ctx context.Context, in UpsertProgressionStateInput) (ProgressionState, error) {
+			gotState = in
+			return ProgressionState{}, nil
+		},
+	}
+
+	service := NewService(repo)
+
+	// User succeeds on all 6 sets of 2 reps at 80 kg
+	err := service.ApplySessionProgression(ctx, ApplySessionProgressionInput{
+		UserID:     1,
+		WorkflowID: 1,
+		SessionID:  20,
+		Logs: []CompletedSetLog{
+			{WorkflowBlockID: intPtr(20), Completed: true, SetIndex: 1, ActualReps: "2", ActualLoad: "80 kg"},
+			{WorkflowBlockID: intPtr(20), Completed: true, SetIndex: 2, ActualReps: "2", ActualLoad: "80 kg"},
+			{WorkflowBlockID: intPtr(20), Completed: true, SetIndex: 3, ActualReps: "2", ActualLoad: "80 kg"},
+			{WorkflowBlockID: intPtr(20), Completed: true, SetIndex: 4, ActualReps: "2", ActualLoad: "80 kg"},
+			{WorkflowBlockID: intPtr(20), Completed: true, SetIndex: 5, ActualReps: "2", ActualLoad: "80 kg"},
+			{WorkflowBlockID: intPtr(20), Completed: true, SetIndex: 6, ActualReps: "3", ActualLoad: "80 kg"}, // AMRAP
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if gotState.Outcome != OutcomeIncrease {
+		t.Fatalf("expected OutcomeIncrease, got %s (summary: %s)", gotState.Outcome, gotState.Summary)
+	}
+	if gotState.SuggestedLoad != "82.5 kg" {
+		t.Fatalf("expected suggested load to be 82.5 kg, got %s", gotState.SuggestedLoad)
+	}
+	// Under bounce_to_base, sequence index resets to 0 (base step: 5x3+)
+	if idx := intOrDefault(gotState.Metadata["current_sequence_index"], -1); idx != 0 {
+		t.Fatalf("expected current_sequence_index to reset to 0 (base), got %v", gotState.Metadata["current_sequence_index"])
+	}
+	if sets := intOrDefault(gotState.Metadata["sets_planned"], -1); sets != 5 {
+		t.Fatalf("expected sets_planned to reset to 5, got %v", gotState.Metadata["sets_planned"])
+	}
+	if reps := asString(gotState.Metadata["reps_planned"]); reps != "3+" {
+		t.Fatalf("expected reps_planned to reset to 3+, got %s", reps)
+	}
+}
+
+func TestApplySessionProgression_GZCLP_Standard_T1_DoesNotBounce(t *testing.T) {
+	ctx := context.Background()
+	var gotState UpsertProgressionStateInput
+
+	repo := &fakeRepo{
+		userOwnsWorkflowFunc: func(ctx context.Context, userID, workflowID int) (bool, error) {
+			return true, nil
+		},
+		listWorkflowBlocksFunc: func(ctx context.Context, workflowID int) ([]workflowBlockConfig, error) {
+			return []workflowBlockConfig{
+				{
+					ID:           21,
+					NodeTypeSlug: "linear_progression",
+					Position:     0,
+					Data: map[string]any{
+						"exercise_name":    "Barbell Squat",
+						"fail_sequence":    "5x3+ -> 6x2+",
+						"bounce_to_base":   false,
+						"start_load":       80.0,
+						"load_unit":        "kg",
+						"increment":        2.5,
+						"progression_rule": "gzclp_standard_t1",
+					},
+				},
+			}, nil
+		},
+		listProgressionStatesFunc: func(ctx context.Context, userID, workflowID int) ([]ProgressionState, error) {
+			return []ProgressionState{
+				{
+					WorkflowBlockID: 21,
+					CurrentLoad:     "80 kg",
+					SuggestedLoad:   "80 kg",
+					Metadata: map[string]any{
+						"current_sequence_index": 1, // On 6x2+
+						"sets_planned":           6,
+						"reps_planned":           "2+",
+						"bounce_to_base":         false,
+						"fail_sequence":          "5x3+ -> 6x2+",
+					},
+				},
+			}, nil
+		},
+		upsertProgressionStateFunc: func(ctx context.Context, in UpsertProgressionStateInput) (ProgressionState, error) {
+			gotState = in
+			return ProgressionState{}, nil
+		},
+	}
+
+	service := NewService(repo)
+
+	// User completes all 6 sets of 2 reps at 80 kg
+	err := service.ApplySessionProgression(ctx, ApplySessionProgressionInput{
+		UserID:     1,
+		WorkflowID: 1,
+		SessionID:  21,
+		Logs: []CompletedSetLog{
+			{WorkflowBlockID: intPtr(21), Completed: true, SetIndex: 1, ActualReps: "2", ActualLoad: "80 kg"},
+			{WorkflowBlockID: intPtr(21), Completed: true, SetIndex: 2, ActualReps: "2", ActualLoad: "80 kg"},
+			{WorkflowBlockID: intPtr(21), Completed: true, SetIndex: 3, ActualReps: "2", ActualLoad: "80 kg"},
+			{WorkflowBlockID: intPtr(21), Completed: true, SetIndex: 4, ActualReps: "2", ActualLoad: "80 kg"},
+			{WorkflowBlockID: intPtr(21), Completed: true, SetIndex: 5, ActualReps: "2", ActualLoad: "80 kg"},
+			{WorkflowBlockID: intPtr(21), Completed: true, SetIndex: 6, ActualReps: "2", ActualLoad: "80 kg"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if gotState.Outcome != OutcomeIncrease {
+		t.Fatalf("expected OutcomeIncrease, got %s (summary: %s)", gotState.Outcome, gotState.Summary)
+	}
+	if gotState.SuggestedLoad != "82.5 kg" {
+		t.Fatalf("expected suggested load to be 82.5 kg, got %s", gotState.SuggestedLoad)
+	}
+	// Under standard GZCLP, stays on step 1 (6x2+)
+	if idx := intOrDefault(gotState.Metadata["current_sequence_index"], -1); idx != 1 {
+		t.Fatalf("expected current_sequence_index to remain 1, got %v", gotState.Metadata["current_sequence_index"])
+	}
+	if sets := intOrDefault(gotState.Metadata["sets_planned"], -1); sets != 6 {
+		t.Fatalf("expected sets_planned to remain 6, got %v", gotState.Metadata["sets_planned"])
+	}
+}
+
+func TestApplySessionProgression_GZCLP_Hypertrophy_T3_CustomProgression(t *testing.T) {
+	ctx := context.Background()
+
+	runT3Test := func(t *testing.T, actualReps []string, expectedOutcome string, expectedSuggestedLoad string) {
+		var gotState UpsertProgressionStateInput
+
+		repo := &fakeRepo{
+			userOwnsWorkflowFunc: func(ctx context.Context, userID, workflowID int) (bool, error) {
+				return true, nil
+			},
+			listWorkflowBlocksFunc: func(ctx context.Context, workflowID int) ([]workflowBlockConfig, error) {
+				return []workflowBlockConfig{
+					{
+						ID:           22,
+						NodeTypeSlug: "linear_progression",
+						Position:     0,
+						Data: map[string]any{
+							"exercise_name":     "Lat Pulldown",
+							"sets":              3,
+							"reps":              "15+",
+							"start_load":        50.0,
+							"load_unit":         "kg",
+							"increment":         2.5,
+							"progression_rule":  "gzclp_hypertrophy_t3",
+							"min_amrap_reps":    20.0,
+							"min_total_reps":    50.0,
+							"strict_total_reps": true,
+						},
+					},
+				}, nil
+			},
+			listProgressionStatesFunc: func(ctx context.Context, userID, workflowID int) ([]ProgressionState, error) {
+				return []ProgressionState{
+					{
+						WorkflowBlockID: 22,
+						CurrentLoad:     "50 kg",
+						SuggestedLoad:   "50 kg",
+					},
+				}, nil
+			},
+			upsertProgressionStateFunc: func(ctx context.Context, in UpsertProgressionStateInput) (ProgressionState, error) {
+				gotState = in
+				return ProgressionState{}, nil
+			},
+		}
+
+		service := NewService(repo)
+
+		var logs []CompletedSetLog
+		for i, r := range actualReps {
+			logs = append(logs, CompletedSetLog{
+				WorkflowBlockID: intPtr(22),
+				Completed:       true,
+				SetIndex:        i + 1,
+				ActualReps:      r,
+				ActualLoad:      "50 kg",
+			})
+		}
+
+		err := service.ApplySessionProgression(ctx, ApplySessionProgressionInput{
+			UserID:     1,
+			WorkflowID: 1,
+			SessionID:  22,
+			Logs:       logs,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if gotState.Outcome != expectedOutcome {
+			t.Fatalf("expected outcome %s, got %s (summary: %s)", expectedOutcome, gotState.Outcome, gotState.Summary)
+		}
+		if gotState.SuggestedLoad != expectedSuggestedLoad {
+			t.Fatalf("expected suggested load %s, got %s", expectedSuggestedLoad, gotState.SuggestedLoad)
+		}
+	}
+
+	t.Run("Fail: AMRAP is 18 (< 20)", func(t *testing.T) {
+		// 15 + 15 + 18 = 48 total reps
+		runT3Test(t, []string{"15", "15", "18"}, OutcomeMaintain, "50 kg")
+	})
+
+	t.Run("Fail: AMRAP is 20, but total is 50 (not > 50)", func(t *testing.T) {
+		// 15 + 15 + 20 = 50 total reps
+		runT3Test(t, []string{"15", "15", "20"}, OutcomeMaintain, "50 kg")
+	})
+
+	t.Run("Pass: AMRAP is 20 and total is 51 (> 50)", func(t *testing.T) {
+		// 16 + 15 + 20 = 51 total reps
+		runT3Test(t, []string{"16", "15", "20"}, OutcomeIncrease, "52.5 kg")
+	})
+}
+
+func TestApplySessionProgression_GZCLP_Standard_T3_Requires25AMRAP(t *testing.T) {
+	ctx := context.Background()
+
+	runStandardT3Test := func(t *testing.T, actualReps []string, expectedOutcome string, expectedSuggestedLoad string) {
+		var gotState UpsertProgressionStateInput
+
+		repo := &fakeRepo{
+			userOwnsWorkflowFunc: func(ctx context.Context, userID, workflowID int) (bool, error) {
+				return true, nil
+			},
+			listWorkflowBlocksFunc: func(ctx context.Context, workflowID int) ([]workflowBlockConfig, error) {
+				return []workflowBlockConfig{
+					{
+						ID:           23,
+						NodeTypeSlug: "linear_progression",
+						Position:     0,
+						Data: map[string]any{
+							"exercise_name":    "Lat Pulldown",
+							"sets":             3,
+							"reps":             "15+",
+							"start_load":       50.0,
+							"load_unit":        "kg",
+							"increment":        2.5,
+							"progression_rule": "gzclp_standard_t3",
+						},
+					},
+				}, nil
+			},
+			listProgressionStatesFunc: func(ctx context.Context, userID, workflowID int) ([]ProgressionState, error) {
+				return []ProgressionState{
+					{
+						WorkflowBlockID: 23,
+						CurrentLoad:     "50 kg",
+						SuggestedLoad:   "50 kg",
+					},
+				}, nil
+			},
+			upsertProgressionStateFunc: func(ctx context.Context, in UpsertProgressionStateInput) (ProgressionState, error) {
+				gotState = in
+				return ProgressionState{}, nil
+			},
+		}
+
+		service := NewService(repo)
+
+		var logs []CompletedSetLog
+		for i, r := range actualReps {
+			logs = append(logs, CompletedSetLog{
+				WorkflowBlockID: intPtr(23),
+				Completed:       true,
+				SetIndex:        i + 1,
+				ActualReps:      r,
+				ActualLoad:      "50 kg",
+			})
+		}
+
+		err := service.ApplySessionProgression(ctx, ApplySessionProgressionInput{
+			UserID:     1,
+			WorkflowID: 1,
+			SessionID:  23,
+			Logs:       logs,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if gotState.Outcome != expectedOutcome {
+			t.Fatalf("expected outcome %s, got %s (summary: %s)", expectedOutcome, gotState.Outcome, gotState.Summary)
+		}
+		if gotState.SuggestedLoad != expectedSuggestedLoad {
+			t.Fatalf("expected suggested load %s, got %s", expectedSuggestedLoad, gotState.SuggestedLoad)
+		}
+	}
+
+	t.Run("Standard GZCLP T3: 20 reps on AMRAP maintains (needs 25)", func(t *testing.T) {
+		runStandardT3Test(t, []string{"15", "15", "20"}, OutcomeMaintain, "50 kg")
+	})
+
+	t.Run("Standard GZCLP T3: 25 reps on AMRAP increases", func(t *testing.T) {
+		runStandardT3Test(t, []string{"15", "15", "25"}, OutcomeIncrease, "52.5 kg")
+	})
 }

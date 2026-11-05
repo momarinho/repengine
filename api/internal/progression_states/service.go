@@ -75,8 +75,14 @@ func (s *Service) ApplySessionProgression(ctx context.Context, in ApplySessionPr
 		return err
 	}
 	existingByKey := make(map[string]ProgressionState, len(existingStates))
+	existingByID := make(map[int]ProgressionState, len(existingStates))
 	for _, state := range existingStates {
-		existingByKey[state.BlockKey] = state
+		if state.BlockKey != "" {
+			existingByKey[state.BlockKey] = state
+		}
+		if state.WorkflowBlockID > 0 {
+			existingByID[state.WorkflowBlockID] = state
+		}
 	}
 
 	logsByBlock := map[int][]CompletedSetLog{}
@@ -125,6 +131,9 @@ func (s *Service) ApplySessionProgression(ctx context.Context, in ApplySessionPr
 		}
 
 		existingState, hasExisting := existingByKey[block.BlockKey]
+		if !hasExisting && block.ID > 0 {
+			existingState, hasExisting = existingByID[block.ID]
+		}
 		if hasExisting {
 			s.syncProgressionStateWithBlock(&existingState, block)
 		}
@@ -339,6 +348,84 @@ func buildLinearProgressionState(
 			failSequenceStr = asString(prog["fail_sequence"])
 		}
 	}
+
+	progRule := strings.ToLower(strings.TrimSpace(asString(block.Data["progression_rule"])))
+	if progRule == "" {
+		if prog, ok := block.Data["progression"].(map[string]any); ok {
+			progRule = strings.ToLower(strings.TrimSpace(asString(prog["rule"])))
+			if progRule == "" {
+				progRule = strings.ToLower(strings.TrimSpace(asString(prog["progression_rule"])))
+			}
+		}
+	}
+
+	// Apply presets for standard GZCLP vs Hypertrophy variations if sequence was not explicitly provided
+	if progRule == "gzclp_t1" || progRule == "gzclp_standard_t1" {
+		if failSequenceStr == "" {
+			failSequenceStr = "3x5+ -> 5x3+ -> 6x2+"
+		}
+	} else if progRule == "gzclp_hypertrophy_t1" {
+		if failSequenceStr == "" {
+			failSequenceStr = "5x3+ -> 6x2+"
+		}
+	} else if progRule == "gzclp_t2" || progRule == "gzclp_standard_t2" || progRule == "gzclp_hypertrophy_t2" {
+		if failSequenceStr == "" {
+			failSequenceStr = "3x10 -> 3x8 -> 3x6"
+		}
+	}
+
+	bounceToBase := false
+	if progRule == "gzclp_hypertrophy_t1" || progRule == "gzclp_hypertrophy_t2" || progRule == "gzclp_hypertrophy" {
+		bounceToBase = true
+	}
+	if b, ok := block.Data["bounce_to_base"].(bool); ok {
+		bounceToBase = b
+	} else if b, ok := block.Data["bounce_back"].(bool); ok {
+		bounceToBase = b
+	} else if prog, ok := block.Data["progression"].(map[string]any); ok {
+		if b, ok := prog["bounce_to_base"].(bool); ok {
+			bounceToBase = b
+		} else if b, ok := prog["bounce_back"].(bool); ok {
+			bounceToBase = b
+		}
+	}
+
+	minAMRAPReps := parseNumberValue(block.Data["min_amrap_reps"])
+	if minAMRAPReps <= 0 {
+		if prog, ok := block.Data["progression"].(map[string]any); ok {
+			minAMRAPReps = parseNumberValue(prog["min_amrap_reps"])
+		}
+	}
+	if minAMRAPReps <= 0 {
+		if progRule == "gzclp_t3" || progRule == "gzclp_standard_t3" {
+			minAMRAPReps = 25 // Standard GZCLP rule: 25 reps on last AMRAP set
+		} else if progRule == "gzclp_hypertrophy_t3" {
+			minAMRAPReps = 20 // Hypertrophy modified rule: 20 reps on last AMRAP set
+		}
+	}
+
+	minTotalReps := parseNumberValue(block.Data["min_total_reps"])
+	if minTotalReps <= 0 {
+		if prog, ok := block.Data["progression"].(map[string]any); ok {
+			minTotalReps = parseNumberValue(prog["min_total_reps"])
+		}
+	}
+	if minTotalReps <= 0 && progRule == "gzclp_hypertrophy_t3" {
+		minTotalReps = 50
+	}
+
+	strictTotalReps := false
+	if progRule == "gzclp_hypertrophy_t3" {
+		strictTotalReps = true // Hypertrophy flowchart specifically requires: total reps > 50
+	}
+	if b, ok := block.Data["strict_total_reps"].(bool); ok {
+		strictTotalReps = b
+	} else if prog, ok := block.Data["progression"].(map[string]any); ok {
+		if b, ok := prog["strict_total_reps"].(bool); ok {
+			strictTotalReps = b
+		}
+	}
+
 	resetPercent := parseNumberValue(block.Data["reset_percent"])
 	if resetPercent <= 0 {
 		if prog, ok := block.Data["progression"].(map[string]any); ok {
@@ -441,6 +528,19 @@ func buildLinearProgressionState(
 	missedFloor := anyRepTargetMiss(logs, lowerTarget)
 	hitCeiling := !anyRepTargetMiss(logs, upperTarget)
 
+	totalReps := 0
+	lastSetReps := 0
+	for _, l := range logs {
+		if r, ok := parseFirstInt(l.ActualReps); ok {
+			totalReps += r
+		}
+	}
+	if len(logs) > 0 {
+		if r, ok := parseFirstInt(logs[len(logs)-1].ActualReps); ok {
+			lastSetReps = r
+		}
+	}
+
 	outcome := OutcomeMaintain
 	suggestedLoad := currentLoad
 	suggestedSeqIndex := currentSeqIndex
@@ -497,6 +597,22 @@ func buildLinearProgressionState(
 		}
 		summary = fmt.Sprintf("Completed %d reps across sets (target range %d-%d). Kept %s; aim for %d reps across all sets before adding load.", minActual, int(lowerTarget), int(upperTarget), currentLoad, int(upperTarget))
 
+	case minAMRAPReps > 0 && lastSetReps < int(minAMRAPReps):
+		outcome = OutcomeMaintain
+		suggestedLoad = currentLoad
+		summary = fmt.Sprintf("Hit %d reps on the AMRAP set (target is %d+ to increase load). Completed %d total reps. Maintained %s; aim to beat total reps next session.",
+			lastSetReps, int(minAMRAPReps), totalReps, currentLoad)
+
+	case minTotalReps > 0 && ((strictTotalReps && totalReps <= int(minTotalReps)) || (!strictTotalReps && totalReps < int(minTotalReps))):
+		outcome = OutcomeMaintain
+		suggestedLoad = currentLoad
+		compText := fmt.Sprintf(">= %d", int(minTotalReps))
+		if strictTotalReps {
+			compText = fmt.Sprintf("> %d", int(minTotalReps))
+		}
+		summary = fmt.Sprintf("Hit %d reps on the AMRAP set, with %d total reps. Need %s total reps across all sets to increase load. Maintained %s; aim to beat total reps next session.",
+			lastSetReps, totalReps, compText, currentLoad)
+
 	case isLinearEasy(hasRPE, avgRPE, hasRIR, avgRIR):
 		outcome = OutcomeIncrease
 		sessionCount++
@@ -518,7 +634,16 @@ func buildLinearProgressionState(
 				}
 				suggestedLoad = formatLoad(rawIncrease, loadUnit)
 			}
-			if isAMRAP && len(logs) > 0 {
+
+			if bounceToBase && currentSeqIndex > 0 && len(steps) > 0 {
+				suggestedSeqIndex = 0
+				baseStep := steps[0]
+				summary = fmt.Sprintf("Succeeded on rescue scheme (%dx%s with %s)! Adding load next session (%s) and returning to base scheme (%dx%s).",
+					steps[currentSeqIndex].Sets, steps[currentSeqIndex].Reps, currentLoad, suggestedLoad, baseStep.Sets, baseStep.Reps)
+			} else if minAMRAPReps > 0 || minTotalReps > 0 {
+				summary = fmt.Sprintf("Achieved progression targets (%d reps on AMRAP, %d total reps)! Adding load next session (%s -> %s).",
+					lastSetReps, totalReps, currentLoad, suggestedLoad)
+			} else if isAMRAP && len(logs) > 0 {
 				amrapReps := 0
 				lastLog := logs[len(logs)-1]
 				if r, ok := parseFirstInt(lastLog.ActualReps); ok {
@@ -540,6 +665,28 @@ func buildLinearProgressionState(
 		summary = "Keep the load steady next session. The work landed close to the target effort."
 	}
 
+	var nextSetsPlanned int
+	var nextRepsPlanned string
+	var nextLowerTarget float64
+	var nextUpperTarget float64
+	if len(steps) > 0 {
+		if suggestedSeqIndex >= 0 && suggestedSeqIndex < len(steps) {
+			nextSetsPlanned = steps[suggestedSeqIndex].Sets
+			nextRepsPlanned = steps[suggestedSeqIndex].Reps
+			nextLowerTarget, nextUpperTarget = parseRepRange(nextRepsPlanned)
+		} else {
+			nextSetsPlanned = setsPlanned
+			nextRepsPlanned = repsPrescribed
+			nextLowerTarget = lowerTarget
+			nextUpperTarget = upperTarget
+		}
+	} else {
+		nextSetsPlanned = setsPlanned
+		nextRepsPlanned = repsPrescribed
+		nextLowerTarget = lowerTarget
+		nextUpperTarget = upperTarget
+	}
+
 	return UpsertProgressionStateInput{
 		UserID:          session.UserID,
 		WorkflowID:      session.WorkflowID,
@@ -559,14 +706,18 @@ func buildLinearProgressionState(
 		Metadata: map[string]any{
 			"increment":              increment,
 			"load_unit":              loadUnit,
-			"progression_rule":       asString(block.Data["progression_rule"]),
-			"sets_planned":           setsPlanned,
-			"reps_planned":           repsPrescribed,
-			"target_reps_lower":      lowerTarget,
-			"target_reps_upper":      upperTarget,
+			"progression_rule":       progRule,
+			"sets_planned":           nextSetsPlanned,
+			"reps_planned":           nextRepsPlanned,
+			"target_reps_lower":      nextLowerTarget,
+			"target_reps_upper":      nextUpperTarget,
 			"current_sequence_index": suggestedSeqIndex,
 			"fail_sequence":          failSequenceStr,
 			"session_count":          sessionCount,
+			"bounce_to_base":         bounceToBase,
+			"min_amrap_reps":         minAMRAPReps,
+			"min_total_reps":         minTotalReps,
+			"strict_total_reps":      strictTotalReps,
 		},
 	}
 }
@@ -1419,9 +1570,81 @@ func (s *Service) syncProgressionStateWithBlock(state *ProgressionState, block r
 		}
 	}
 
-	state.Metadata["increment"] = parseNumberValue(block.Data["increment"])
+	inc := parseNumberValue(block.Data["increment"])
+	if inc == 0 {
+		if prog, ok := block.Data["progression"].(map[string]any); ok {
+			inc = parseNumberValue(prog["increment"])
+		}
+	}
+	state.Metadata["increment"] = inc
 	state.Metadata["load_unit"] = asString(block.Data["load_unit"])
-	state.Metadata["progression_rule"] = asString(block.Data["progression_rule"])
+
+	progRule := strings.ToLower(strings.TrimSpace(asString(block.Data["progression_rule"])))
+	if progRule == "" {
+		if prog, ok := block.Data["progression"].(map[string]any); ok {
+			progRule = strings.ToLower(strings.TrimSpace(asString(prog["rule"])))
+			if progRule == "" {
+				progRule = strings.ToLower(strings.TrimSpace(asString(prog["progression_rule"])))
+			}
+		}
+	}
+	state.Metadata["progression_rule"] = progRule
+
+	bounceToBase := false
+	if progRule == "gzclp_hypertrophy_t1" || progRule == "gzclp_hypertrophy_t2" || progRule == "gzclp_hypertrophy" {
+		bounceToBase = true
+	}
+	if b, ok := block.Data["bounce_to_base"].(bool); ok {
+		bounceToBase = b
+	} else if b, ok := block.Data["bounce_back"].(bool); ok {
+		bounceToBase = b
+	} else if prog, ok := block.Data["progression"].(map[string]any); ok {
+		if b, ok := prog["bounce_to_base"].(bool); ok {
+			bounceToBase = b
+		} else if b, ok := prog["bounce_back"].(bool); ok {
+			bounceToBase = b
+		}
+	}
+	state.Metadata["bounce_to_base"] = bounceToBase
+
+	minAMRAPReps := parseNumberValue(block.Data["min_amrap_reps"])
+	if minAMRAPReps <= 0 {
+		if prog, ok := block.Data["progression"].(map[string]any); ok {
+			minAMRAPReps = parseNumberValue(prog["min_amrap_reps"])
+		}
+	}
+	if minAMRAPReps <= 0 {
+		if progRule == "gzclp_t3" || progRule == "gzclp_standard_t3" {
+			minAMRAPReps = 25
+		} else if progRule == "gzclp_hypertrophy_t3" {
+			minAMRAPReps = 20
+		}
+	}
+	state.Metadata["min_amrap_reps"] = minAMRAPReps
+
+	minTotalReps := parseNumberValue(block.Data["min_total_reps"])
+	if minTotalReps <= 0 {
+		if prog, ok := block.Data["progression"].(map[string]any); ok {
+			minTotalReps = parseNumberValue(prog["min_total_reps"])
+		}
+	}
+	if minTotalReps <= 0 && progRule == "gzclp_hypertrophy_t3" {
+		minTotalReps = 50
+	}
+	state.Metadata["min_total_reps"] = minTotalReps
+
+	strictTotalReps := false
+	if progRule == "gzclp_hypertrophy_t3" {
+		strictTotalReps = true
+	}
+	if b, ok := block.Data["strict_total_reps"].(bool); ok {
+		strictTotalReps = b
+	} else if prog, ok := block.Data["progression"].(map[string]any); ok {
+		if b, ok := prog["strict_total_reps"].(bool); ok {
+			strictTotalReps = b
+		}
+	}
+	state.Metadata["strict_total_reps"] = strictTotalReps
 }
 
 func enrichStateMetadata(

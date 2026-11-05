@@ -527,18 +527,135 @@ func gzclpT1Block(exercise string, startLoad float64, loadUnit string, increment
 		Data: map[string]any{
 			"exercise_name": exercise,
 			"sets":          3,
-			"reps":          "5",
+			"reps":          "5+",
 			"load_value":    startLoad,
 			"load_unit":     loadUnit,
 			"rest_seconds":  restSeconds,
 			"notes":         notes,
 			"progression": map[string]any{
 				"type":               "linear",
+				"rule":               "gzclp_standard_t1",
 				"increment":          increment,
-				"rule":               "add_each_session",
-				"fail_sequence":      "3x5 -> 5x3 -> 6x2",
+				"fail_sequence":      "3x5+ -> 5x3+ -> 6x2+",
+				"bounce_to_base":     false,
 				"reset_percent":      0.85,
 				"rounding_precision": 2.5,
+			},
+		},
+	}
+}
+
+func gzclpT2Block(exercise string, startLoad float64, loadUnit string, increment float64, restSeconds int, notes string) templateBlockSeed {
+	return templateBlockSeed{
+		NodeTypeSlug: "exercise",
+		Data: map[string]any{
+			"exercise_name": exercise,
+			"sets":          3,
+			"reps":          "10",
+			"load_value":    startLoad,
+			"load_unit":     loadUnit,
+			"rest_seconds":  restSeconds,
+			"notes":         notes,
+			"progression": map[string]any{
+				"type":               "linear",
+				"rule":               "gzclp_standard_t2",
+				"increment":          increment,
+				"fail_sequence":      "3x10 -> 3x8 -> 3x6",
+				"bounce_to_base":     false,
+				"reset_percent":      0.85,
+				"rounding_precision": 2.5,
+			},
+		},
+	}
+}
+
+func gzclpT3Block(exercise string, startLoad float64, loadUnit string, increment float64, restSeconds int, notes string) templateBlockSeed {
+	return templateBlockSeed{
+		NodeTypeSlug: "exercise",
+		Data: map[string]any{
+			"exercise_name": exercise,
+			"sets":          3,
+			"reps":          "15+",
+			"load_value":    startLoad,
+			"load_unit":     loadUnit,
+			"rest_seconds":  restSeconds,
+			"notes":         notes,
+			"progression": map[string]any{
+				"type":           "linear",
+				"rule":           "gzclp_standard_t3",
+				"increment":      increment,
+				"min_amrap_reps": 25,
+			},
+		},
+	}
+}
+
+func gzclpHypertrophyT1Block(exercise string, startLoad float64, loadUnit string, increment float64, restSeconds int, notes string) templateBlockSeed {
+	return templateBlockSeed{
+		NodeTypeSlug: "exercise",
+		Data: map[string]any{
+			"exercise_name": exercise,
+			"sets":          5,
+			"reps":          "3+",
+			"load_value":    startLoad,
+			"load_unit":     loadUnit,
+			"rest_seconds":  restSeconds,
+			"notes":         notes,
+			"progression": map[string]any{
+				"type":               "linear",
+				"rule":               "gzclp_hypertrophy_t1",
+				"increment":          increment,
+				"fail_sequence":      "5x3+ -> 6x2+",
+				"bounce_to_base":     true,
+				"reset_percent":      0.85,
+				"rounding_precision": 2.5,
+			},
+		},
+	}
+}
+
+func gzclpHypertrophyT2Block(exercise string, startLoad float64, loadUnit string, increment float64, restSeconds int, notes string) templateBlockSeed {
+	return templateBlockSeed{
+		NodeTypeSlug: "exercise",
+		Data: map[string]any{
+			"exercise_name": exercise,
+			"sets":          3,
+			"reps":          "10",
+			"load_value":    startLoad,
+			"load_unit":     loadUnit,
+			"rest_seconds":  restSeconds,
+			"notes":         notes,
+			"progression": map[string]any{
+				"type":               "linear",
+				"rule":               "gzclp_hypertrophy_t2",
+				"increment":          increment,
+				"fail_sequence":      "3x10 -> 3x8 -> 3x6",
+				"bounce_to_base":     true,
+				"reset_percent":      0.85,
+				"rounding_precision": 2.5,
+			},
+		},
+	}
+}
+
+func gzclpHypertrophyT3Block(exercise string, reps string, sets int, startLoad float64, loadUnit string, increment float64, restSeconds int, notes string) templateBlockSeed {
+	return templateBlockSeed{
+		NodeTypeSlug: "exercise",
+		Data: map[string]any{
+			"exercise_name": exercise,
+			"sets":          sets,
+			"reps":          reps,
+			"load_value":    startLoad,
+			"load_unit":     loadUnit,
+			"rest_seconds":  restSeconds,
+			"notes":         notes,
+			"progression": map[string]any{
+				"type":              "linear",
+				"rule":              "gzclp_hypertrophy_t3",
+				"increment":         increment,
+				"min_amrap_reps":    20,
+				"min_total_reps":    50,
+				"strict_total_reps": true,
 			},
 		},
 	}
@@ -961,6 +1078,96 @@ func SeedTemplates(ctx context.Context) error {
 				append(recommendedRoutineDayBlocks(1), recommendedRoutineDayBlocks(2)...),
 				recommendedRoutineDayBlocks(3)...,
 			),
+		},
+		{
+			Name:        "GZCLP Hypertrophy (4-Day + 2 Active Rest)",
+			Description: "Customized GZCLP modified for maximum hypertrophy: 5x3+ T1 and 3x10 T2 schemes with bounce-to-base on success, T3 progression requiring AMRAP >= 20 and total > 50 reps, plus 2 dedicated active recovery conditioning days.",
+			Category:    "strength",
+			IsOfficial:  true,
+			Metadata: map[string]any{
+				"duration":  "12 weeks",
+				"frequency": "4-6 days/week",
+				"level":     "intermediate",
+				"warmup":    "1x10 bar only, 1x5 at 50% target, 1x3 at 70%",
+				"deload":    "Every 4-6 weeks: reduce load by 20% and volume by 50% for 1 week.",
+			},
+			Blocks: []templateBlockSeed{
+				// DAY A
+				sectionBlock("Day A - Squat & Bench", "T1 Squat (5x3+), T2 Bench Press (3x10), T3 Lat Pulldown, Leg Press, and Dips.", "day"),
+				gzclpHypertrophyT1Block("Barbell Squat", 80.0, "kg", 2.5, 180, "T1 Main Compound. 5x3+ -> 6x2+ (bounce-to-base on pass). Rest 3-5 min."),
+				restBlock(180),
+				gzclpHypertrophyT2Block("Barbell Bench Press", 60.0, "kg", 2.5, 120, "T2 Volume Press. 3x10 -> 3x8 -> 3x6 (bounce-to-base on pass). Rest 2-3 min."),
+				restBlock(120),
+				gzclpHypertrophyT3Block("Lat Pulldown", "15+", 3, 50.0, "kg", 2.5, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
+				restBlock(60),
+				gzclpHypertrophyT3Block("Leg Press", "15+", 3, 120.0, "kg", 5.0, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
+				restBlock(60),
+				gzclpHypertrophyT3Block("Parallel Bar Dips", "12+", 3, 20.0, "kg", 1.25, 60, "T3 Tricep & Chest Accessory. Target 3x12+. Rest 1-2 min."),
+
+				// DAY B
+				sectionBlock("Day B - Overhead Press & Deadlift", "T1 Overhead Press (5x3+), T2 Deadlift (3x10), T3 Rows, Leg Curl, and Lateral Raises.", "day"),
+				gzclpHypertrophyT1Block("Barbell Overhead Press", 80.0, "kg", 2.0, 180, "T1 Main Compound. 5x3+ -> 6x2+ (bounce-to-base on pass). Rest 3-5 min."),
+				restBlock(180),
+				gzclpHypertrophyT2Block("Barbell Deadlift", 100.0, "kg", 5.0, 120, "T2 Volume Hinge. 3x10 -> 3x8 -> 3x6 (bounce-to-base on pass). Rest 2-3 min."),
+				restBlock(120),
+				gzclpHypertrophyT3Block("Barbell Bent-Over Row", "15+", 3, 40.0, "kg", 2.5, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
+				restBlock(60),
+				gzclpHypertrophyT3Block("Leg Curl", "15+", 3, 50.0, "kg", 2.5, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
+				restBlock(60),
+				gzclpHypertrophyT3Block("Dumbbell Lateral Raise", "15+", 3, 10.0, "kg", 1.0, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
+
+				// DAY C
+				sectionBlock("Day C - Bench Press & Squat", "T1 Bench Press (5x3+), T2 Squat (3x10), T3 Lat Pulldown, Incline Bench, and Hack Squat.", "day"),
+				gzclpHypertrophyT1Block("Barbell Bench Press", 75.0, "kg", 2.5, 180, "T1 Main Compound. 5x3+ -> 6x2+ (bounce-to-base on pass). Rest 3-5 min."),
+				restBlock(180),
+				gzclpHypertrophyT2Block("Barbell Squat", 80.0, "kg", 2.5, 120, "T2 Volume Squat. 3x10 -> 3x8 -> 3x6 (bounce-to-base on pass). Rest 2-3 min."),
+				restBlock(120),
+				gzclpHypertrophyT3Block("Lat Pulldown", "15+", 3, 50.0, "kg", 2.5, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
+				restBlock(60),
+				gzclpHypertrophyT3Block("Incline Bench Press", "15+", 3, 25.0, "kg", 2.5, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
+				restBlock(60),
+				gzclpHypertrophyT3Block("Hack Squat", "15+", 3, 60.0, "kg", 5.0, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
+
+				// DAY D
+				sectionBlock("Day D - Deadlift & Overhead Press", "T1 Deadlift (5x3+), T2 Overhead Press (3x10), T3 Rows, Leg Curl, and Face Pulls.", "day"),
+				gzclpHypertrophyT1Block("Barbell Deadlift", 150.0, "kg", 5.0, 180, "T1 Main Compound. 5x3+ -> 6x2+ (bounce-to-base on pass). Rest 3-5 min."),
+				restBlock(180),
+				gzclpHypertrophyT2Block("Barbell Overhead Press", 45.0, "kg", 2.0, 120, "T2 Volume Press. 3x10 -> 3x8 -> 3x6 (bounce-to-base on pass). Rest 2-3 min."),
+				restBlock(120),
+				gzclpHypertrophyT3Block("Barbell Bent-Over Row", "15+", 3, 50.0, "kg", 2.5, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
+				restBlock(60),
+				gzclpHypertrophyT3Block("Leg Curl", "15+", 3, 40.0, "kg", 2.5, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
+				restBlock(60),
+				gzclpHypertrophyT3Block("Cable Face Pull", "15+", 3, 10.0, "kg", 1.0, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
+
+				// REST DAY 1
+				sectionBlock("Rest Day 1 - Cardio, Core & Calves", "15 min steady-state cardio, plank and russian twists, standing calf raises.", "cardio"),
+				timedExerciseBlock("Cardio: Steady-State Brisk Walking / Cycling (15 min)", 900),
+				restBlock(60),
+				timedExerciseBlock("Plank Hold (Set 1: 45s)", 45),
+				restBlock(45),
+				timedExerciseBlock("Plank Hold (Set 2: 45s)", 45),
+				restBlock(45),
+				timedExerciseBlock("Plank Hold (Set 3: 45s)", 45),
+				restBlock(60),
+				exerciseBlockWithNotes("Russian Twists", "15 per side", 3, "Rotational abdominal stability. 3 sets of 15 each side."),
+				restBlock(60),
+				exerciseBlockWithNotes("Standing Calf Raise", "15", 3, "Calves isolation. 2s pause at top contraction."),
+
+				// REST DAY 2
+				sectionBlock("Rest Day 2 - Cardio, Core & Calves", "20 min light jogging or elliptical, machine crunch, hollow body holds, seated calf raises.", "cardio"),
+				timedExerciseBlock("Cardio: Light Jogging / Elliptical (20 min)", 1200),
+				restBlock(60),
+				exerciseBlockWithNotes("Machine Crunch", "15", 3, "Controlled abdominal flexion. 3 sets of 15."),
+				restBlock(60),
+				timedExerciseBlock("Isometric Hold: Hollow Body (Set 1: 20s)", 20),
+				restBlock(30),
+				timedExerciseBlock("Isometric Hold: Hollow Body (Set 2: 20s)", 20),
+				restBlock(30),
+				timedExerciseBlock("Isometric Hold: Hollow Body (Set 3: 20s)", 20),
+				restBlock(60),
+				exerciseBlockWithNotes("Seated Calf Raise", "20", 3, "Soleus isolation. 3 sets of 20 with full stretch."),
+			},
 		},
 	}
 
