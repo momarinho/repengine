@@ -1092,53 +1092,45 @@ func SeedTemplates(ctx context.Context) error {
 				"deload":    "Every 4-6 weeks: reduce load by 20% and volume by 50% for 1 week.",
 			},
 			Blocks: []templateBlockSeed{
-				// DAY A (formerly B)
-				sectionBlock("Day A - Overhead Press & Deadlift", "T1 Overhead Press (5x3+), T2 Deadlift (3x10), T3 Rows, Leg Curl, and Lateral Raises.", "day"),
+				// DAY A - Overhead Press & Deadlift
+				sectionBlock("Day A - Overhead Press & Deadlift", "T1 Overhead Press (5x3+), T2 Deadlift (3x10), T3 Rows, and Lateral Raises.", "day"),
 				gzclpHypertrophyT1Block("Barbell Overhead Press", 35.0, "kg", 2.0, 180, "T1 Main Compound. 5x3+ -> 6x2+ (bounce-to-base on pass). Rest 3-5 min."),
 				restBlock(180),
 				gzclpHypertrophyT2Block("Barbell Deadlift", 70.0, "kg", 5.0, 120, "T2 Volume Hinge. 3x10 -> 3x8 -> 3x6 (bounce-to-base on pass). Rest 2-3 min."),
 				restBlock(120),
-				gzclpHypertrophyT3Block("Barbell Bent-Over Row", "15+", 3, 35.0, "kg", 2.5, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
+				gzclpHypertrophyT3Block("Barbell Bent-Over Row", "15+", 3, 35.0, "kg", 2.5, 60, "T3 Horizontal Pull. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
 				restBlock(60),
-				gzclpHypertrophyT3Block("Leg Curl", "15+", 3, 35.0, "kg", 2.5, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
-				restBlock(60),
-				gzclpHypertrophyT3Block("Dumbbell Lateral Raise", "15+", 3, 6.0, "kg", 1.0, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
+				gzclpHypertrophyT3Block("Dumbbell Lateral Raise", "15+", 3, 6.0, "kg", 1.0, 60, "T3 Lateral Delt Isolation. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
 
-				// DAY B (formerly A)
-				sectionBlock("Day B - Squat & Bench", "T1 Squat (5x3+), T2 Bench Press (3x10), T3 Lat Pulldown, Leg Press, and Dips.", "day"),
+				// DAY B - Squat & Bench
+				sectionBlock("Day B - Squat & Bench", "T1 Squat (5x3+), T2 Bench Press (3x10), T3 Lat Pulldown, and Leg Curl.", "day"),
 				gzclpHypertrophyT1Block("Barbell Squat", 60.0, "kg", 2.5, 180, "T1 Main Compound. 5x3+ -> 6x2+ (bounce-to-base on pass). Rest 3-5 min."),
 				restBlock(180),
 				gzclpHypertrophyT2Block("Barbell Bench Press", 45.0, "kg", 2.5, 120, "T2 Volume Press. 3x10 -> 3x8 -> 3x6 (bounce-to-base on pass). Rest 2-3 min."),
 				restBlock(120),
-				gzclpHypertrophyT3Block("Lat Pulldown", "15+", 3, 40.0, "kg", 2.5, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
+				gzclpHypertrophyT3Block("Lat Pulldown", "15+", 3, 40.0, "kg", 2.5, 60, "T3 Vertical Pull. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
 				restBlock(60),
-				gzclpHypertrophyT3Block("Leg Press", "15+", 3, 90.0, "kg", 5.0, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
-				restBlock(60),
-				gzclpHypertrophyT3Block("Parallel Bar Dips", "12+", 3, 0.0, "kg", 1.25, 60, "T3 Tricep & Chest Accessory. Target 3x12+ bodyweight. Rest 1-2 min."),
+				gzclpHypertrophyT3Block("Leg Curl", "15+", 3, 35.0, "kg", 2.5, 60, "T3 Knee Flexion (Hamstrings). AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
 
-				// DAY C (formerly D)
-				sectionBlock("Day C - Deadlift & Overhead Press", "T1 Deadlift (5x3+), T2 Overhead Press (3x10), T3 Rows, Leg Curl, and Face Pulls.", "day"),
+				// DAY C - Deadlift & Overhead Press
+				sectionBlock("Day C - Deadlift & Overhead Press", "T1 Deadlift (5x3+), T2 Overhead Press (3x10), T3 Rows, and Face Pulls.", "day"),
 				gzclpHypertrophyT1Block("Barbell Deadlift", 85.0, "kg", 5.0, 180, "T1 Main Compound. 5x3+ -> 6x2+ (bounce-to-base on pass). Rest 3-5 min."),
 				restBlock(180),
 				gzclpHypertrophyT2Block("Barbell Overhead Press", 25.0, "kg", 2.0, 120, "T2 Volume Press. 3x10 -> 3x8 -> 3x6 (bounce-to-base on pass). Rest 2-3 min."),
 				restBlock(120),
-				gzclpHypertrophyT3Block("Barbell Bent-Over Row", "15+", 3, 35.0, "kg", 2.5, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
+				gzclpHypertrophyT3Block("Barbell Bent-Over Row", "15+", 3, 35.0, "kg", 2.5, 60, "T3 Horizontal Pull. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
 				restBlock(60),
-				gzclpHypertrophyT3Block("Leg Curl", "15+", 3, 35.0, "kg", 2.5, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
-				restBlock(60),
-				gzclpHypertrophyT3Block("Cable Face Pull", "15+", 3, 15.0, "kg", 1.0, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
+				gzclpHypertrophyT3Block("Cable Face Pull", "15+", 3, 15.0, "kg", 1.0, 60, "T3 Rear Delts & Rotator Cuff. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
 
-				// DAY D (formerly C)
-				sectionBlock("Day D - Bench Press & Squat", "T1 Bench Press (5x3+), T2 Squat (3x10), T3 Lat Pulldown, Incline Bench, and Hack Squat.", "day"),
+				// DAY D - Bench Press & Squat
+				sectionBlock("Day D - Bench Press & Squat", "T1 Bench Press (5x3+), T2 Squat (3x10), T3 Lat Pulldown, and Leg Press.", "day"),
 				gzclpHypertrophyT1Block("Barbell Bench Press", 55.0, "kg", 2.5, 180, "T1 Main Compound. 5x3+ -> 6x2+ (bounce-to-base on pass). Rest 3-5 min."),
 				restBlock(180),
 				gzclpHypertrophyT2Block("Barbell Squat", 50.0, "kg", 2.5, 120, "T2 Volume Squat. 3x10 -> 3x8 -> 3x6 (bounce-to-base on pass). Rest 2-3 min."),
 				restBlock(120),
-				gzclpHypertrophyT3Block("Lat Pulldown", "15+", 3, 40.0, "kg", 2.5, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
+				gzclpHypertrophyT3Block("Lat Pulldown", "15+", 3, 40.0, "kg", 2.5, 60, "T3 Vertical Pull. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
 				restBlock(60),
-				gzclpHypertrophyT3Block("Incline Bench Press", "15+", 3, 25.0, "kg", 2.5, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
-				restBlock(60),
-				gzclpHypertrophyT3Block("Hack Squat", "15+", 3, 40.0, "kg", 5.0, 60, "T3 Accessory. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
+				gzclpHypertrophyT3Block("Leg Press", "15+", 3, 90.0, "kg", 5.0, 60, "T3 Quad Hypertrophy. AMRAP >= 20 and sum > 50 to advance. Rest 1-2 min."),
 
 				// REST DAY 1
 				sectionBlock("Rest Day 1 - Cardio, Core & Calves", "15 min steady-state cardio, plank and russian twists, standing calf raises.", "cardio"),
