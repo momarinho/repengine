@@ -62,6 +62,7 @@
 	let saveInFlight = $state(false);
 	let queuedSave = $state<{ source: 'autosave' | 'manual'; createVersion: boolean } | null>(null);
 	let sectionCollapseState = $state<Record<string, boolean>>({});
+	let sectionToDelete = $state<SectionBlockGroup<DraftBlock> | null>(null);
 	let restoringVersionID = $state<number | null>(null);
 	let undoStack = $state<Array<{
 		title: string;
@@ -298,8 +299,55 @@
 		}
 	}
 
+	function promptDeleteSection(group: SectionBlockGroup<DraftBlock>): void {
+		if (!group.section) return;
+		sectionToDelete = group;
+	}
+
+	function deleteSectionGroup(group: SectionBlockGroup<DraftBlock>, deleteBlocks = true): void {
+		recordHistory();
+		const idsToRemove = new Set<string>();
+		if (group.section) {
+			idsToRemove.add(group.section.client_id);
+		}
+		if (deleteBlocks) {
+			for (const block of group.blocks) {
+				idsToRemove.add(block.client_id);
+			}
+		}
+
+		const nextBlocks = blocks.filter((block) => !idsToRemove.has(block.client_id));
+		blocks = nextBlocks.map((block, index) => ({ ...block, position: index }));
+
+		if (selectedBlockId && idsToRemove.has(selectedBlockId)) {
+			selectedBlockId = blocks[0]?.client_id ?? null;
+		}
+
+		if (group.id in sectionCollapseState) {
+			const nextCollapse = { ...sectionCollapseState };
+			delete nextCollapse[group.id];
+			sectionCollapseState = nextCollapse;
+		}
+
+		const count = group.blocks.length;
+		const label = group.kind === 'day' ? 'Day' : 'Section';
+		sectionToDelete = null;
+		statusMessage = deleteBlocks
+			? `Deleted ${label} "${group.title}" and ${count} block(s)`
+			: `Removed header for ${label} "${group.title}"`;
+	}
+
 	function removeSelectedBlock(): void {
 		if (!selectedBlockId) return;
+
+		const targetBlock = blocks.find((block) => block.client_id === selectedBlockId);
+		if (targetBlock?.node_type_slug === 'section') {
+			const group = blockGroups.find((g) => g.section?.client_id === selectedBlockId);
+			if (group) {
+				promptDeleteSection(group);
+				return;
+			}
+		}
 
 		recordHistory();
 		const nextBlocks = blocks.filter((block) => block.client_id !== selectedBlockId);
@@ -961,6 +1009,18 @@
 															>
 																<span class="material-symbols-outlined text-sm">add</span>
 																Below
+															</button>
+															<button
+																type="button"
+																class="inline-flex items-center gap-1 rounded-md border border-error/30 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-error transition-colors hover:bg-error-container/30 hover:border-error/50 cursor-pointer"
+																title={`Delete ${group.kind === 'day' ? 'Day' : 'Section'}`}
+																onclick={(event) => {
+																	event.stopPropagation();
+																	promptDeleteSection(group);
+																}}
+															>
+																<span class="material-symbols-outlined text-sm">delete</span>
+																Delete
 															</button>
 														</div>
 													</div>
@@ -2477,13 +2537,31 @@
 								>
 									Advanced Settings
 								</button>
-								<button
-									type="button"
-									class="rounded-md bg-error-container px-3 py-2 text-sm font-semibold text-on-error-container transition-opacity hover:opacity-90"
-									onclick={removeSelectedBlock}
-								>
-									Remove
-								</button>
+								{#if selectedBlock.node_type_slug === 'section'}
+									{@const currentGroup = blockGroups.find((g) => g.section?.client_id === selectedBlock.client_id)}
+									<button
+										type="button"
+										class="inline-flex items-center gap-1.5 rounded-md bg-error-container px-3 py-2 text-sm font-semibold text-on-error-container transition-opacity hover:opacity-90 cursor-pointer"
+										onclick={() => {
+											if (currentGroup) {
+												promptDeleteSection(currentGroup);
+											} else {
+												removeSelectedBlock();
+											}
+										}}
+									>
+										<span class="material-symbols-outlined text-base">delete</span>
+										Delete {selectedBlock.data.kind === 'day' ? 'Day' : 'Section'}
+									</button>
+								{:else}
+									<button
+										type="button"
+										class="rounded-md bg-error-container px-3 py-2 text-sm font-semibold text-on-error-container transition-opacity hover:opacity-90 cursor-pointer"
+										onclick={removeSelectedBlock}
+									>
+										Remove
+									</button>
+								{/if}
 							</div>
 						</div>
 					</div>
@@ -2523,5 +2601,75 @@
 			onclose={() => (showJsonModal = false)}
 			onapply={handleJsonApply}
 		/>
+
+		{#if sectionToDelete}
+			<div
+				class="fixed inset-0 z-50 flex items-center justify-center bg-surface-lowest/80 p-4 backdrop-blur-sm"
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="delete-section-title"
+				tabindex="-1"
+				onclick={(event) => {
+					if (event.target === event.currentTarget) sectionToDelete = null;
+				}}
+				onkeydown={(event) => {
+					if (event.key === 'Escape') sectionToDelete = null;
+				}}
+			>
+				<div class="w-full max-w-md overflow-hidden rounded-xl border border-outline-variant/30 bg-surface-container p-6 shadow-2xl">
+					<div class="flex items-start gap-4">
+						<div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-error-container text-on-error-container">
+							<span class="material-symbols-outlined text-2xl">delete_forever</span>
+						</div>
+						<div class="min-w-0 flex-1">
+							<h3 id="delete-section-title" class="font-headline text-lg font-bold text-on-surface">
+								Delete {sectionToDelete.kind === 'day' ? 'Day' : 'Section'}
+							</h3>
+							<p class="mt-1 text-sm font-semibold text-primary truncate">
+								{sectionToDelete.title}
+							</p>
+							<p class="mt-2 text-xs leading-relaxed text-on-surface-variant">
+								{#if sectionToDelete.blocks.length > 0}
+									This section contains <span class="font-bold text-on-surface">{sectionToDelete.blocks.length} block(s)</span>. Do you want to delete the entire {sectionToDelete.kind === 'day' ? 'day' : 'section'} including all exercises, or only remove the section header?
+								{:else}
+									Are you sure you want to remove this empty {sectionToDelete.kind === 'day' ? 'day' : 'section'}?
+								{/if}
+							</p>
+							<p class="mt-2 text-[11px] font-medium text-tertiary">
+								💡 Tip: You can undo this change anytime with Ctrl+Z.
+							</p>
+						</div>
+					</div>
+
+					<div class="mt-6 flex flex-wrap items-center justify-end gap-2">
+						<button
+							type="button"
+							class="rounded-lg border border-outline-variant/30 px-3.5 py-2 text-xs font-semibold uppercase tracking-wider text-on-surface transition-colors hover:bg-surface-container-high cursor-pointer"
+							onclick={() => (sectionToDelete = null)}
+						>
+							Cancel
+						</button>
+						{#if sectionToDelete.blocks.length > 0}
+							<button
+								type="button"
+								class="rounded-lg border border-outline-variant/30 px-3.5 py-2 text-xs font-semibold uppercase tracking-wider text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface cursor-pointer"
+								title="Removes only the section divider, leaving exercises intact"
+								onclick={() => deleteSectionGroup(sectionToDelete!, false)}
+							>
+								Header Only
+							</button>
+						{/if}
+						<button
+							type="button"
+							class="inline-flex items-center gap-1.5 rounded-lg bg-error px-3.5 py-2 text-xs font-semibold uppercase tracking-wider text-on-error transition-opacity hover:opacity-90 shadow-sm cursor-pointer"
+							onclick={() => deleteSectionGroup(sectionToDelete!, true)}
+						>
+							<span class="material-symbols-outlined text-sm">delete</span>
+							{sectionToDelete.blocks.length > 0 ? `Delete All (${sectionToDelete.blocks.length + 1})` : 'Delete Section'}
+						</button>
+					</div>
+				</div>
+			</div>
+		{/if}
 	</div>
 {/if}
