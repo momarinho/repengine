@@ -16,7 +16,7 @@ test('parseRoutineWithGemini throws when no API key is provided or found in envi
 				});
 			},
 			{
-				message: /Chave de API do Gemini não configurada/
+				message: /Gemini API key not configured/
 			}
 		);
 	} finally {

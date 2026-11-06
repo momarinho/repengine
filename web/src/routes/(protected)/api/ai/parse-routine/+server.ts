@@ -67,7 +67,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		if (!text && !imageBytesBase64) {
 			return json(
 				{
-					message: 'Envie uma imagem da ficha ou um texto para ser analisado.'
+					message: 'Provide a routine image or text description to analyze.'
 				},
 				{ status: 400 }
 			);
@@ -80,7 +80,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			return json(
 				{
 					message:
-						'Nenhuma chave de API configurada. Por favor, insira sua chave gratuita do Google Gemini no campo "Chave de API Pessoal (BYOK)" no topo do modal.'
+						'No API key configured. Please enter your free Google Gemini key or OpenAI key in the "Personal API Key (BYOK)" field.'
 				},
 				{ status: 400 }
 			);
@@ -99,7 +99,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	} catch (err: any) {
 		console.error('[AI Parse Error]', err);
 		return json(
-			{ message: err?.message || 'Falha ao processar treino com IA' },
+			{ message: err?.message || 'Failed to process routine with AI' },
 			{ status: 500 }
 		);
 	}

@@ -3510,21 +3510,21 @@
 								<!-- Previous session stats -->
 								<div class="flex items-center gap-1 min-w-0">
 									<span class="material-symbols-outlined text-xs text-tertiary shrink-0">history</span>
-									<span class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant shrink-0">Anterior:</span>
+									<span class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant shrink-0">Previous:</span>
 									<span class="font-bold text-on-surface truncate">
 										{#if prevLogForCurrentSet}
 											{prevLogForCurrentSet.actual_reps || prevLogForCurrentSet.prescribed_reps}r {prevLogForCurrentSet.actual_load ? `@ ${prevLogForCurrentSet.actual_load}` : ''}
 										{:else if prevLogs.length > 0}
 											{prevReps}r {prevLoad ? `@ ${prevLoad}` : ''}
 										{:else}
-											1ª sessão
+											1st session
 										{/if}
 									</span>
 								</div>
 
 								<!-- Target -->
 								<div class="flex items-center gap-1 shrink-0">
-									<span class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Meta:</span>
+									<span class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Target:</span>
 									<span class="font-bold text-primary">
 										{currentBlockReps}r {currentPrescribedLoad ? `@ ${currentPrescribedLoad}` : ''}
 									</span>
@@ -3541,7 +3541,7 @@
 								<div class="mt-1.5 flex items-center justify-between gap-2 rounded-lg bg-primary/10 border border-primary/20 px-2 py-0.5 text-[11px] text-primary">
 									<div class="flex items-center gap-1 font-bold">
 										<span class="material-symbols-outlined text-xs">trending_up</span>
-										<span>Progressão: +{currentBlock.increment ?? 2.5} {currentBlock.loadUnit ?? 'kg'}</span>
+										<span>Progression: +{currentBlock.increment ?? 2.5} {currentBlock.loadUnit ?? 'kg'}</span>
 									</div>
 									<span class="text-[10px] opacity-80">{prevLoad ? `${prevLoad} ➔ ` : ''}{currentPrescribedLoad}</span>
 								</div>
@@ -3553,9 +3553,9 @@
 							<!-- Table Header -->
 							<div class="grid grid-cols-[32px_1fr_1fr_auto] items-center gap-1.5 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/70 border-b border-white/5">
 								<span>Set</span>
-								<span>Anterior</span>
-								<span>Meta</span>
-								<span class="text-right">Feito / Status</span>
+								<span>Previous</span>
+								<span>Target</span>
+								<span class="text-right">Logged / Status</span>
 							</div>
 
 							<!-- Table Rows -->
@@ -3610,10 +3610,10 @@
 												</span>
 											{:else if isCurrent}
 												<span class="rounded bg-primary/20 px-1.5 py-0.5 text-[9px] font-black uppercase text-primary border border-primary/30">
-													Atual
+													Current
 												</span>
 											{:else}
-												<span class="text-[10px] text-on-surface-variant/40">Pendente</span>
+												<span class="text-[10px] text-on-surface-variant/40">Pending</span>
 											{/if}
 										</div>
 									</div>
@@ -3630,7 +3630,7 @@
 								<div class="flex flex-col items-center text-center">
 									<div class="flex items-center gap-2 rounded-full bg-primary/20 border border-primary/30 px-3 py-0.5">
 										<span class={`flex h-2 w-2 rounded-full bg-primary ${intraSetRest.remainingSeconds <= 5 ? 'animate-ping' : ''}`}></span>
-										<span class="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Descanso Ativo</span>
+										<span class="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Resting</span>
 									</div>
 
 									<div class="mt-2 my-1">
@@ -3642,12 +3642,12 @@
 									</div>
 
 									<div class="mt-2 w-full max-w-sm rounded-xl border border-white/10 bg-surface-container-lowest/80 p-2 text-center">
-										<span class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">A Seguir</span>
+										<span class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Up Next</span>
 										<p class="mt-0.5 text-xs sm:text-sm font-bold text-on-surface truncate">
 											{intraSetRest.nextLabel} • {currentBlock.title}
 										</p>
 										<p class="text-xs font-semibold text-primary mt-0.5">
-											Meta: {actualRepsByBlock[currentBlock.id] || currentBlockReps}r {currentPrescribedLoad ? `@ ${actualLoadByBlock[currentBlock.id] || currentPrescribedLoad}` : ''}
+											Target: {actualRepsByBlock[currentBlock.id] || currentBlockReps}r {currentPrescribedLoad ? `@ ${actualLoadByBlock[currentBlock.id] || currentPrescribedLoad}` : ''}
 										</p>
 									</div>
 
@@ -3677,7 +3677,7 @@
 											title="Skip rest and start next set"
 										>
 											<span class="material-symbols-outlined text-base">play_arrow</span>
-											<span>Iniciar Agora</span>
+											<span>Start Now</span>
 										</button>
 									</div>
 								</div>
@@ -3690,7 +3690,7 @@
 										<span class="flex h-5 w-5 items-center justify-center rounded-lg bg-primary/20 text-primary">
 											<span class="material-symbols-outlined text-xs font-bold">fitness_center</span>
 										</span>
-										<span class="text-xs font-bold uppercase tracking-wider text-on-surface">Registrar Set {currentExerciseSet} de {currentBlockSets}</span>
+										<span class="text-xs font-bold uppercase tracking-wider text-on-surface">Log Set {currentExerciseSet} of {currentBlockSets}</span>
 									</div>
 									<div class="flex items-center gap-1.5">
 										{#if prevLogs.length > 0}
@@ -3698,20 +3698,20 @@
 												type="button"
 												class="flex items-center gap-1 rounded-lg border border-outline-variant/30 bg-surface-container px-2 py-0.5 text-[11px] font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high active:scale-95 transition-all cursor-pointer"
 												onclick={copyPreviousSetValues}
-												title="Copiar repetições e carga da última sessão"
+												title="Copy reps and load from previous session"
 											>
 												<span class="material-symbols-outlined text-xs">history</span>
-												<span>Copiar Anterior</span>
+												<span>Copy Previous</span>
 											</button>
 										{/if}
 										<button
 											type="button"
 											class="flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary hover:bg-primary/20 active:scale-95 transition-all cursor-pointer"
 											onclick={fillTargetValues}
-											title="Preencher com repetições e carga da meta"
+											title="Fill with target reps and load"
 										>
 											<span class="material-symbols-outlined text-xs">bolt</span>
-											<span>Meta</span>
+											<span>Target</span>
 										</button>
 									</div>
 								</div>
@@ -3722,7 +3722,7 @@
 									<div class="rounded-xl border border-white/5 bg-surface-container-lowest p-2.5 flex flex-col justify-between">
 										<div class="flex items-center justify-between mb-1">
 											<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Reps</span>
-											<span class="text-[10px] font-semibold text-primary">Meta: {currentBlockReps}</span>
+											<span class="text-[10px] font-semibold text-primary">Target: {currentBlockReps}</span>
 										</div>
 										<div class="flex items-center gap-1.5">
 											<button
@@ -3763,8 +3763,8 @@
 									<!-- LOAD STEPPER -->
 									<div class="rounded-xl border border-white/5 bg-surface-container-lowest p-2.5 flex flex-col justify-between">
 										<div class="flex items-center justify-between mb-1">
-											<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Carga ({currentBlock.loadUnit || 'kg'})</span>
-											<span class="text-[10px] font-semibold text-secondary">Meta: {currentPrescribedLoad || '-'}</span>
+											<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Load ({currentBlock.loadUnit || 'kg'})</span>
+											<span class="text-[10px] font-semibold text-secondary">Target: {currentPrescribedLoad || '-'}</span>
 										</div>
 										<div class="flex items-center gap-1.5">
 											<button
@@ -3886,7 +3886,7 @@
 											type="text"
 											autocomplete="off"
 											class="h-7 max-w-[120px] sm:max-w-[160px] flex-1 rounded-lg border border-white/10 bg-surface-container/60 px-2 text-[12px] text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-1 focus:ring-primary/50 truncate"
-											placeholder="Nota"
+											placeholder="Notes"
 											value={notesByBlock[currentBlock.id] ?? ''}
 											oninput={(event) => {
 												notesByBlock = {
@@ -3925,17 +3925,17 @@
 							<div class="flex items-center justify-between text-xs">
 								<div class="flex items-center gap-1.5">
 									<span class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Superset:</span>
-									<span class="font-bold text-primary">Set {currentExerciseSet} de {currentBlock.data?.sets || 3}</span>
+									<span class="font-bold text-primary">Set {currentExerciseSet} of {currentBlock.data?.sets || 3}</span>
 								</div>
 								<div class="flex items-center gap-1 text-[10px] font-semibold text-on-surface-variant">
 									<span class="material-symbols-outlined text-xs">timer</span>
-									<span>Descanso: {formatClock(Number(currentBlock.data?.rest_seconds ?? 120))}</span>
+									<span>Rest: {formatClock(Number(currentBlock.data?.rest_seconds ?? 120))}</span>
 								</div>
 							</div>
 							{#if lastLog}
 								<div class="flex items-center gap-1.5 text-[11px] text-on-surface-variant pt-1 border-t border-white/5">
 									<span class="material-symbols-outlined text-xs text-tertiary">history</span>
-									<span class="text-[10px] font-bold uppercase tracking-wider">Última sessão:</span>
+									<span class="text-[10px] font-bold uppercase tracking-wider">Previous session:</span>
 									<span class="font-bold text-on-surface truncate">
 										A: {lastRepsParts[0] || '-'}r @ {fallbackLoadA || '-'} • B: {lastRepsParts[1] || '-'}r @ {fallbackLoadB || '-'}
 									</span>
@@ -3948,7 +3948,7 @@
 								<div class="flex flex-col items-center text-center">
 									<div class="flex items-center gap-2 rounded-full bg-primary/20 border border-primary/30 px-3 py-0.5">
 										<span class={`flex h-2 w-2 rounded-full bg-primary ${intraSetRest.remainingSeconds <= 5 ? 'animate-ping' : ''}`}></span>
-										<span class="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Descanso Ativo</span>
+										<span class="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Resting</span>
 									</div>
 									<div class="mt-2 my-1">
 										<span class={`font-display font-mono text-5xl sm:text-6xl font-black tabular-nums tracking-tight ${
@@ -3957,7 +3957,7 @@
 											{formatClock(intraSetRest.remainingSeconds)}
 										</span>
 									</div>
-									<p class="mt-1 text-xs text-on-surface-variant">A seguir: {intraSetRest.nextLabel}</p>
+									<p class="mt-1 text-xs text-on-surface-variant">Up next: {intraSetRest.nextLabel}</p>
 									<div class="mt-2.5 flex items-center justify-center gap-2 w-full max-w-sm">
 										<button
 											type="button"
@@ -3971,7 +3971,7 @@
 											class="flex-[1.4] h-9 flex items-center justify-center gap-1 rounded-xl bg-primary text-xs font-black text-on-primary-fixed shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer"
 											onclick={() => clearIntraSetRest(true)}
 										>
-											Iniciar Agora
+											Start Now
 										</button>
 									</div>
 								</div>
@@ -3981,23 +3981,23 @@
 						<!-- Superset Inputs Card -->
 						<div class="rounded-2xl border border-white/10 bg-surface-container-low/90 p-3 sm:p-4 shadow-xl space-y-3">
 							<div class="flex items-center justify-between">
-								<span class="text-xs font-bold uppercase tracking-wider text-on-surface">Registrar Série {currentExerciseSet}</span>
+								<span class="text-xs font-bold uppercase tracking-wider text-on-surface">Log Set {currentExerciseSet}</span>
 								<button
 									type="button"
 									class="flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary hover:bg-primary/20 active:scale-95 transition-all cursor-pointer"
 									onclick={fillSupersetTargets}
-									title="Preencher com repetições e cargas da meta"
+									title="Fill with target reps and load"
 								>
 									<span class="material-symbols-outlined text-xs">bolt</span>
-									<span>Meta</span>
+									<span>Target</span>
 								</button>
 							</div>
 
 							<!-- Inputs for Exercise A -->
 							<div class="rounded-xl border border-white/5 bg-surface-container-lowest p-2.5 space-y-1.5">
 								<div class="flex items-center justify-between">
-									<p class="text-xs font-bold text-primary truncate">A: {currentBlock.data?.exercise_a_name || 'Exercício A'}</p>
-									<span class="text-[10px] text-on-surface-variant font-semibold">Meta: {targetRepsA}r @ {prescribedLoadA}</span>
+									<p class="text-xs font-bold text-primary truncate">A: {currentBlock.data?.exercise_a_name || 'Exercise A'}</p>
+									<span class="text-[10px] text-on-surface-variant font-semibold">Target: {targetRepsA}r @ {prescribedLoadA}</span>
 								</div>
 								<div class="grid grid-cols-2 gap-2">
 									<div>
@@ -4036,7 +4036,7 @@
 										</div>
 									</div>
 									<div>
-										<label for="superset-actual-load-a" class="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Carga A ({currentBlock.data?.load_unit_a || 'kg'})</label>
+										<label for="superset-actual-load-a" class="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Load A ({currentBlock.data?.load_unit_a || 'kg'})</label>
 										<div class="flex items-center gap-1">
 											<button
 												type="button"
@@ -4076,8 +4076,8 @@
 							<!-- Inputs for Exercise B -->
 							<div class="rounded-xl border border-white/5 bg-surface-container-lowest p-2.5 space-y-1.5">
 								<div class="flex items-center justify-between">
-									<p class="text-xs font-bold text-secondary truncate">B: {currentBlock.data?.exercise_b_name || 'Exercício B'}</p>
-									<span class="text-[10px] text-on-surface-variant font-semibold">Meta: {targetRepsB}r @ {prescribedLoadB}</span>
+									<p class="text-xs font-bold text-secondary truncate">B: {currentBlock.data?.exercise_b_name || 'Exercise B'}</p>
+									<span class="text-[10px] text-on-surface-variant font-semibold">Target: {targetRepsB}r @ {prescribedLoadB}</span>
 								</div>
 								<div class="grid grid-cols-2 gap-2">
 									<div>
@@ -4116,7 +4116,7 @@
 										</div>
 									</div>
 									<div>
-										<label for="superset-actual-load-b" class="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Carga B ({currentBlock.data?.load_unit_b || 'kg'})</label>
+										<label for="superset-actual-load-b" class="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Load B ({currentBlock.data?.load_unit_b || 'kg'})</label>
 										<div class="flex items-center gap-1">
 											<button
 												type="button"
@@ -5075,12 +5075,12 @@
 					<div class="mt-3 pt-2.5 border-t border-white/5">
 						<div class="flex items-center gap-1.5 mb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
 							<span class="material-symbols-outlined text-xs">edit_note</span>
-							<span>Notas do bloco (opcional)</span>
+							<span>Block notes (optional)</span>
 						</div>
 						<input
 							id="session-notes"
 							class="w-full rounded-xl border border-white/5 bg-surface-container-lowest px-3 py-1.5 text-xs text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-							placeholder={currentBlock.notePlaceholder ?? 'Anotações sobre técnica, fadiga ou ajuste...'}
+							placeholder={currentBlock.notePlaceholder ?? 'Notes on form, fatigue, or adjustments...'}
 							value={notesByBlock[currentBlock.id] ?? ''}
 							oninput={(event) => {
 								notesByBlock = {
@@ -5158,7 +5158,7 @@
 			<div class="mb-4 flex items-center justify-between">
 				<h3 class="text-sm font-bold text-on-surface flex items-center gap-1.5">
 					<span class="material-symbols-outlined text-primary text-base">format_list_bulleted</span>
-					<span>Fila & Histórico da Sessão</span>
+					<span>Queue & Session History</span>
 				</h3>
 				<div class="flex items-center gap-2">
 					<button
@@ -5170,7 +5170,7 @@
 						}}
 					>
 						<span class="material-symbols-outlined text-sm">flag</span>
-						Finalizar
+						Finish
 					</button>
 					<button
 						type="button"
@@ -5184,11 +5184,11 @@
 
 			<div class="space-y-4">
 				<div>
-					<p class="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Próximos Blocos</p>
+					<p class="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Upcoming Blocks</p>
 					<div class="space-y-1.5">
 						{#if upcomingBlocks.length === 0}
 							<div class="rounded-xl border border-white/5 bg-surface-container-low/50 p-2.5 text-xs text-on-surface-variant">
-								Nenhum bloco restante nesta seção.
+								No remaining blocks in this section.
 							</div>
 						{:else}
 							{#each upcomingBlocks as block}
@@ -5214,11 +5214,11 @@
 				</div>
 
 				<div>
-					<p class="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Concluídos</p>
+					<p class="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">Completed</p>
 					<div class="space-y-1.5">
 						{#if completedBlocks.length === 0}
 							<div class="rounded-xl border border-white/5 bg-surface-container-low/50 p-2.5 text-xs text-on-surface-variant">
-								Nenhum bloco concluído ainda nesta sessão.
+								No blocks completed yet in this session.
 							</div>
 						{:else}
 							{#each completedBlocks as block}
@@ -5240,16 +5240,16 @@
 				<!-- Session Stats & Sync in Drawer -->
 				<div class="rounded-2xl border border-white/5 bg-surface-container-low p-3 space-y-2.5">
 					<div class="flex items-center justify-between text-xs">
-						<span class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Estatísticas do Treino</span>
+						<span class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Workout Stats</span>
 						<span class="font-mono text-primary font-bold">{formatClock(sessionElapsedSeconds)}</span>
 					</div>
 					<div class="grid grid-cols-3 gap-2 text-center text-xs">
 						<div class="rounded-lg bg-surface-container-lowest p-1.5">
-							<span class="text-[9px] uppercase text-on-surface-variant block">Blocos</span>
+							<span class="text-[9px] uppercase text-on-surface-variant block">Blocks</span>
 							<span class="font-bold text-on-surface">{completedBlockCount}</span>
 						</div>
 						<div class="rounded-lg bg-surface-container-lowest p-1.5">
-							<span class="text-[9px] uppercase text-on-surface-variant block">Séries</span>
+							<span class="text-[9px] uppercase text-on-surface-variant block">Sets</span>
 							<span class="font-bold text-on-surface">{loggedSetCount}</span>
 						</div>
 						<div class="rounded-lg bg-surface-container-lowest p-1.5">
@@ -5262,7 +5262,7 @@
 							href={`/workflows/${routine.id}/history`}
 							class="text-xs font-semibold text-tertiary hover:underline"
 						>
-							Ver Histórico
+							View History
 						</a>
 						{#if activePersistedSession}
 							<button
@@ -5271,7 +5271,7 @@
 								onclick={() => void abandonPersistedSession()}
 								disabled={isSyncingSession}
 							>
-								Abandonar treino
+								Abandon workout
 							</button>
 						{/if}
 					</div>

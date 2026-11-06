@@ -4,16 +4,16 @@ import type { AiGenerateInput, AiModelOption, AiParseInput } from './types';
 const ROUTINE_SCHEMA = {
 	type: 'OBJECT',
 	properties: {
-		name: { type: 'STRING', description: 'Nome da rotina de treino' },
-		description: { type: 'STRING', description: 'Breve resumo do foco da rotina' },
+		name: { type: 'STRING', description: 'Workout routine name' },
+		description: { type: 'STRING', description: 'Brief summary of routine focus' },
 		sections: {
 			type: 'ARRAY',
-			description: 'Dias da rotina (ex: Dia 1, Treino A, etc.)',
+			description: 'Routine days/sections (e.g. Day 1, Workout A, etc.)',
 			items: {
 				type: 'OBJECT',
 				properties: {
-					title: { type: 'STRING', description: 'Nome do dia (ex: Day 1 - Push)' },
-					subtitle: { type: 'STRING', description: 'Músculos trabalhados' },
+					title: { type: 'STRING', description: 'Day/Section name (e.g. Day 1 - Push)' },
+					subtitle: { type: 'STRING', description: 'Target muscle groups' },
 					kind: { type: 'STRING', enum: ['day', 'warmup', 'cooldown'] },
 					blocks: {
 						type: 'ARRAY',
@@ -55,7 +55,7 @@ export async function parseRoutineWithGemini(input: AiParseInput): Promise<any> 
 
 	if (!effectiveApiKey) {
 		throw new Error(
-			'Chave de API do Gemini não configurada. Forneça uma chave no cabeçalho x-gemini-api-key ou defina GEMINI_API_KEY no .env.'
+			'Gemini API key not configured. Provide a key in the x-gemini-api-key header or set GEMINI_API_KEY in .env.'
 		);
 	}
 
@@ -73,18 +73,18 @@ export async function parseRoutineWithGemini(input: AiParseInput): Promise<any> 
 	}
 
 	const promptText = `
-Você é um especialista em treinamento de força e periodização.
-Sua missão é extrair ou converter as informações de treino fornecidas (seja imagem de ficha de academia, anotação manuscrita ou texto livre) para a estrutura formal de treino do RepEngine.
+You are an expert strength and conditioning specialist and sports scientist.
+Your mission is to extract or convert the provided routine information (whether a gym routine photo, handwritten notes, or free text) into the formal RepEngine workout structure.
 
-Regras importantes:
-1. Identifique os dias de treino (ex: Treino A, Treino B, Dia 1, etc.) e mapeie para "sections".
-2. Para cada exercício:
-   - Se for exercício convencional, use node_type_slug: "exercise" com "sets", "reps", "load_value" (se houver carga indicada, caso contrário 0) e "rest_seconds" (padrão 90 se omitido).
-   - Se for superset (dois exercícios combinados sem descanso), use node_type_slug: "superset" preenchendo exercise_a_name e exercise_b_name.
-   - Se for aeróbio ou prancha com tempo, use node_type_slug: "exercise_timed" com "duration" em segundos.
-3. Padronize os nomes dos exercícios para termos limpos e reconhecíveis (em português ou inglês padronizado).
-4. Retorne somente o objeto JSON correspondente ao schema fornecido.
-${input.text?.trim() ? `\nTexto fornecido pelo usuário:\n${input.text.trim()}` : ''}
+Key rules:
+1. Identify routine days (e.g. Day 1, Workout A, Push Day, etc.) and map them to "sections".
+2. For each exercise:
+   - If conventional exercise, use node_type_slug: "exercise" with "sets", "reps", "load_value" (if load is specified, otherwise 0) and "rest_seconds" (default 90 if omitted).
+   - If superset (two exercises paired back-to-back), use node_type_slug: "superset" populating exercise_a_name and exercise_b_name.
+   - If cardio or timed plank/hold, use node_type_slug: "exercise_timed" with "duration" in seconds.
+3. Standardize exercise names into clean, recognized English terms.
+4. Return strictly the JSON object matching the provided schema.
+${input.text?.trim() ? `\nUser provided text:\n${input.text.trim()}` : ''}
 `;
 
 	parts.push({ text: promptText });
@@ -97,23 +97,23 @@ export async function generateRoutineWithGemini(input: AiGenerateInput): Promise
 
 	if (!effectiveApiKey) {
 		throw new Error(
-			'Chave de API do Gemini não configurada. Forneça uma chave no cabeçalho x-gemini-api-key ou defina GEMINI_API_KEY no .env.'
+			'Gemini API key not configured. Provide a key in the x-gemini-api-key header or set GEMINI_API_KEY in .env.'
 		);
 	}
 
 	const prompt = `
-Você é um treinador de alto nível e cientista do esporte. Crie uma rotina de treino estruturada e periodizada com base nas seguintes preferências:
-- Objetivo principal: ${input.goal || 'Hipertrofia'}
-- Divisão (Split): ${input.split || 'Full Body'}
-- Nível do atleta: ${input.level || 'Intermediário'}
-- Equipamentos disponíveis: ${input.equipment || 'Academia completa'}
-- Restrições / Observações: ${input.constraints || 'Nenhuma'}
-- Pedido específico do usuário: "${input.prompt}"
+You are an elite strength and conditioning coach and sports scientist. Create a structured, periodized workout routine based on the following preferences:
+- Primary goal: ${input.goal || 'Hypertrophy'}
+- Routine split: ${input.split || 'Full Body'}
+- Athlete level: ${input.level || 'Intermediate'}
+- Available equipment: ${input.equipment || 'Full Commercial Gym'}
+- Constraints / Notes: ${input.constraints || 'None'}
+- User specific request: "${input.prompt}"
 
-Regras:
-1. Estruture a rotina em dias organizados (sections).
-2. Para cada exercício, defina séries (sets), repetições (reps), carga estimada inicial em kg (load_value) e descanso em segundos (rest_seconds).
-3. Use nomes claros e padronizados para os exercícios.
+Rules:
+1. Structure the routine into organized days (sections).
+2. For each exercise, specify sets, reps, estimated starting load in kg (load_value), and rest in seconds (rest_seconds).
+3. Use clean, standardized English exercise names.
 `;
 
 	return callGemini(effectiveApiKey, [{ text: prompt }], ROUTINE_SCHEMA, input.model);
@@ -193,11 +193,11 @@ export async function listGeminiModels(apiKey: string): Promise<AiModelOption[]>
 	const modelIds = await resolveGeminiModels(apiKey);
 	return modelIds.map((id) => {
 		let name = id;
-		if (id === 'gemini-2.5-flash') name = 'Gemini 2.5 Flash (Padrão Recomendado)';
+		if (id === 'gemini-2.5-flash') name = 'Gemini 2.5 Flash (Recommended Default)';
 		else if (id === 'gemini-2.0-flash') name = 'Gemini 2.0 Flash';
-		else if (id === 'gemini-2.5-flash-lite') name = 'Gemini 2.5 Flash Lite (Mais rápido)';
+		else if (id === 'gemini-2.5-flash-lite') name = 'Gemini 2.5 Flash Lite (Faster)';
 		else if (id === 'gemini-2.0-flash-lite') name = 'Gemini 2.0 Flash Lite';
-		else if (id === 'gemini-2.5-pro') name = 'Gemini 2.5 Pro (Raciocínio Avançado)';
+		else if (id === 'gemini-2.5-pro') name = 'Gemini 2.5 Pro (Advanced Reasoning)';
 		else {
 			name = id
 				.replace(/-/g, ' ')
@@ -300,10 +300,10 @@ async function callGemini(
 
 			// If key is invalid or quota exceeded, fail fast with a friendly message
 			if (msgLower.includes('api key not valid') || msgLower.includes('invalid api key') || (response.status === 400 && msgLower.includes('api key'))) {
-				throw new Error('Chave de API do Gemini inválida. Por favor, verifique sua chave no campo BYOK.');
+				throw new Error('Invalid Gemini API key. Please check your key in the BYOK field.');
 			}
 			if (response.status === 429 || msgLower.includes('quota') || msgLower.includes('resource exhausted')) {
-				throw new Error('Limite de requisições excedido na sua chave Gemini (Quota Exceeded). Aguarde alguns instantes ou use outra chave.');
+				throw new Error('Rate limit exceeded on your Gemini key (Quota Exceeded). Please wait a moment or use another key.');
 			}
 
 			// Check if error is related to model availability or unsupported version, so we try the next candidate
@@ -317,11 +317,11 @@ async function callGemini(
 						msgLower.includes('model')));
 
 			if (isModelError) {
-				lastError = new Error(apiMessage || `Modelo ${model} indisponível (HTTP ${response.status})`);
+				lastError = new Error(apiMessage || `Model ${model} unavailable (HTTP ${response.status})`);
 				continue;
 			}
 
-			throw new Error(apiMessage || `Erro da API do Gemini (HTTP ${response.status})`);
+			throw new Error(apiMessage || `Gemini API error (HTTP ${response.status})`);
 		}
 
 		const result: unknown = await response.json();
@@ -345,7 +345,7 @@ async function callGemini(
 				: null;
 
 		if (!rawJsonText?.trim()) {
-			throw new Error('A IA não retornou nenhum conteúdo válido.');
+			throw new Error('AI returned no valid content.');
 		}
 
 		let cleanJsonText = rawJsonText.trim();
@@ -358,9 +358,9 @@ async function callGemini(
 		try {
 			return JSON.parse(cleanJsonText);
 		} catch {
-			throw new Error('A IA retornou um formato que não pôde ser convertido para JSON válido.');
+			throw new Error('AI returned a format that could not be parsed as valid JSON.');
 		}
 	}
 
-	throw lastError || new Error('Nenhum modelo Gemini compatível pôde responder.');
+	throw lastError || new Error('No compatible Gemini model could respond.');
 }

@@ -1,20 +1,20 @@
 import type { AiGenerateInput, AiModelOption, AiParseInput } from './types';
 
 const OPENAI_SCHEMA_PROMPT = `
-Você deve responder ESTRITAMENTE com um objeto JSON válido, sem texto explicativo antes ou depois.
-O JSON deve seguir rigorosamente a estrutura abaixo:
+You must respond STRICTLY with a valid JSON object, without any explanatory text before or after.
+The JSON must strictly follow the schema structure below:
 {
-  "name": "Nome da Rotina",
-  "description": "Descrição sucinta",
+  "name": "Routine Name",
+  "description": "Brief routine description",
   "sections": [
     {
       "title": "Day 1 - Push",
-      "subtitle": "Peito, Ombros e Tríceps",
+      "subtitle": "Chest, Shoulders & Triceps",
       "kind": "day",
       "blocks": [
         {
           "node_type_slug": "exercise",
-          "exercise_name": "Supino Reto",
+          "exercise_name": "Barbell Bench Press",
           "sets": 3,
           "reps": "8-12",
           "load_value": 60,
@@ -35,7 +35,7 @@ O JSON deve seguir rigorosamente a estrutura abaixo:
         },
         {
           "node_type_slug": "exercise_timed",
-          "exercise_name": "Prancha",
+          "exercise_name": "Plank",
           "duration": 60
         },
         {
@@ -53,7 +53,7 @@ export async function parseRoutineWithOpenAI(input: AiParseInput): Promise<any> 
 
 	if (!effectiveApiKey) {
 		throw new Error(
-			'Chave de API da OpenAI não configurada. Forneça uma chave sk-... no cabeçalho x-gemini-api-key / x-openai-api-key ou defina OPENAI_API_KEY no .env.'
+			'OpenAI API key not configured. Provide an sk-... key in the x-gemini-api-key / x-openai-api-key header or set OPENAI_API_KEY in .env.'
 		);
 	}
 
@@ -71,17 +71,17 @@ export async function parseRoutineWithOpenAI(input: AiParseInput): Promise<any> 
 	}
 
 	const promptText = `
-Você é um especialista em treinamento de força e periodização.
-Sua missão é extrair ou converter as informações de treino fornecidas (seja imagem de ficha de academia, anotação manuscrita ou texto livre) para a estrutura formal de treino do RepEngine.
+You are an expert strength and conditioning specialist and sports scientist.
+Your mission is to extract or convert the provided routine information (whether a gym routine photo, handwritten notes, or free text) into the formal RepEngine workout structure.
 
-Regras importantes:
-1. Identifique os dias de treino (ex: Treino A, Treino B, Dia 1, etc.) e mapeie para "sections".
-2. Para cada exercício:
-   - Se for exercício convencional, use node_type_slug: "exercise" com "sets", "reps", "load_value" (se houver carga indicada, caso contrário 0) e "rest_seconds" (padrão 90 se omitido).
-   - Se for superset (dois exercícios combinados sem descanso), use node_type_slug: "superset" preenchendo exercise_a_name e exercise_b_name.
-   - Se for aeróbio ou prancha com tempo, use node_type_slug: "exercise_timed" com "duration" em segundos.
-3. Padronize os nomes dos exercícios para termos limpos e reconhecíveis (em português ou inglês padronizado).
-${input.text?.trim() ? `\nTexto fornecido pelo usuário:\n${input.text.trim()}` : ''}
+Key rules:
+1. Identify routine days (e.g. Day 1, Workout A, Push Day, etc.) and map them to "sections".
+2. For each exercise:
+   - If conventional exercise, use node_type_slug: "exercise" with "sets", "reps", "load_value" (if load is specified, otherwise 0) and "rest_seconds" (default 90 if omitted).
+   - If superset (two exercises paired back-to-back), use node_type_slug: "superset" populating exercise_a_name and exercise_b_name.
+   - If cardio or timed plank/hold, use node_type_slug: "exercise_timed" with "duration" in seconds.
+3. Standardize exercise names into clean, recognized English terms.
+${input.text?.trim() ? `\nUser provided text:\n${input.text.trim()}` : ''}
 `;
 
 	userContent.push({
@@ -104,23 +104,23 @@ export async function generateRoutineWithOpenAI(input: AiGenerateInput): Promise
 
 	if (!effectiveApiKey) {
 		throw new Error(
-			'Chave de API da OpenAI não configurada. Forneça uma chave sk-... ou defina OPENAI_API_KEY no .env.'
+			'OpenAI API key not configured. Provide an sk-... key or set OPENAI_API_KEY in .env.'
 		);
 	}
 
 	const prompt = `
-Você é um treinador de alto nível e cientista do esporte. Crie uma rotina de treino estruturada e periodizada com base nas seguintes preferências:
-- Objetivo principal: ${input.goal || 'Hipertrofia'}
-- Divisão (Split): ${input.split || 'Full Body'}
-- Nível do atleta: ${input.level || 'Intermediário'}
-- Equipamentos disponíveis: ${input.equipment || 'Academia completa'}
-- Restrições / Observações: ${input.constraints || 'Nenhuma'}
-- Pedido específico do usuário: "${input.prompt}"
+You are an elite strength and conditioning coach and sports scientist. Create a structured, periodized workout routine based on the following preferences:
+- Primary goal: ${input.goal || 'Hypertrophy'}
+- Routine split: ${input.split || 'Full Body'}
+- Athlete level: ${input.level || 'Intermediate'}
+- Available equipment: ${input.equipment || 'Full Commercial Gym'}
+- Constraints / Notes: ${input.constraints || 'None'}
+- User specific request: "${input.prompt}"
 
-Regras:
-1. Estruture a rotina em dias organizados (sections).
-2. Para cada exercício, defina séries (sets), repetições (reps), carga estimada inicial em kg (load_value) e descanso em segundos (rest_seconds).
-3. Use nomes claros e padronizados para os exercícios.
+Rules:
+1. Structure the routine into organized days (sections).
+2. For each exercise, specify sets, reps, estimated starting load in kg (load_value), and rest in seconds (rest_seconds).
+3. Use clean, standardized English exercise names.
 `;
 
 	return callOpenAI(
@@ -191,11 +191,11 @@ export async function listOpenAIModels(apiKey: string): Promise<AiModelOption[]>
 
 	return modelIds.map((id) => {
 		let name = id;
-		if (id === 'gpt-4o-mini') name = 'GPT-4o mini (Padrão Recomendado)';
-		else if (id === 'gpt-4o') name = 'GPT-4o (Visão e Raciocínio Avançado)';
-		else if (id === 'o3-mini') name = 'o3-mini (Raciocínio STEM)';
+		if (id === 'gpt-4o-mini') name = 'GPT-4o mini (Recommended Default)';
+		else if (id === 'gpt-4o') name = 'GPT-4o (Vision & Advanced Reasoning)';
+		else if (id === 'o3-mini') name = 'o3-mini (STEM Reasoning)';
 		else if (id === 'o1-mini') name = 'o1-mini';
-		else if (id === 'o1') name = 'o1 (Raciocínio Profundo)';
+		else if (id === 'o1') name = 'o1 (Deep Reasoning)';
 
 		return {
 			id,
@@ -241,7 +241,7 @@ async function callOpenAI(
 				? errorData.error.message
 				: null;
 
-		throw new Error(apiMessage || `Erro da API da OpenAI (HTTP ${response.status})`);
+		throw new Error(apiMessage || `OpenAI API error (HTTP ${response.status})`);
 	}
 
 	const result: unknown = await response.json();
@@ -261,12 +261,12 @@ async function callOpenAI(
 			: null;
 
 	if (!rawJsonText?.trim()) {
-		throw new Error('A OpenAI não retornou nenhum conteúdo válido.');
+		throw new Error('OpenAI returned no valid content.');
 	}
 
 	try {
 		return JSON.parse(rawJsonText);
 	} catch {
-		throw new Error('A OpenAI retornou um formato que não é um JSON válido.');
+		throw new Error('OpenAI returned a format that is not valid JSON.');
 	}
 }

@@ -35,14 +35,14 @@ export const POST: RequestHandler = async ({ request }) => {
 			parsed.success && parsed.draftBlocks ? toWorkflowPayload(parsed.draftBlocks) : [];
 
 		return json({
-			routine_name: result.name || result.routine_name || 'Rotina Gerada',
+			routine_name: result.name || result.routine_name || 'Generated Routine',
 			description: result.description || '',
 			days: (result.sections || result.days || []).map((s: any, idx: number) => ({
-				day_name: s.title || s.day_name || `Dia ${idx + 1}`,
+				day_name: s.title || s.day_name || `Day ${idx + 1}`,
 				exercises: (s.blocks || s.exercises || [])
 					.filter((b: any) => b.node_type_slug === 'exercise' || b.exercise_name || b.name)
 					.map((b: any) => ({
-						name: b.exercise_name || b.name || 'Exercício',
+						name: b.exercise_name || b.name || 'Exercise',
 						sets: b.sets || 3,
 						reps: String(b.reps || '8-10'),
 						target_load: Number(b.load_value || b.target_load || 0),
@@ -52,6 +52,6 @@ export const POST: RequestHandler = async ({ request }) => {
 			blocks
 		});
 	} catch (err: any) {
-		return json({ error: err?.message || 'Falha na geração de rotina' }, { status: 500 });
+		return json({ error: err?.message || 'Failed to generate routine' }, { status: 500 });
 	}
 };

@@ -294,7 +294,7 @@
 			selectedImagePreview = URL.createObjectURL(processed);
 			await handleScanWithAi(processed);
 		} catch (e: any) {
-			errorMessage = e?.message || 'Falha ao processar a imagem';
+			errorMessage = e?.message || 'Failed to process image';
 		} finally {
 			target.value = '';
 		}
@@ -303,7 +303,7 @@
 	async function handleScanWithAi(imageFile?: File, rawText?: string): Promise<void> {
 		const text = rawText?.trim() || scanText.trim();
 		if (!imageFile && !text) {
-			errorMessage = 'Selecione uma foto ou informe o texto da ficha.';
+			errorMessage = 'Select a photo or enter routine text.';
 			return;
 		}
 
@@ -344,13 +344,13 @@
 				let errMsg = data?.message;
 				if (!errMsg) {
 					if (res.status === 404) {
-						errMsg = 'Endpoint de IA não encontrado (HTTP 404). As rotas de IA no Nginx precisam apontar para o web.';
+						errMsg = 'AI endpoint not found (HTTP 404). Nginx AI routes must point to web.';
 					} else if (res.status === 413) {
-						errMsg = 'Foto muito pesada para o servidor (HTTP 413). O limite de upload do Nginx foi atingido.';
+						errMsg = 'Image file too large for server (HTTP 413). Nginx upload limit reached.';
 					} else if (res.status === 502 || res.status === 504) {
-						errMsg = `Tempo limite esgotado no servidor (HTTP ${res.status}). A IA demorou para responder.`;
+						errMsg = `Server timeout (HTTP ${res.status}). AI took too long to respond.`;
 					} else {
-						errMsg = `Falha no processamento (HTTP ${res.status})`;
+						errMsg = `Processing failed (HTTP ${res.status})`;
 					}
 				}
 				const msgLower = errMsg.toLowerCase();
@@ -358,7 +358,7 @@
 					res.status === 400 ||
 					res.status === 401 ||
 					res.status === 403 ||
-					msgLower.includes('chave') ||
+					msgLower.includes('key') ||
 					msgLower.includes('api key') ||
 					msgLower.includes('byok')
 				) {
@@ -370,7 +370,7 @@
 			importText = JSON.stringify(data, null, 2);
 			activeTab = 'import';
 		} catch (error: unknown) {
-			errorMessage = error instanceof Error ? error.message : 'Falha no processamento';
+			errorMessage = error instanceof Error ? error.message : 'Processing failed';
 		} finally {
 			isScanning = false;
 		}
@@ -691,9 +691,9 @@
 					<div class="space-y-5">
 						<div class="rounded-xl border border-primary/25 bg-primary/5 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 							<div>
-								<h3 class="text-sm font-bold text-on-surface">Scan com IA (Foto ou Texto)</h3>
+								<h3 class="text-sm font-bold text-on-surface">AI Scan (Photo or Text)</h3>
 								<p class="mt-0.5 text-xs text-on-surface-variant">
-									Envie uma foto da ficha ou descreva o treino. O resultado é convertido diretamente para blocos do RepEngine.
+									Upload a photo of your routine or describe your workout. The result is converted directly into RepEngine blocks.
 								</p>
 							</div>
 							{#if detectedProvider}
@@ -713,13 +713,13 @@
 									onclick={() => (showCustomKey = !showCustomKey)}
 								>
 									<span class="material-symbols-outlined text-sm text-primary">key</span>
-									<span>Chave de API Pessoal (BYOK)</span>
+									<span>Personal API Key (BYOK)</span>
 									{#if detectedProvider}
 										<span class="ml-1 text-[11px] text-on-surface-variant font-normal">({detectedProvider.name})</span>
 									{:else if customApiKey.trim()}
-										<span class="ml-1 text-[11px] text-on-surface-variant font-normal">(Configurada)</span>
+										<span class="ml-1 text-[11px] text-on-surface-variant font-normal">(Configured)</span>
 									{:else}
-										<span class="ml-1 text-[11px] text-primary font-medium">(Necessário para IA se não configurado no servidor)</span>
+										<span class="ml-1 text-[11px] text-primary font-medium">(Required for AI if not configured on server)</span>
 									{/if}
 									{#if selectedModel && selectedModel !== 'auto'}
 										<span class="ml-1 text-[10px] text-primary font-bold bg-primary/10 px-1.5 py-0.5 rounded">
@@ -731,7 +731,7 @@
 									type="button"
 									class="text-on-surface-variant hover:text-on-surface transition-colors"
 									onclick={() => (showCustomKey = !showCustomKey)}
-									aria-label="Expandir chave de API"
+									aria-label="Toggle API Key"
 								>
 									<span class="material-symbols-outlined text-base">
 										{showCustomKey ? 'expand_less' : 'expand_more'}
@@ -743,18 +743,18 @@
 								<div class="pt-1.5 space-y-3">
 									<div>
 										<label for="byok-api-key-input" class="text-[11px] font-semibold text-on-surface-variant block mb-1">
-											Chave de API:
+											API Key:
 										</label>
 										<input
 											id="byok-api-key-input"
 											type="password"
 											class="w-full rounded-lg border border-outline-variant/30 bg-surface-container px-3 py-2 text-xs text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:outline-none font-mono"
-											placeholder="Insira sua chave: AIzaSy... (Gemini) ou sk-... (OpenAI)"
+											placeholder="Enter your key: AIzaSy... (Gemini) or sk-... (OpenAI)"
 											value={customApiKey}
 											oninput={(e) => saveCustomApiKey((e.currentTarget as HTMLInputElement).value)}
 										/>
 										<p class="text-[11px] text-on-surface-variant mt-1">
-											Detecta automaticamente chaves gratuitas do <strong>Google Gemini</strong> ou chaves da <strong>OpenAI</strong>. Salvo apenas localmente no seu navegador.
+											Automatically detects free <strong>Google Gemini</strong> keys or <strong>OpenAI</strong> keys. Saved only locally in your browser.
 										</p>
 									</div>
 
@@ -762,12 +762,12 @@
 										<div class="flex items-center justify-between">
 											<label for="byok-model-select" class="text-[11px] font-semibold text-on-surface-variant flex items-center gap-1.5">
 												<span class="material-symbols-outlined text-sm text-primary">tune</span>
-												Modelo de Inteligência Artificial:
+												AI Model:
 											</label>
 											{#if isLoadingModels}
 												<span class="text-[10px] text-primary flex items-center gap-1">
 													<span class="material-symbols-outlined text-xs animate-spin">sync</span>
-													Buscando modelos...
+													Fetching models...
 												</span>
 											{/if}
 										</div>
@@ -779,7 +779,7 @@
 											onchange={(e) => saveSelectedModel((e.currentTarget as HTMLSelectElement).value)}
 										>
 											<option value="auto">
-												Automático (Recomendado: seleção inteligente de melhor modelo)
+												Automatic (Recommended: smart selection of best model)
 											</option>
 											{#each availableModels as model}
 												<option value={model.id}>
@@ -788,7 +788,7 @@
 											{/each}
 										</select>
 										<p class="text-[10px] text-on-surface-variant/80">
-											Filtro inteligente: apenas modelos com suporte a imagens/visão. No modo <strong>Automático</strong>, o sistema usa o modelo mais rápido e estável com fallback automático.
+											Smart filter: only models with image/vision support. In <strong>Automatic</strong> mode, the system uses the fastest and most stable model with automatic fallback.
 										</p>
 									</div>
 								</div>
@@ -798,12 +798,12 @@
 						<div class="flex flex-col items-center justify-center rounded-xl border border-dashed border-outline-variant/30 bg-surface-container-low p-6 text-center">
 							{#if selectedImagePreview}
 								<div class="relative mb-3 max-h-48 overflow-hidden rounded-lg border border-outline-variant/30 shadow-md">
-									<img src={selectedImagePreview} alt="Ficha selecionada" class="max-h-48 object-contain" />
+									<img src={selectedImagePreview} alt="Selected routine" class="max-h-48 object-contain" />
 									{#if isScanning}
 										<div class="absolute inset-0 flex items-center justify-center bg-surface-lowest/70 backdrop-blur-xs">
 											<span class="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-on-primary-fixed shadow">
 												<span class="material-symbols-outlined animate-spin text-sm">sync</span>
-												Analisando com IA...
+												Analyzing with AI...
 											</span>
 										</div>
 									{/if}
@@ -813,8 +813,8 @@
 								{/if}
 							{:else}
 								<span class="material-symbols-outlined text-4xl text-primary">add_a_photo</span>
-								<p class="mt-2 text-sm font-semibold text-on-surface">Fotografe ou selecione sua ficha</p>
-								<p class="mt-1 text-xs text-on-surface-variant">Tire uma foto direta da câmera ou escolha uma imagem da galeria</p>
+								<p class="mt-2 text-sm font-semibold text-on-surface">Capture or select your routine</p>
+								<p class="mt-1 text-xs text-on-surface-variant">Take a photo directly from your camera or choose an image from your gallery</p>
 							{/if}
 
 							<div class="mt-4 flex flex-wrap items-center justify-center gap-3">
@@ -825,7 +825,7 @@
 									disabled={isScanning}
 								>
 									<span class="material-symbols-outlined text-base">photo_camera</span>
-									{isScanning ? 'Processando...' : 'Tirar Foto (Câmera)'}
+									{isScanning ? 'Processing...' : 'Take Photo (Camera)'}
 								</button>
 								<button
 									type="button"
@@ -834,11 +834,11 @@
 									disabled={isScanning}
 								>
 									<span class="material-symbols-outlined text-base">photo_library</span>
-									Escolher da Galeria
+									Choose from Gallery
 								</button>
 							</div>
 
-							<!-- Input 1: Direto da Câmera (capture=environment) -->
+							<!-- Input 1: Camera Direct (capture=environment) -->
 							<input
 								type="file"
 								accept="image/*"
@@ -848,7 +848,7 @@
 								onchange={handleImageUpload}
 							/>
 
-							<!-- Input 2: Galeria / Arquivos -->
+							<!-- Input 2: Gallery / Files -->
 							<input
 								type="file"
 								accept="image/*"
@@ -860,12 +860,12 @@
 
 						<div class="space-y-2">
 							<label for="routine-ai-scan-text" class="text-xs font-semibold text-on-surface">
-								Ou cole/descreva o treino em texto
+								Or paste/describe your workout in text
 							</label>
 							<textarea
 								id="routine-ai-scan-text"
 								bind:value={scanText}
-								placeholder="Ex.: Treino A: supino reto 4x8 com 60 kg, descanso de 90 segundos..."
+								placeholder="e.g. Day A: Barbell Bench Press 4x8 with 60 kg, 90s rest..."
 								class="h-40 w-full resize-none rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-4 text-sm text-on-surface outline-none focus:border-primary/50"
 								disabled={isScanning}
 							></textarea>
@@ -876,7 +876,7 @@
 								disabled={!scanText.trim() || isScanning}
 							>
 								<span class="material-symbols-outlined text-base">{isScanning ? 'sync' : 'auto_awesome'}</span>
-								{isScanning ? 'Processando...' : 'Processar texto com IA'}
+								{isScanning ? 'Processing...' : 'Process text with AI'}
 							</button>
 						</div>
 					</div>
@@ -932,7 +932,7 @@
 						class="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-on-primary-fixed shadow-lg shadow-primary/20 transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
 					>
 						<span class="material-symbols-outlined text-base">{isScanning ? 'sync' : 'auto_awesome'}</span>
-						{isScanning ? 'Processando...' : 'Processar texto'}
+						{isScanning ? 'Processing...' : 'Process text'}
 					</button>
 				{/if}
 			</div>

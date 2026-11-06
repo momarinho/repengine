@@ -21,7 +21,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	} catch (err: any) {
 		console.error('[AI Models Error]', err);
 		return json(
-			{ message: err?.message || 'Falha ao buscar modelos de IA' },
+			{ message: err?.message || 'Failed to fetch AI models' },
 			{ status: 500 }
 		);
 	}
