@@ -63,6 +63,7 @@
 	let queuedSave = $state<{ source: 'autosave' | 'manual'; createVersion: boolean } | null>(null);
 	let sectionCollapseState = $state<Record<string, boolean>>({});
 	let sectionToDelete = $state<SectionBlockGroup<DraftBlock> | null>(null);
+	let showAdvancedProgression = $state<Record<string, boolean>>({});
 	let restoringVersionID = $state<number | null>(null);
 	let undoStack = $state<Array<{
 		title: string;
@@ -353,6 +354,78 @@
 		const nextBlocks = blocks.filter((block) => block.client_id !== selectedBlockId);
 		blocks = nextBlocks.map((block, index) => ({ ...block, position: index }));
 		selectedBlockId = blocks[0]?.client_id ?? null;
+	}
+
+	function resolveLinearRule(blockData: Record<string, unknown>): string {
+		if (typeof blockData.progression_rule === 'string' && blockData.progression_rule.trim()) {
+			return blockData.progression_rule.trim();
+		}
+		const failSeq = typeof blockData.fail_sequence === 'string' ? blockData.fail_sequence.trim() : '';
+		if (failSeq === '5x3+ -> 6x2+') return 'gzclp_hypertrophy_t1';
+		if (failSeq === '3x10 -> 3x8 -> 3x6') {
+			return blockData.bounce_to_base === true ? 'gzclp_hypertrophy_t2' : 'gzclp_standard_t2';
+		}
+		if (failSeq === '3x5+ -> 5x3+ -> 6x2+') return 'gzclp_standard_t1';
+		if (blockData.min_amrap_reps === 20 && blockData.min_total_reps === 50) return 'gzclp_hypertrophy_t3';
+		if (blockData.min_amrap_reps === 25) return 'gzclp_standard_t3';
+		if (typeof blockData.min_reps === 'number' && typeof blockData.max_reps === 'number') return 'double_progression';
+		if (failSeq !== '') return 'custom';
+		return 'add_each_session';
+	}
+
+	function handleLinearRuleChange(clientId: string, newRule: string): void {
+		recordHistory();
+		setBlockData(clientId, (current) => {
+			current.progression_rule = newRule;
+
+			if (newRule === 'gzclp_hypertrophy_t1') {
+				current.fail_sequence = '5x3+ -> 6x2+';
+				current.bounce_to_base = true;
+				if (typeof current.reset_percent !== 'number') current.reset_percent = 0.85;
+				if (typeof current.sets !== 'number' || current.sets === 3) current.sets = 5;
+				if (typeof current.reps !== 'string' || current.reps === '5' || current.reps === '10' || current.reps === '15+') current.reps = '3+';
+			} else if (newRule === 'gzclp_hypertrophy_t2') {
+				current.fail_sequence = '3x10 -> 3x8 -> 3x6';
+				current.bounce_to_base = true;
+				if (typeof current.reset_percent !== 'number') current.reset_percent = 0.85;
+				if (typeof current.sets !== 'number' || current.sets === 5) current.sets = 3;
+				if (typeof current.reps !== 'string' || current.reps === '5' || current.reps === '3+' || current.reps === '15+') current.reps = '10';
+			} else if (newRule === 'gzclp_hypertrophy_t3') {
+				current.min_amrap_reps = 20;
+				current.min_total_reps = 50;
+				current.strict_total_reps = true;
+				delete current.fail_sequence;
+				if (typeof current.sets !== 'number') current.sets = 3;
+				if (typeof current.reps !== 'string' || current.reps === '5' || current.reps === '10') current.reps = '15+';
+			} else if (newRule === 'gzclp_standard_t1') {
+				current.fail_sequence = '3x5+ -> 5x3+ -> 6x2+';
+				current.bounce_to_base = false;
+				if (typeof current.reset_percent !== 'number') current.reset_percent = 0.85;
+				if (typeof current.sets !== 'number') current.sets = 3;
+				if (typeof current.reps !== 'string' || current.reps === '10' || current.reps === '15+') current.reps = '5+';
+			} else if (newRule === 'gzclp_standard_t2') {
+				current.fail_sequence = '3x10 -> 3x8 -> 3x6';
+				current.bounce_to_base = false;
+				if (typeof current.reset_percent !== 'number') current.reset_percent = 0.85;
+				if (typeof current.sets !== 'number') current.sets = 3;
+				if (typeof current.reps !== 'string' || current.reps === '5' || current.reps === '3+' || current.reps === '15+') current.reps = '10';
+			} else if (newRule === 'gzclp_standard_t3') {
+				current.min_amrap_reps = 25;
+				delete current.fail_sequence;
+				if (typeof current.sets !== 'number') current.sets = 3;
+				if (typeof current.reps !== 'string' || current.reps === '5' || current.reps === '10') current.reps = '15+';
+			} else if (newRule === 'double_progression') {
+				if (typeof current.min_reps !== 'number') current.min_reps = 8;
+				if (typeof current.max_reps !== 'number') current.max_reps = 12;
+				if (typeof current.sets !== 'number') current.sets = 3;
+				if (typeof current.reps !== 'string' || current.reps === '5' || current.reps === '3+') current.reps = '8-12';
+				delete current.fail_sequence;
+			} else if (newRule === 'add_each_session' || newRule === 'add_weekly') {
+				delete current.fail_sequence;
+				if (typeof current.reset_percent !== 'number') current.reset_percent = 0.9;
+			}
+			return current;
+		});
 	}
 
 	function moveBlock(clientId: string, direction: -1 | 1): void {
@@ -1660,6 +1733,12 @@
 									</div>
 								</div>
 							{:else if selectedBlock.node_type_slug === 'linear_progression'}
+								{@const currentRule = resolveLinearRule(selectedBlock.data)}
+								{@const isLinearSimple = currentRule === 'add_each_session' || currentRule === 'add_weekly'}
+								{@const isDoubleProgression = currentRule === 'double_progression'}
+								{@const isGzclp = currentRule.startsWith('gzclp_')}
+								{@const isCustom = currentRule === 'custom'}
+								{@const isManual = currentRule === 'manual'}
 								<div class="space-y-5">
 									<div class="space-y-2">
 										<label for="linear-exercise-name" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Exercise name</label>
@@ -1765,106 +1844,350 @@
 										<select
 											id="linear-rule"
 											class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
-											value={typeof selectedBlock.data.progression_rule === 'string' ? selectedBlock.data.progression_rule : 'add_each_session'}
-											onchange={(event) => updateBlockField(selectedBlock.client_id, 'progression_rule', (event.currentTarget as HTMLSelectElement).value)}
+											value={currentRule}
+											onchange={(event) => handleLinearRuleChange(selectedBlock.client_id, (event.currentTarget as HTMLSelectElement).value)}
 										>
-											<option value="add_each_session">Add each session</option>
-											<option value="add_weekly">Add weekly</option>
-											<option value="double_progression">Double progression</option>
-											<option value="manual">Manual</option>
+											<optgroup label="Standard Linear (Add weight)">
+												<option value="add_each_session">Add weight each session (+{typeof selectedBlock.data.increment === 'number' ? selectedBlock.data.increment : 2.5} {selectedBlock.data.load_unit || 'kg'})</option>
+												<option value="add_weekly">Add weight weekly</option>
+											</optgroup>
+											<optgroup label="Double Progression (Reps first, then load)">
+												<option value="double_progression">Double progression (Rep range)</option>
+											</optgroup>
+											<optgroup label="GZCLP Hypertrophy (With Bounce-to-Base)">
+												<option value="gzclp_hypertrophy_t1">GZCLP Hypertrophy T1 (5x3+ → 6x2+)</option>
+												<option value="gzclp_hypertrophy_t2">GZCLP Hypertrophy T2 (3x10 → 3x8 → 3x6)</option>
+												<option value="gzclp_hypertrophy_t3">GZCLP Hypertrophy T3 (3x15+, AMRAP ≥ 20, Total &gt; 50)</option>
+											</optgroup>
+											<optgroup label="GZCLP Standard (Classic Cody Lefever)">
+												<option value="gzclp_standard_t1">GZCLP Standard T1 (3x5+ → 5x3+ → 6x2+)</option>
+												<option value="gzclp_standard_t2">GZCLP Standard T2 (3x10 → 3x8 → 3x6)</option>
+												<option value="gzclp_standard_t3">GZCLP Standard T3 (3x15+, AMRAP ≥ 25)</option>
+											</optgroup>
+											<optgroup label="Custom / Other">
+												<option value="custom">Custom fail sequence &amp; rules</option>
+												<option value="manual">Manual (No automated progression)</option>
+											</optgroup>
 										</select>
 									</div>
 
-									<div class="border-t border-outline-variant/10 pt-4 mt-2 space-y-4">
-										<h4 class="text-xs font-bold uppercase tracking-wider text-secondary">Advanced Progression / GZCLP</h4>
-										<div class="grid gap-3 md:grid-cols-2">
-											<div class="space-y-2">
-												<label for="linear-fail-sequence" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Fail sequence (GZCLP)</label>
+									{#if isLinearSimple}
+										<div class="rounded-xl border border-outline-variant/15 bg-surface-container-low p-4 space-y-3">
+											<div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-secondary">
+												<span class="material-symbols-outlined text-base">sync_problem</span>
+												Stall &amp; Failure Handling
+											</div>
+											<p class="text-xs text-on-surface-variant leading-relaxed">
+												What to do if you fail to complete all prescribed sets and reps:
+											</p>
+											<div class="space-y-1.5">
+												<label for="linear-simple-stall" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Action on 3 consecutive stalls</label>
+												<select
+													id="linear-simple-stall"
+													class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+													value={typeof selectedBlock.data.reset_percent === 'number' ? String(selectedBlock.data.reset_percent) : '0.9'}
+													onchange={(event) => {
+														const val = (event.currentTarget as HTMLSelectElement).value;
+														updateBlockField(selectedBlock.client_id, 'reset_percent', val === '1.0' ? null : Number(val));
+													}}
+												>
+													<option value="0.9">Deload -10% of working weight &amp; build back up</option>
+													<option value="0.85">Deload -15% of working weight &amp; build back up</option>
+													<option value="0.8">Deload -20% of working weight &amp; build back up</option>
+													<option value="1.0">Keep same weight (keep retrying)</option>
+												</select>
+											</div>
+										</div>
+									{:else if isDoubleProgression}
+										<div class="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+											<div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary">
+												<span class="material-symbols-outlined text-base">repeat</span>
+												Double Progression Settings
+											</div>
+											<p class="text-xs text-on-surface-variant leading-relaxed">
+												Progress in reps first until you hit the top of the range across all sets, then increase load.
+											</p>
+											<div class="grid grid-cols-2 gap-3">
+												<div class="space-y-1.5">
+													<label for="dp-min-reps" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Min Reps (Floor)</label>
+													<input
+														id="dp-min-reps"
+														type="number"
+														min="1"
+														class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+														value={typeof selectedBlock.data.min_reps === 'number' ? selectedBlock.data.min_reps : 8}
+														oninput={(event) => updateBlockField(selectedBlock.client_id, 'min_reps', Number((event.currentTarget as HTMLInputElement).value))}
+													/>
+												</div>
+												<div class="space-y-1.5">
+													<label for="dp-max-reps" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Max Reps (Target)</label>
+													<input
+														id="dp-max-reps"
+														type="number"
+														min="1"
+														class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+														value={typeof selectedBlock.data.max_reps === 'number' ? selectedBlock.data.max_reps : 12}
+														oninput={(event) => updateBlockField(selectedBlock.client_id, 'max_reps', Number((event.currentTarget as HTMLInputElement).value))}
+													/>
+												</div>
+											</div>
+											<div class="rounded-lg bg-surface-container-high/60 p-2.5 text-[11px] text-on-surface-variant leading-relaxed">
+												🎯 <strong>Progression logic:</strong> Aim for {selectedBlock.data.min_reps ?? 8}–{selectedBlock.data.max_reps ?? 12} reps each set. When all sets hit {selectedBlock.data.max_reps ?? 12} reps, load increases by +{selectedBlock.data.increment ?? 2.5} {selectedBlock.data.load_unit || 'kg'} next session and reps reset to {selectedBlock.data.min_reps ?? 8}.
+											</div>
+										</div>
+									{:else if isGzclp}
+										<div class="rounded-xl border border-secondary/20 bg-secondary/5 p-4 space-y-3">
+											<div class="flex items-center justify-between">
+												<div class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-secondary">
+													<span class="material-symbols-outlined text-base">route</span>
+													GZCLP Progression Rules
+												</div>
+												<span class="rounded bg-secondary/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-secondary">
+													Preset Active
+												</span>
+											</div>
+
+											{#if currentRule === 'gzclp_hypertrophy_t1'}
+												<div class="space-y-2 text-xs">
+													<div class="flex items-center gap-2 rounded-lg bg-surface-container-high/80 p-2.5">
+														<span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/20 text-xs font-bold text-primary">1</span>
+														<div class="flex-1 min-w-0">
+															<span class="font-bold text-on-surface">Base Tier: 5 sets × 3+ reps</span>
+															<p class="text-[11px] text-on-surface-variant">Pass: add weight (+{selectedBlock.data.increment ?? 2} kg). Fail: switch to Stage 2.</p>
+														</div>
+													</div>
+													<div class="flex items-center gap-2 rounded-lg bg-surface-container-high/80 p-2.5">
+														<span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-secondary/20 text-xs font-bold text-secondary">2</span>
+														<div class="flex-1 min-w-0">
+															<span class="font-bold text-on-surface">Rescue Tier: 6 sets × 2+ reps</span>
+															<p class="text-[11px] text-on-surface-variant">Pass: add weight &amp; bounce back to 5x3+. Fail: reset load (-15%) &amp; restart at 5x3+.</p>
+														</div>
+													</div>
+												</div>
+											{:else if currentRule === 'gzclp_hypertrophy_t2' || currentRule === 'gzclp_standard_t2'}
+												<div class="space-y-2 text-xs">
+													<div class="flex items-center gap-2 rounded-lg bg-surface-container-high/80 p-2">
+														<span class="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-primary/20 text-[11px] font-bold text-primary">1</span>
+														<span class="text-on-surface font-semibold">Stage 1: 3 sets × 10 reps</span>
+													</div>
+													<div class="flex items-center gap-2 rounded-lg bg-surface-container-high/80 p-2">
+														<span class="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-secondary/20 text-[11px] font-bold text-secondary">2</span>
+														<span class="text-on-surface font-semibold">Stage 2 (on fail): 3 sets × 8 reps</span>
+													</div>
+													<div class="flex items-center gap-2 rounded-lg bg-surface-container-high/80 p-2">
+														<span class="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-tertiary/20 text-[11px] font-bold text-tertiary">3</span>
+														<span class="text-on-surface font-semibold">Stage 3 (on fail): 3 sets × 6 reps</span>
+													</div>
+													<p class="text-[11px] text-on-surface-variant pt-1">
+														{#if currentRule === 'gzclp_hypertrophy_t2'}
+															✨ <strong>Bounce to base:</strong> Passing any stage adds weight and returns to 3x10 next session. Failing Stage 3 resets weight by -15%.
+														{:else}
+															Failing Stage 3 resets weight by -15% and returns to Stage 1.
+														{/if}
+													</p>
+												</div>
+											{:else if currentRule === 'gzclp_hypertrophy_t3'}
+												<div class="rounded-lg bg-surface-container-high/80 p-3 space-y-1 text-xs">
+													<p class="font-bold text-on-surface">Target Scheme: 3 sets × 15+ reps</p>
+													<p class="text-[11px] text-on-surface-variant leading-relaxed">
+														Weight advances (+{selectedBlock.data.increment ?? 1} kg) only when:
+													</p>
+													<div class="flex flex-wrap gap-2 pt-1 text-[11px]">
+														<span class="rounded bg-primary/10 border border-primary/20 px-2 py-0.5 font-bold text-primary">AMRAP set ≥ 20 reps</span>
+														<span class="rounded bg-secondary/10 border border-secondary/20 px-2 py-0.5 font-bold text-secondary">Total session reps &gt; 50</span>
+													</div>
+												</div>
+											{:else if currentRule === 'gzclp_standard_t1'}
+												<div class="space-y-2 text-xs">
+													<div class="flex items-center gap-2 rounded-lg bg-surface-container-high/80 p-2">
+														<span class="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-primary/20 text-[11px] font-bold text-primary">1</span>
+														<span class="text-on-surface font-semibold">Stage 1: 3 sets × 5+ reps</span>
+													</div>
+													<div class="flex items-center gap-2 rounded-lg bg-surface-container-high/80 p-2">
+														<span class="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-secondary/20 text-[11px] font-bold text-secondary">2</span>
+														<span class="text-on-surface font-semibold">Stage 2 (on fail): 5 sets × 3+ reps</span>
+													</div>
+													<div class="flex items-center gap-2 rounded-lg bg-surface-container-high/80 p-2">
+														<span class="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-tertiary/20 text-[11px] font-bold text-tertiary">3</span>
+														<span class="text-on-surface font-semibold">Stage 3 (on fail): 6 sets × 2+ reps</span>
+													</div>
+													<p class="text-[11px] text-on-surface-variant pt-1">
+														On failing 6x2+: reset load by -15% and return to 3x5+.
+													</p>
+												</div>
+											{:else if currentRule === 'gzclp_standard_t3'}
+												<div class="rounded-lg bg-surface-container-high/80 p-3 space-y-1 text-xs">
+													<p class="font-bold text-on-surface">Target Scheme: 3 sets × 15+ reps</p>
+													<p class="text-[11px] text-on-surface-variant leading-relaxed">
+														Weight advances only when the final AMRAP set hits <span class="font-bold text-primary">25+ reps</span>.
+													</p>
+												</div>
+											{/if}
+
+											<div class="pt-1">
+												<button
+													type="button"
+													class="inline-flex items-center gap-1 text-[11px] font-semibold text-secondary hover:underline cursor-pointer"
+													onclick={() => {
+														showAdvancedProgression[selectedBlock.client_id] = !showAdvancedProgression[selectedBlock.client_id];
+													}}
+												>
+													<span class="material-symbols-outlined text-sm">
+														{showAdvancedProgression[selectedBlock.client_id] ? 'expand_less' : 'tune'}
+													</span>
+													{showAdvancedProgression[selectedBlock.client_id] ? 'Hide stage overrides' : 'Customize stages & reset percentage'}
+												</button>
+											</div>
+
+											{#if showAdvancedProgression[selectedBlock.client_id]}
+												<div class="pt-3 border-t border-outline-variant/15 space-y-3">
+													<div class="space-y-1.5">
+														<label for="linear-fail-sequence" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Fail sequence override</label>
+														<input
+															id="linear-fail-sequence"
+															type="text"
+															placeholder="e.g. 5x3 -> 6x2"
+															class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+															value={typeof selectedBlock.data.fail_sequence === 'string' ? selectedBlock.data.fail_sequence : ''}
+															oninput={(event) => updateBlockField(selectedBlock.client_id, 'fail_sequence', (event.currentTarget as HTMLInputElement).value)}
+														/>
+													</div>
+													<div class="space-y-1.5">
+														<label for="linear-reset-percent" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Weight Reset on Final Failure</label>
+														<select
+															id="linear-reset-percent"
+															class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+															value={typeof selectedBlock.data.reset_percent === 'number' ? String(selectedBlock.data.reset_percent) : '0.85'}
+															onchange={(event) => updateBlockField(selectedBlock.client_id, 'reset_percent', Number((event.currentTarget as HTMLSelectElement).value))}
+														>
+															<option value="0.9">Deload -10% of failed load</option>
+															<option value="0.85">Deload -15% of failed load (Standard GZCLP)</option>
+															<option value="0.8">Deload -20% of failed load</option>
+															<option value="0.75">Deload -25% of failed load</option>
+														</select>
+													</div>
+												</div>
+											{/if}
+										</div>
+									{:else if isCustom}
+										<div class="rounded-xl border border-outline-variant/20 bg-surface-container-low p-4 space-y-4">
+											<div class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-on-surface">
+												<span class="material-symbols-outlined text-base">tune</span>
+												Custom Fail Sequence &amp; Overrides
+											</div>
+											<div class="space-y-1.5">
+												<label for="linear-custom-sequence" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Fail sequence</label>
 												<input
-													id="linear-fail-sequence"
+													id="linear-custom-sequence"
 													type="text"
 													placeholder="e.g. 5x3 -> 6x2 -> 10x1"
 													class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
 													value={typeof selectedBlock.data.fail_sequence === 'string' ? selectedBlock.data.fail_sequence : ''}
 													oninput={(event) => updateBlockField(selectedBlock.client_id, 'fail_sequence', (event.currentTarget as HTMLInputElement).value)}
 												/>
-												<span class="text-[10px] text-on-surface-variant/70 block leading-tight">Rotates sets x reps on session failure. Keep empty for standard linear progression.</span>
+												<span class="text-[10px] text-on-surface-variant/70 block leading-tight">Separate stages with arrows (-&gt;). Rotates sets x reps on session failure.</span>
 											</div>
-											<div class="space-y-2">
-												<label for="linear-reset-percent" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Reset percent</label>
-												<input
-													id="linear-reset-percent"
-													type="number"
-													step="0.05"
-													min="0.1"
-													max="1.0"
-													placeholder="0.85 (85%)"
-													class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
-													value={typeof selectedBlock.data.reset_percent === 'number' ? selectedBlock.data.reset_percent : ''}
-													oninput={(event) => {
-														const val = (event.currentTarget as HTMLInputElement).value;
-														updateBlockField(selectedBlock.client_id, 'reset_percent', val === '' ? null : Number(val));
-													}}
-												/>
-												<span class="text-[10px] text-on-surface-variant/70 block leading-tight">Percent of failed weight to reset to (e.g. 0.85 for 85%). Defaults to 85% GZCLP.</span>
+											<div class="grid gap-3 md:grid-cols-2">
+												<div class="space-y-1.5">
+													<label for="linear-custom-reset" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Reset on failure</label>
+													<select
+														id="linear-custom-reset"
+														class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+														value={typeof selectedBlock.data.reset_percent === 'number' ? String(selectedBlock.data.reset_percent) : '0.85'}
+														onchange={(event) => updateBlockField(selectedBlock.client_id, 'reset_percent', Number((event.currentTarget as HTMLSelectElement).value))}
+													>
+														<option value="0.9">Reset -10%</option>
+														<option value="0.85">Reset -15%</option>
+														<option value="0.8">Reset -20%</option>
+														<option value="0.75">Reset -25%</option>
+													</select>
+												</div>
+												<div class="flex items-center gap-2 pt-6">
+													<input
+														id="linear-custom-bounce"
+														type="checkbox"
+														class="h-4 w-4 rounded border-outline-variant/30 text-primary focus:ring-primary/40 cursor-pointer"
+														checked={selectedBlock.data.bounce_to_base === true}
+														onchange={(event) => updateBlockField(selectedBlock.client_id, 'bounce_to_base', (event.currentTarget as HTMLInputElement).checked)}
+													/>
+													<label for="linear-custom-bounce" class="text-xs font-medium text-on-surface cursor-pointer">
+														Bounce to base on pass
+													</label>
+												</div>
 											</div>
 										</div>
+									{:else if isManual}
+										<div class="rounded-xl border border-outline-variant/15 bg-surface-container-low p-3.5 text-xs text-on-surface-variant leading-relaxed">
+											ℹ️ <strong>Manual mode:</strong> No automated weight or rep progression is scheduled. You have full freedom to adjust load and reps during your workout.
+										</div>
+									{/if}
 
-										<div class="grid gap-3 md:grid-cols-3 pt-3 border-t border-outline-variant/10">
-											<div class="space-y-2">
-												<label for="linear-rounding-precision" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Rounding</label>
-												<select
-													id="linear-rounding-precision"
-													class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
-													value={typeof selectedBlock.data.rounding_precision === 'number' ? selectedBlock.data.rounding_precision : ''}
-													onchange={(event) => {
-														const val = (event.currentTarget as HTMLSelectElement).value;
-														updateBlockField(selectedBlock.client_id, 'rounding_precision', val === '' ? null : Number(val));
-													}}
-												>
-													<option value="">No rounding</option>
-													<option value="0.5">0.5 kg/lb</option>
-													<option value="1">1.0 kg/lb</option>
-													<option value="2.5">2.5 kg/lb</option>
-													<option value="5">5.0 kg/lb</option>
-												</select>
-												<span class="text-[10px] text-on-surface-variant/70 block leading-tight">Rounding step for weight suggestions.</span>
+									<div class="border-t border-outline-variant/10 pt-3">
+										<details class="group">
+											<summary class="flex items-center justify-between cursor-pointer list-none text-xs font-bold uppercase tracking-wider text-on-surface-variant transition-colors hover:text-on-surface">
+												<span class="flex items-center gap-1.5">
+													<span class="material-symbols-outlined text-base">straighten</span>
+													Rounding &amp; Scheduled Deload
+												</span>
+												<span class="material-symbols-outlined text-base transition-transform group-open:rotate-180">expand_more</span>
+											</summary>
+											<div class="mt-3 grid gap-3 md:grid-cols-3 pt-2">
+												<div class="space-y-1.5">
+													<label for="linear-rounding-precision" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Rounding</label>
+													<select
+														id="linear-rounding-precision"
+														class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+														value={typeof selectedBlock.data.rounding_precision === 'number' ? selectedBlock.data.rounding_precision : ''}
+														onchange={(event) => {
+															const val = (event.currentTarget as HTMLSelectElement).value;
+															updateBlockField(selectedBlock.client_id, 'rounding_precision', val === '' ? null : Number(val));
+														}}
+													>
+														<option value="">No rounding</option>
+														<option value="0.5">0.5 kg/lb</option>
+														<option value="1">1.0 kg/lb</option>
+														<option value="2.5">2.5 kg/lb</option>
+														<option value="5">5.0 kg/lb</option>
+													</select>
+													<span class="text-[10px] text-on-surface-variant/70 block leading-tight">Rounding step for weight suggestions.</span>
+												</div>
+												<div class="space-y-1.5">
+													<label for="linear-deload-weeks" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Deload Every</label>
+													<input
+														id="linear-deload-weeks"
+														type="number"
+														min="0"
+														placeholder="e.g. 4 weeks"
+														class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+														value={typeof selectedBlock.data.deload_weeks === 'number' ? selectedBlock.data.deload_weeks : ''}
+														oninput={(event) => {
+															const val = (event.currentTarget as HTMLInputElement).value;
+															updateBlockField(selectedBlock.client_id, 'deload_weeks', val === '' ? null : Number(val));
+														}}
+													/>
+													<span class="text-[10px] text-on-surface-variant/70 block leading-tight">Every X sessions. Keep 0 to disable.</span>
+												</div>
+												<div class="space-y-1.5">
+													<label for="linear-deload-percent" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Deload Percent</label>
+													<select
+														id="linear-deload-percent"
+														class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+														value={typeof selectedBlock.data.deload_percent === 'number' ? String(selectedBlock.data.deload_percent) : '0.9'}
+														onchange={(event) => {
+															const val = (event.currentTarget as HTMLSelectElement).value;
+															updateBlockField(selectedBlock.client_id, 'deload_percent', val === '' ? null : Number(val));
+														}}
+													>
+														<option value="0.9">Deload -10% (90% load)</option>
+														<option value="0.85">Deload -15% (85% load)</option>
+														<option value="0.8">Deload -20% (80% load)</option>
+														<option value="0.7">Deload -30% (70% load)</option>
+														<option value="0.6">Deload -40% (60% load)</option>
+													</select>
+													<span class="text-[10px] text-on-surface-variant/70 block leading-tight">Weight reduction during scheduled deload.</span>
+												</div>
 											</div>
-											<div class="space-y-2">
-												<label for="linear-deload-weeks" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Deload Every</label>
-												<input
-													id="linear-deload-weeks"
-													type="number"
-													min="0"
-													placeholder="e.g. 4 weeks"
-													class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
-													value={typeof selectedBlock.data.deload_weeks === 'number' ? selectedBlock.data.deload_weeks : ''}
-													oninput={(event) => {
-														const val = (event.currentTarget as HTMLInputElement).value;
-														updateBlockField(selectedBlock.client_id, 'deload_weeks', val === '' ? null : Number(val));
-													}}
-												/>
-												<span class="text-[10px] text-on-surface-variant/70 block leading-tight">Trigger deload every X sessions. Keep 0 to disable.</span>
-											</div>
-											<div class="space-y-2">
-												<label for="linear-deload-percent" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Deload Percent</label>
-												<input
-													id="linear-deload-percent"
-													type="number"
-													step="0.05"
-													min="0.1"
-													max="1.0"
-													placeholder="0.90 (90%)"
-													class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
-													value={typeof selectedBlock.data.deload_percent === 'number' ? selectedBlock.data.deload_percent : ''}
-													oninput={(event) => {
-														const val = (event.currentTarget as HTMLInputElement).value;
-														updateBlockField(selectedBlock.client_id, 'deload_percent', val === '' ? null : Number(val));
-													}}
-												/>
-												<span class="text-[10px] text-on-surface-variant/70 block leading-tight">Load reduction during deload week (e.g. 0.90).</span>
-											</div>
-										</div>
+										</details>
 									</div>
 								</div>
 							{:else if selectedBlock.node_type_slug === 'wave'}
