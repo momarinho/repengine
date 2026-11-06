@@ -636,11 +636,15 @@ class CanonicalRoutineImport {
             final rest = int.tryParse(b['rest_seconds']?.toString() ?? '') ?? 90;
 
             final prog = b['progression'] as Map<String, dynamic>?;
-            final progType = prog?['type']?.toString();
-            final progInc = double.tryParse(prog?['increment']?.toString() ?? '');
-            var minR = int.tryParse(prog?['min_reps']?.toString() ?? '');
-            var maxR = int.tryParse(prog?['max_reps']?.toString() ?? '');
-            final rule = prog?['rule']?.toString();
+            final progType = prog?['type']?.toString() ??
+                (type == 'linear_progression' || b['increment'] != null ? 'linear' : null);
+            final progInc = double.tryParse(
+                prog?['increment']?.toString() ?? b['increment']?.toString() ?? '');
+            var minR = int.tryParse(prog?['min_reps']?.toString() ?? b['min_reps']?.toString() ?? '');
+            var maxR = int.tryParse(prog?['max_reps']?.toString() ?? b['max_reps']?.toString() ?? '');
+            final rule = prog?['rule']?.toString() ??
+                prog?['progression_rule']?.toString() ??
+                b['progression_rule']?.toString();
 
             if (progType == 'double' || (minR == null && reps.contains('-'))) {
               final rangeMatch = RegExp(r'(\d+)\s*[-–]\s*(\d+)').firstMatch(reps);
