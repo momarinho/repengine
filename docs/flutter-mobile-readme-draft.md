@@ -7,7 +7,7 @@
 [![BFF](https://img.shields.io/badge/Backend-Dart%20Frog-00B4AB)](https://dartfrog.vgv.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **Offline-first workout execution HUD** designed for athletes in underground gym basements with zero cell reception. Features deterministic bidirectional synchronization, idempotent batch mutations, reactive SQLite streams, and hardware-accelerated workout tracking.
+> **Local-first workout execution HUD** designed for athletes training anywhere without requiring a constant server connection. Since the Go Core engine runs locally on the athlete's PC/Docker rather than an expensive VPS, workouts are recorded in local SQLite and automatically synchronized whenever the phone reconnects to the home local network (LAN).
 
 ---
 

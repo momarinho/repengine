@@ -2,7 +2,7 @@
 
 The official mobile client for **RepEngine**, engineered as a local-first, gym-hardened physical training companion using **Flutter**, **Riverpod 2**, and **Drift (SQLite)**.
 
-It delivers instantaneous $< 5\text{ms}$ UI response times, full offline workout logging in basement gyms, thumb-first ergonomics, and automatic background synchronization with the RepEngine Core API via the Dart Frog BFF.
+It delivers instantaneous $< 5\text{ms}$ UI response times, local-first offline workout logging anywhere, thumb-first ergonomics, and automatic background synchronization whenever connected to the same local network (LAN) as the RepEngine Core API.
 
 ---
 
