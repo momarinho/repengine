@@ -106,13 +106,17 @@ info "Database      : ${POSTGRES_DB} @ ${DB_HOST} (user: ${POSTGRES_USER})"
 # ---------------------------------------------------------------------------
 # Determine backup method: docker compose exec vs direct pg_dump
 # ---------------------------------------------------------------------------
-COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.prod.yml"
-
 run_backup() {
-  # Prefer docker compose exec if the compose file exists and the db service is running
-  if [[ -f "$COMPOSE_FILE" ]] && docker compose -f "$COMPOSE_FILE" ps db 2>/dev/null | grep -q "running\|Up"; then
-    info "Using docker compose exec (db container is running)"
-    docker compose -f "$COMPOSE_FILE" exec -T db \
+  local compose_file=""
+  if [[ -f "${PROJECT_ROOT}/docker-compose.prod.yml" ]] && docker compose -f "${PROJECT_ROOT}/docker-compose.prod.yml" ps db 2>/dev/null | grep -q "running\|Up"; then
+    compose_file="${PROJECT_ROOT}/docker-compose.prod.yml"
+  elif [[ -f "${PROJECT_ROOT}/docker-compose.dev.yml" ]] && docker compose -f "${PROJECT_ROOT}/docker-compose.dev.yml" ps db 2>/dev/null | grep -q "running\|Up"; then
+    compose_file="${PROJECT_ROOT}/docker-compose.dev.yml"
+  fi
+
+  if [[ -n "$compose_file" ]]; then
+    info "Using docker compose exec (db container running via $(basename "$compose_file"))"
+    docker compose -f "$compose_file" exec -T db \
       pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" \
       | gzip > "${BACKUP_FILE}"
   else

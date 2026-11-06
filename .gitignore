@@ -38,6 +38,12 @@ venv/
 .packages
 build/
 *.apk
+
+# Backups
+backups/
+*.sql
+*.sql.gz
+
 # IDE
 .idea/
 .vscode/

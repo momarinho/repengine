@@ -130,11 +130,18 @@ if [[ -z "$POSTGRES_USER" || -z "$POSTGRES_DB" ]]; then
   exit 1
 fi
 
-COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.prod.yml"
+COMPOSE_FILE=""
+if [[ -f "${PROJECT_ROOT}/docker-compose.prod.yml" ]] && docker compose -f "${PROJECT_ROOT}/docker-compose.prod.yml" ps db 2>/dev/null | grep -q "running\|Up"; then
+  COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.prod.yml"
+elif [[ -f "${PROJECT_ROOT}/docker-compose.dev.yml" ]] && docker compose -f "${PROJECT_ROOT}/docker-compose.dev.yml" ps db 2>/dev/null | grep -q "running\|Up"; then
+  COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.dev.yml"
+elif [[ -f "${PROJECT_ROOT}/docker-compose.prod.yml" ]]; then
+  COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.prod.yml"
+fi
 
-if [[ ! -f "$COMPOSE_FILE" ]]; then
-  error "Compose file not found: ${COMPOSE_FILE}"
-  error "Ensure docker-compose.prod.yml exists in the project root."
+if [[ -z "$COMPOSE_FILE" ]]; then
+  error "Compose file not found or docker is not running."
+  error "Ensure docker-compose.prod.yml or docker-compose.dev.yml exists in the project root."
   exit 1
 fi
 
