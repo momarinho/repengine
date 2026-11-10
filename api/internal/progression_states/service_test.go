@@ -1953,3 +1953,449 @@ func TestApplySessionProgression_GZCLP_Standard_T3_Requires25AMRAP(t *testing.T)
 		runStandardT3Test(t, []string{"15", "15", "25"}, OutcomeIncrease, "52.5 kg")
 	})
 }
+
+func TestApplySessionProgression_EquipmentMaxLoad_LinearGZCLP(t *testing.T) {
+	ctx := context.Background()
+
+	blockData := map[string]any{
+		"exercise_name":    "Deadlift",
+		"sets":             5,
+		"reps":             "3+",
+		"start_load":       70.0,
+		"load_unit":        "kg",
+		"increment":        5.0,
+		"max_load":         72.0,
+		"on_max_load":      "expand_reps",
+		"fail_sequence":    "5x3+, 6x2+, 10x1+",
+		"progression_rule": "gzclp_standard_t1",
+	}
+
+	currentState := &ProgressionState{
+		WorkflowBlockID: 101,
+		NodeTypeSlug:    "linear_progression",
+		CurrentLoad:     "70 kg",
+		SuggestedLoad:   "70 kg",
+		Metadata: map[string]any{
+			"current_sequence_index": 0,
+			"sets_planned":           5,
+			"reps_planned":           "3+",
+			"max_load":               72.0,
+			"on_max_load":            "expand_reps",
+			"capped":                 false,
+		},
+	}
+
+	var savedState UpsertProgressionStateInput
+
+	repo := &fakeRepo{
+		userOwnsWorkflowFunc: func(ctx context.Context, userID, workflowID int) (bool, error) {
+			return true, nil
+		},
+		listWorkflowBlocksFunc: func(ctx context.Context, workflowID int) ([]workflowBlockConfig, error) {
+			return []workflowBlockConfig{
+				{
+					ID:           101,
+					NodeTypeSlug: "linear_progression",
+					Position:     0,
+					Data:         blockData,
+				},
+			}, nil
+		},
+		listProgressionStatesFunc: func(ctx context.Context, userID, workflowID int) ([]ProgressionState, error) {
+			return []ProgressionState{*currentState}, nil
+		},
+		upsertProgressionStateFunc: func(ctx context.Context, in UpsertProgressionStateInput) (ProgressionState, error) {
+			savedState = in
+			// Update currentState for next session simulation
+			currentState = &ProgressionState{
+				WorkflowBlockID: in.WorkflowBlockID,
+				NodeTypeSlug:    in.NodeTypeSlug,
+				Outcome:         in.Outcome,
+				CurrentLoad:     in.CurrentLoad,
+				SuggestedLoad:   in.SuggestedLoad,
+				Metadata:        in.Metadata,
+			}
+			return *currentState, nil
+		},
+	}
+
+	service := NewService(repo)
+
+	// Session 1: Lift 70 kg for 5 sets of 3 reps.
+	// 70 + 5 = 75 kg > max_load (72 kg), so suggestedLoad should be capped at 72 kg,
+	// and target reps for next session should remain base 3+ reps.
+	logsSession1 := make([]CompletedSetLog, 5)
+	for i := 0; i < 5; i++ {
+		logsSession1[i] = CompletedSetLog{
+			WorkflowBlockID: intPtr(101),
+			SetIndex:        i,
+			PrescribedReps:  "3+",
+			PrescribedLoad:  "70 kg",
+			ActualReps:      "3",
+			ActualLoad:      "70 kg",
+			Completed:       true,
+		}
+	}
+	err := service.ApplySessionProgression(ctx, ApplySessionProgressionInput{
+		UserID: 1, WorkflowID: 1, SessionID: 1, Logs: logsSession1,
+	})
+	if err != nil {
+		t.Fatalf("session 1 failed: %v", err)
+	}
+	if savedState.SuggestedLoad != "72 kg" {
+		t.Errorf("expected 72 kg, got %s", savedState.SuggestedLoad)
+	}
+	if savedState.Metadata["reps_planned"] != "3+" {
+		t.Errorf("expected 3+ reps planned for first 72kg session, got %v", savedState.Metadata["reps_planned"])
+	}
+	if capped, _ := savedState.Metadata["capped"].(bool); !capped {
+		t.Errorf("expected capped to be true")
+	}
+
+	// Session 2: User lifts 72 kg for 5 sets of 3 reps.
+	// Now user completed base reps at maxLoad! Should advance to 4+ reps at 72 kg.
+	logsSession2 := make([]CompletedSetLog, 5)
+	for i := 0; i < 5; i++ {
+		logsSession2[i] = CompletedSetLog{
+			WorkflowBlockID: intPtr(101),
+			SetIndex:        i,
+			PrescribedReps:  "3+",
+			PrescribedLoad:  "72 kg",
+			ActualReps:      "3",
+			ActualLoad:      "72 kg",
+			Completed:       true,
+		}
+	}
+	err = service.ApplySessionProgression(ctx, ApplySessionProgressionInput{
+		UserID: 1, WorkflowID: 1, SessionID: 2, Logs: logsSession2,
+	})
+	if err != nil {
+		t.Fatalf("session 2 failed: %v", err)
+	}
+	if savedState.SuggestedLoad != "72 kg" {
+		t.Errorf("expected 72 kg, got %s", savedState.SuggestedLoad)
+	}
+	if savedState.Metadata["reps_planned"] != "4+" {
+		t.Errorf("expected 4+ reps planned, got %v", savedState.Metadata["reps_planned"])
+	}
+
+	// Session 3: User lifts 72 kg for 5 sets of 4 reps.
+	// Succeeds at 4 reps -> should advance to 5+ reps at 72 kg.
+	logsSession3 := make([]CompletedSetLog, 5)
+	for i := 0; i < 5; i++ {
+		logsSession3[i] = CompletedSetLog{
+			WorkflowBlockID: intPtr(101),
+			SetIndex:        i,
+			PrescribedReps:  "4+",
+			PrescribedLoad:  "72 kg",
+			ActualReps:      "4",
+			ActualLoad:      "72 kg",
+			Completed:       true,
+		}
+	}
+	err = service.ApplySessionProgression(ctx, ApplySessionProgressionInput{
+		UserID: 1, WorkflowID: 1, SessionID: 3, Logs: logsSession3,
+	})
+	if err != nil {
+		t.Fatalf("session 3 failed: %v", err)
+	}
+	if savedState.SuggestedLoad != "72 kg" {
+		t.Errorf("expected 72 kg, got %s", savedState.SuggestedLoad)
+	}
+	if savedState.Metadata["reps_planned"] != "5+" {
+		t.Errorf("expected 5+ reps planned, got %v", savedState.Metadata["reps_planned"])
+	}
+
+	// Session 4: User attempts 5x5+ at 72 kg but fails set 4 (got 4 reps).
+	// Should maintain 72 kg and maintain 5+ target reps for retry.
+	logsSession4 := make([]CompletedSetLog, 5)
+	for i := 0; i < 5; i++ {
+		reps := "5"
+		if i == 3 {
+			reps = "4" // missed target
+		}
+		logsSession4[i] = CompletedSetLog{
+			WorkflowBlockID: intPtr(101),
+			SetIndex:        i,
+			PrescribedReps:  "5+",
+			PrescribedLoad:  "72 kg",
+			ActualReps:      reps,
+			ActualLoad:      "72 kg",
+			Completed:       true,
+		}
+	}
+	err = service.ApplySessionProgression(ctx, ApplySessionProgressionInput{
+		UserID: 1, WorkflowID: 1, SessionID: 4, Logs: logsSession4,
+	})
+	if err != nil {
+		t.Fatalf("session 4 failed: %v", err)
+	}
+	if savedState.SuggestedLoad != "72 kg" {
+		t.Errorf("expected 72 kg, got %s", savedState.SuggestedLoad)
+	}
+	if savedState.Metadata["reps_planned"] != "5+" {
+		t.Errorf("expected 5+ reps planned retry, got %v", savedState.Metadata["reps_planned"])
+	}
+
+	// Session 5: Retries 5x5+ at 72 kg and hits all sets!
+	// Should advance to 6+ reps at 72 kg.
+	logsSession5 := make([]CompletedSetLog, 5)
+	for i := 0; i < 5; i++ {
+		logsSession5[i] = CompletedSetLog{
+			WorkflowBlockID: intPtr(101),
+			SetIndex:        i,
+			PrescribedReps:  "5+",
+			PrescribedLoad:  "72 kg",
+			ActualReps:      "5",
+			ActualLoad:      "72 kg",
+			Completed:       true,
+		}
+	}
+	err = service.ApplySessionProgression(ctx, ApplySessionProgressionInput{
+		UserID: 1, WorkflowID: 1, SessionID: 5, Logs: logsSession5,
+	})
+	if err != nil {
+		t.Fatalf("session 5 failed: %v", err)
+	}
+	if savedState.SuggestedLoad != "72 kg" {
+		t.Errorf("expected 72 kg, got %s", savedState.SuggestedLoad)
+	}
+	if savedState.Metadata["reps_planned"] != "6+" {
+		t.Errorf("expected 6+ reps planned, got %v", savedState.Metadata["reps_planned"])
+	}
+}
+
+func TestApplySessionProgression_EquipmentMaxLoad_Maintain(t *testing.T) {
+	ctx := context.Background()
+
+	blockData := map[string]any{
+		"exercise_name": "Deadlift",
+		"sets":          5,
+		"reps":          "3+",
+		"start_load":    72.0,
+		"load_unit":     "kg",
+		"increment":     5.0,
+		"max_load":      72.0,
+		"on_max_load":   "maintain",
+	}
+
+	var savedState UpsertProgressionStateInput
+
+	repo := &fakeRepo{
+		userOwnsWorkflowFunc: func(ctx context.Context, userID, workflowID int) (bool, error) {
+			return true, nil
+		},
+		listWorkflowBlocksFunc: func(ctx context.Context, workflowID int) ([]workflowBlockConfig, error) {
+			return []workflowBlockConfig{
+				{
+					ID:           102,
+					NodeTypeSlug: "linear_progression",
+					Position:     0,
+					Data:         blockData,
+				},
+			}, nil
+		},
+		listProgressionStatesFunc: func(ctx context.Context, userID, workflowID int) ([]ProgressionState, error) {
+			return []ProgressionState{
+				{
+					WorkflowBlockID: 102,
+					NodeTypeSlug:    "linear_progression",
+					CurrentLoad:     "72 kg",
+					SuggestedLoad:   "72 kg",
+				},
+			}, nil
+		},
+		upsertProgressionStateFunc: func(ctx context.Context, in UpsertProgressionStateInput) (ProgressionState, error) {
+			savedState = in
+			return ProgressionState{}, nil
+		},
+	}
+
+	service := NewService(repo)
+
+	logs := make([]CompletedSetLog, 5)
+	for i := 0; i < 5; i++ {
+		logs[i] = CompletedSetLog{
+			WorkflowBlockID: intPtr(102),
+			SetIndex:        i,
+			PrescribedReps:  "3+",
+			PrescribedLoad:  "72 kg",
+			ActualReps:      "3",
+			ActualLoad:      "72 kg",
+			Completed:       true,
+		}
+	}
+
+	err := service.ApplySessionProgression(ctx, ApplySessionProgressionInput{
+		UserID: 1, WorkflowID: 1, SessionID: 1, Logs: logs,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if savedState.SuggestedLoad != "72 kg" {
+		t.Errorf("expected 72 kg, got %s", savedState.SuggestedLoad)
+	}
+	if savedState.Metadata["reps_planned"] != "3+" {
+		t.Errorf("expected 3+ reps maintained, got %v", savedState.Metadata["reps_planned"])
+	}
+}
+
+func TestApplySessionProgression_EquipmentMaxLoad_DoubleProgression(t *testing.T) {
+	ctx := context.Background()
+
+	blockData := map[string]any{
+		"exercise_name": "Dumbbell Bench Press",
+		"sets":          3,
+		"reps":          "5-8",
+		"load_value":    72.0,
+		"load_unit":     "kg",
+		"increment":     2.5,
+		"max_load":      72.0,
+		"on_max_load":   "expand_reps",
+	}
+
+	var savedState UpsertProgressionStateInput
+
+	repo := &fakeRepo{
+		userOwnsWorkflowFunc: func(ctx context.Context, userID, workflowID int) (bool, error) {
+			return true, nil
+		},
+		listWorkflowBlocksFunc: func(ctx context.Context, workflowID int) ([]workflowBlockConfig, error) {
+			return []workflowBlockConfig{
+				{
+					ID:           103,
+					NodeTypeSlug: "exercise",
+					Position:     0,
+					Data:         blockData,
+				},
+			}, nil
+		},
+		listProgressionStatesFunc: func(ctx context.Context, userID, workflowID int) ([]ProgressionState, error) {
+			return []ProgressionState{
+				{
+					WorkflowBlockID: 103,
+					NodeTypeSlug:    "exercise",
+					StateType:       StateTypeDouble,
+					CurrentLoad:     "72 kg",
+					SuggestedLoad:   "72 kg",
+					Metadata: map[string]any{
+						"target_reps": 8,
+						"min_reps":    5,
+						"max_reps":    8,
+						"capped":      true,
+						"max_load":    72.0,
+						"on_max_load": "expand_reps",
+					},
+				},
+			}, nil
+		},
+		upsertProgressionStateFunc: func(ctx context.Context, in UpsertProgressionStateInput) (ProgressionState, error) {
+			savedState = in
+			return ProgressionState{}, nil
+		},
+	}
+
+	service := NewService(repo)
+
+	// User completes 3 sets of 8 reps at 72 kg (the max)
+	logs := make([]CompletedSetLog, 3)
+	for i := 0; i < 3; i++ {
+		logs[i] = CompletedSetLog{
+			WorkflowBlockID: intPtr(103),
+			SetIndex:        i,
+			PrescribedReps:  "8",
+			PrescribedLoad:  "72 kg",
+			ActualReps:      "8",
+			ActualLoad:      "72 kg",
+			Completed:       true,
+		}
+	}
+
+	err := service.ApplySessionProgression(ctx, ApplySessionProgressionInput{
+		UserID: 1, WorkflowID: 1, SessionID: 1, Logs: logs,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if savedState.SuggestedLoad != "72 kg" {
+		t.Errorf("expected 72 kg, got %s", savedState.SuggestedLoad)
+	}
+	// Target reps should expand to 9 reps!
+	if savedState.Metadata["target_reps"] != 9 {
+		t.Errorf("expected target_reps 9, got %v", savedState.Metadata["target_reps"])
+	}
+}
+
+func TestListProgressionStates_SynchronizesWithMaxLoadPreservesCappedReps(t *testing.T) {
+	ctx := context.Background()
+
+	repo := &fakeRepo{
+		userOwnsWorkflowFunc: func(ctx context.Context, userID, workflowID int) (bool, error) {
+			return true, nil
+		},
+		listWorkflowBlocksFunc: func(ctx context.Context, workflowID int) ([]workflowBlockConfig, error) {
+			return []workflowBlockConfig{
+				{
+					ID:           104,
+					NodeTypeSlug: "linear_progression",
+					Position:     1,
+					Data: map[string]any{
+						"exercise_name": "Deadlift",
+						"sets":          5,
+						"reps":          "3+",
+						"fail_sequence": "5x3+, 6x2+",
+						"start_load":    72.0,
+						"max_load":      72.0,
+						"on_max_load":   "expand_reps",
+					},
+				},
+			}, nil
+		},
+		listProgressionStatesFunc: func(ctx context.Context, userID, workflowID int) ([]ProgressionState, error) {
+			return []ProgressionState{
+				{
+					ID:              1,
+					UserID:          1,
+					WorkflowID:      1,
+					WorkflowBlockID: 104,
+					BlockKey:        "::linear_progression::deadlift::1",
+					NodeTypeSlug:    "linear_progression",
+					StateType:       StateTypeLinear,
+					SuggestedLoad:   "72 kg",
+					Metadata: map[string]any{
+						"fail_sequence":          "5x3+, 6x2+",
+						"current_sequence_index": 0,
+						"sets_planned":           5,
+						"reps_planned":           "5+",
+						"capped":                 true,
+						"capped_reps":            5,
+						"max_load":               72.0,
+						"on_max_load":            "expand_reps",
+					},
+				},
+			}, nil
+		},
+	}
+
+	service := NewService(repo)
+	states, err := service.ListProgressionStates(ctx, ListProgressionStatesInput{
+		UserID:     1,
+		WorkflowID: 1,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(states) != 1 {
+		t.Fatalf("expected 1 state, got %d", len(states))
+	}
+
+	meta := states[0].Metadata
+	if meta["reps_planned"] != "5+" {
+		t.Errorf("expected reps_planned to be preserved as 5+, got %v", meta["reps_planned"])
+	}
+	if meta["capped"] != true {
+		t.Errorf("expected capped to be true")
+	}
+}

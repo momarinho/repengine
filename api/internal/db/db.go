@@ -82,7 +82,7 @@ func SeedNodeTypes(ctx context.Context) error {
 		schema                        string
 	}{
 		{"exercise", "Exercise", "A single exercise node", "dumbbell",
-			`{"exercise_name": "", "sets": 3, "reps": "", "rest_seconds": 90, "notes": "", "load_value": null, "load_unit": "kg", "progression": null, "load": null, "target_load": null}`},
+			`{"exercise_name": "", "sets": 3, "reps": "", "rest_seconds": 90, "notes": "", "load_value": null, "load_unit": "kg", "progression": null, "load": null, "target_load": null, "max_load": null, "on_max_load": null}`},
 		{"exercise_timed", "Timed Exercise", "Exercise with duration", "timer",
 			`{"exercise_name": "", "duration": 30, "progression": null}`},
 		{
@@ -141,7 +141,9 @@ func SeedNodeTypes(ctx context.Context) error {
 				"progression": null,
 				"load": null,
 				"load_value": null,
-				"target_load": null
+				"target_load": null,
+				"max_load": null,
+				"on_max_load": null
 			}`,
 		},
 		{

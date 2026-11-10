@@ -18,6 +18,7 @@
 	const increment = $derived(typeof block.data.increment === 'number' ? block.data.increment : null);
 	const loadUnit = $derived(typeof block.data.load_unit === 'string' ? block.data.load_unit : 'kg');
 	const restSeconds = $derived(typeof block.data.rest_seconds === 'number' ? block.data.rest_seconds : null);
+	const maxLoad = $derived(typeof block.data.max_load === 'number' ? block.data.max_load : null);
 	const notes = $derived(typeof block.data.notes === 'string' ? block.data.notes : '');
 	const rule = $derived(
 		typeof block.data.progression_rule === 'string'
@@ -39,6 +40,7 @@
 		<span class="rounded bg-surface-container-high px-2 py-0.5 font-semibold text-on-surface">{reps} reps</span>
 		{#if startLoad !== null}<span class="rounded bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 font-bold">{startLoad} {loadUnit}</span>{/if}
 		{#if increment !== null}<span class="rounded bg-secondary/10 text-secondary border border-secondary/20 px-2 py-0.5 font-bold">+{increment} {loadUnit}/sess</span>{/if}
+		{#if maxLoad !== null}<span class="rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 font-bold">Max: {maxLoad} {loadUnit}</span>{/if}
 		{#if restSeconds}<span class="rounded bg-surface-container-high px-2 py-0.5 text-on-surface-variant font-medium">{restSeconds}s rest</span>{/if}
 		<span class="rounded bg-surface-container-high px-2 py-0.5 text-on-surface-variant capitalize">{rule}</span>
 	</div>

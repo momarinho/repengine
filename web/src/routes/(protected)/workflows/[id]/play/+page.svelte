@@ -3537,7 +3537,15 @@
 								</div>
 							</div>
 
-							{#if isLinearIncrease}
+							{#if progression?.metadata?.capped === true}
+								<div class="mt-1.5 flex items-center justify-between gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[11px] text-amber-400">
+									<div class="flex items-center gap-1 font-bold">
+										<span class="material-symbols-outlined text-xs">fitness_center</span>
+										<span>Equipment Cap ({progression.metadata.max_load ? `${progression.metadata.max_load} ${currentBlock.loadUnit ?? 'kg'}` : currentPrescribedLoad}): Rep Mode</span>
+									</div>
+									<span class="text-[10px] opacity-90 font-semibold">Target: {currentBlockReps} reps</span>
+								</div>
+							{:else if isLinearIncrease}
 								<div class="mt-1.5 flex items-center justify-between gap-2 rounded-lg bg-primary/10 border border-primary/20 px-2 py-0.5 text-[11px] text-primary">
 									<div class="flex items-center gap-1 font-bold">
 										<span class="material-symbols-outlined text-xs">trending_up</span>

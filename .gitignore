@@ -43,6 +43,7 @@ build/
 backups/
 *.sql
 *.sql.gz
+!api/migrations/*.sql
 
 # IDE
 .idea/

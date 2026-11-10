@@ -346,3 +346,46 @@ test('parseAndValidateRoutineJson preserves independent double progression range
 	assert.equal(superset.data.max_reps_b, 15);
 	assert.equal(superset.data.progression_type_b, 'double');
 });
+
+test('parseAndValidateRoutineJson and exportWorkflowToCanonicalJson preserve max_load and on_max_load', () => {
+	const userJson = JSON.stringify({
+		name: 'Home Gym GZCLP',
+		sections: [
+			{
+				title: 'Workout A',
+				blocks: [
+					{
+						type: 'linear_progression',
+						exercise_name: 'Deadlift',
+						sets: 5,
+						reps: '3+',
+						start_load: 70,
+						load_unit: 'kg',
+						increment: 5,
+						max_load: 72,
+						on_max_load: 'expand_reps'
+					}
+				]
+			}
+		]
+	});
+
+	const result = parseAndValidateRoutineJson(userJson);
+	assert.ok(result.success);
+	assert.ok(result.draftBlocks);
+
+	const payload = toWorkflowPayload(result.draftBlocks);
+	const deadlift = payload[1];
+	assert.ok(deadlift?.data);
+	assert.equal(deadlift.node_type_slug, 'linear_progression');
+	assert.equal(deadlift.data.max_load, 72);
+	assert.equal(deadlift.data.on_max_load, 'expand_reps');
+
+	const canonical = exportWorkflowToCanonicalJson(
+		{ id: 1, name: 'Home Gym GZCLP', description: '', is_public: false, blocks: [] },
+		result.draftBlocks
+	);
+	const blockJson = canonical.sections[0].blocks[0];
+	assert.equal(blockJson.max_load, 72);
+	assert.equal(blockJson.on_max_load, 'expand_reps');
+});

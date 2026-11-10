@@ -1715,6 +1715,54 @@
 											{/if}
 										</div>
 									{/if}
+
+									<!-- Equipment Limit (Home Gym) -->
+									<div class="border-t border-outline-variant/10 pt-1">
+										<details class="group" open={typeof selectedBlock.data.max_load === 'number' && selectedBlock.data.max_load > 0}>
+											<summary class="flex items-center justify-between cursor-pointer list-none text-xs font-bold uppercase tracking-wider text-on-surface-variant transition-colors hover:text-on-surface">
+												<span class="flex items-center gap-1.5">
+													<span class="material-symbols-outlined text-base">fitness_center</span>
+													Equipment Limit (Home Gym)
+												</span>
+												<span class="material-symbols-outlined text-base transition-transform group-open:rotate-180">expand_more</span>
+											</summary>
+											<div class="mt-3 grid gap-3 md:grid-cols-2 pt-1">
+												<div class="space-y-1.5">
+													<label for="exercise-max-load" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Max Equipment Load</label>
+													<input
+														id="exercise-max-load"
+														type="number"
+														step="0.5"
+														min="0"
+														placeholder="e.g. 72 kg"
+														class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+														value={typeof selectedBlock.data.max_load === 'number' ? selectedBlock.data.max_load : ''}
+														oninput={(event) => {
+															const val = (event.currentTarget as HTMLInputElement).value;
+															updateBlockField(selectedBlock.client_id, 'max_load', val === '' ? null : Number(val));
+														}}
+													/>
+													<span class="text-[10px] text-on-surface-variant/70 block leading-tight">Total plate + barbell capacity available.</span>
+												</div>
+												<div class="space-y-1.5">
+													<label for="exercise-on-max-load" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">When Max Reached</label>
+													<select
+														id="exercise-on-max-load"
+														class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+														value={typeof selectedBlock.data.on_max_load === 'string' && selectedBlock.data.on_max_load ? selectedBlock.data.on_max_load : 'expand_reps'}
+														onchange={(event) => {
+															const val = (event.currentTarget as HTMLSelectElement).value;
+															updateBlockField(selectedBlock.client_id, 'on_max_load', val);
+														}}
+													>
+														<option value="expand_reps">Auto Rep Progression (Add reps at max load)</option>
+														<option value="maintain">Maintain Load &amp; Reps (Hold steady)</option>
+													</select>
+													<span class="text-[10px] text-on-surface-variant/70 block leading-tight">Caps weight and auto-progresses target reps.</span>
+												</div>
+											</div>
+										</details>
+									</div>
 								</div>
 							{:else if selectedBlock.node_type_slug === 'exercise_timed'}
 								<div class="space-y-5">
@@ -2134,6 +2182,53 @@
 														<option value="0.6">Deload -40% (60% load)</option>
 													</select>
 													<span class="text-[10px] text-on-surface-variant/70 block leading-tight">Weight reduction during scheduled deload.</span>
+												</div>
+											</div>
+										</details>
+									</div>
+
+									<div class="border-t border-outline-variant/10 pt-3">
+										<details class="group" open={typeof selectedBlock.data.max_load === 'number' && selectedBlock.data.max_load > 0}>
+											<summary class="flex items-center justify-between cursor-pointer list-none text-xs font-bold uppercase tracking-wider text-on-surface-variant transition-colors hover:text-on-surface">
+												<span class="flex items-center gap-1.5">
+													<span class="material-symbols-outlined text-base">fitness_center</span>
+													Equipment Limit (Home Gym)
+												</span>
+												<span class="material-symbols-outlined text-base transition-transform group-open:rotate-180">expand_more</span>
+											</summary>
+											<div class="mt-3 grid gap-3 md:grid-cols-2 pt-2">
+												<div class="space-y-1.5">
+													<label for="linear-max-load" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Max Equipment Load</label>
+													<input
+														id="linear-max-load"
+														type="number"
+														step="0.5"
+														min="0"
+														placeholder="e.g. 72 kg"
+														class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+														value={typeof selectedBlock.data.max_load === 'number' ? selectedBlock.data.max_load : ''}
+														oninput={(event) => {
+															const val = (event.currentTarget as HTMLInputElement).value;
+															updateBlockField(selectedBlock.client_id, 'max_load', val === '' ? null : Number(val));
+														}}
+													/>
+													<span class="text-[10px] text-on-surface-variant/70 block leading-tight">Total plate + barbell capacity available.</span>
+												</div>
+												<div class="space-y-1.5">
+													<label for="linear-on-max-load" class="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">When Max Reached</label>
+													<select
+														id="linear-on-max-load"
+														class="w-full rounded-md border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
+														value={typeof selectedBlock.data.on_max_load === 'string' && selectedBlock.data.on_max_load ? selectedBlock.data.on_max_load : 'expand_reps'}
+														onchange={(event) => {
+															const val = (event.currentTarget as HTMLSelectElement).value;
+															updateBlockField(selectedBlock.client_id, 'on_max_load', val);
+														}}
+													>
+														<option value="expand_reps">Auto Rep Progression (Add reps at max load)</option>
+														<option value="maintain">Maintain Load &amp; Reps (Hold steady)</option>
+													</select>
+													<span class="text-[10px] text-on-surface-variant/70 block leading-tight">Caps weight and auto-progresses target reps.</span>
 												</div>
 											</div>
 										</details>

@@ -9,6 +9,8 @@ export type CanonicalProgressionJson = {
 	target_rpe?: number;
 	target_rir?: number;
 	deload_percent?: number;
+	max_load?: number | null;
+	on_max_load?: string;
 	notes?: string;
 };
 
@@ -25,6 +27,8 @@ export type CanonicalBlockJson = {
 	load_unit?: string;
 	rest_seconds?: number;
 	duration?: number;
+	max_load?: number | null;
+	on_max_load?: string;
 	notes?: string;
 	progression?: CanonicalProgressionJson;
 	[key: string]: unknown;
@@ -124,6 +128,13 @@ export function exportWorkflowToCanonicalJson(
 				delete (blockJson as Record<string, any>).load_a;
 				delete (blockJson as Record<string, any>).load_b;
 				delete (blockJson as Record<string, any>).target_load;
+			}
+
+			if (typeof bData.max_load === 'number') {
+				blockJson.max_load = bData.max_load;
+			}
+			if (typeof bData.on_max_load === 'string' && bData.on_max_load.trim()) {
+				blockJson.on_max_load = bData.on_max_load.trim();
 			}
 
 			// Normalize progression
@@ -290,6 +301,10 @@ export function parseAndValidateRoutineJson(jsonInput: string): ParseRoutineResu
 			const reps = String(rawBlock.reps || rawBlockData?.reps || '5');
 			const restSeconds = Number(rawBlock.rest_seconds || rawBlockData?.rest_seconds || 90);
 			const notes = String(rawBlock.notes || rawBlockData?.notes || '');
+			const rawMaxLoad = rawBlock.max_load ?? rawBlockData?.max_load ?? prog?.max_load;
+			const maxLoad = (rawMaxLoad !== undefined && rawMaxLoad !== null && rawMaxLoad !== '') ? Number(rawMaxLoad) : null;
+			const rawOnMaxLoad = rawBlock.on_max_load ?? rawBlockData?.on_max_load ?? prog?.on_max_load;
+			const onMaxLoad = typeof rawOnMaxLoad === 'string' && rawOnMaxLoad.trim() ? rawOnMaxLoad.trim() : (maxLoad !== null ? 'expand_reps' : undefined);
 
 			let cleanData: Record<string, any> = {};
 
@@ -313,6 +328,10 @@ export function parseAndValidateRoutineJson(jsonInput: string): ParseRoutineResu
 				if (deloadPercent !== undefined && deloadPercent !== null) {
 					cleanData.deload_percent = Number(deloadPercent);
 				}
+				if (maxLoad !== null && !isNaN(maxLoad)) {
+					cleanData.max_load = maxLoad;
+					cleanData.on_max_load = onMaxLoad || 'expand_reps';
+				}
 			} else if (slug === 'exercise') {
 				exerciseCount++;
 				cleanData = {
@@ -324,6 +343,10 @@ export function parseAndValidateRoutineJson(jsonInput: string): ParseRoutineResu
 					rest_seconds: restSeconds,
 					notes
 				};
+				if (maxLoad !== null && !isNaN(maxLoad)) {
+					cleanData.max_load = maxLoad;
+					cleanData.on_max_load = onMaxLoad || 'expand_reps';
+				}
 				if (prog && prog.type !== 'none') {
 					if (prog.type === 'double') {
 						if (!prog.min_reps || !prog.max_reps) {

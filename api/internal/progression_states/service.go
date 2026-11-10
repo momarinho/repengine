@@ -458,6 +458,33 @@ func buildLinearProgressionState(
 		}
 	}
 
+	maxLoad := parseNumberValue(block.Data["max_load"])
+	if maxLoad <= 0 {
+		if prog, ok := block.Data["progression"].(map[string]any); ok {
+			maxLoad = parseNumberValue(prog["max_load"])
+		}
+	}
+	onMaxLoad := strings.ToLower(strings.TrimSpace(asString(block.Data["on_max_load"])))
+	if onMaxLoad == "" {
+		if prog, ok := block.Data["progression"].(map[string]any); ok {
+			onMaxLoad = strings.ToLower(strings.TrimSpace(asString(prog["on_max_load"])))
+		}
+	}
+	if onMaxLoad == "" {
+		onMaxLoad = "expand_reps"
+	}
+
+	isAlreadyCapped := false
+	cappedReps := 0
+	if hasExisting && existing.Metadata != nil {
+		if b, ok := existing.Metadata["capped"].(bool); ok {
+			isAlreadyCapped = b
+		}
+		if cr, ok := existing.Metadata["capped_reps"]; ok {
+			cappedReps = intOrDefault(cr, 0)
+		}
+	}
+
 	// Parse steps if sequence exists
 	var steps []failStep
 	if failSequenceStr != "" {
@@ -486,13 +513,32 @@ func buildLinearProgressionState(
 				"session_count":          sessionCount,
 				"is_deload":              true,
 				"baseline_load":          existing.SuggestedLoad,
+				"max_load":               maxLoad,
+				"on_max_load":            onMaxLoad,
+				"capped":                 isAlreadyCapped,
+				"capped_reps":            cappedReps,
 			},
 		}
 	}
 
+	baseRepsStr := asString(block.Data["reps"])
+	if len(steps) > 0 && currentSeqIndex >= 0 && currentSeqIndex < len(steps) {
+		baseRepsStr = steps[currentSeqIndex].Reps
+	}
+
 	var setsPlanned int
 	var repsPrescribed string
-	if len(steps) > 0 {
+	if isAlreadyCapped && cappedReps > 0 && onMaxLoad == "expand_reps" {
+		if len(steps) > 0 && currentSeqIndex >= 0 && currentSeqIndex < len(steps) {
+			setsPlanned = steps[currentSeqIndex].Sets
+		} else {
+			setsPlanned = intOrDefault(block.Data["sets"], len(logs))
+		}
+		repsPrescribed = fmt.Sprintf("%d", cappedReps)
+		if strings.Contains(baseRepsStr, "+") {
+			repsPrescribed = fmt.Sprintf("%d+", cappedReps)
+		}
+	} else if len(steps) > 0 {
 		// Ensure currentSeqIndex is within bounds
 		if currentSeqIndex < 0 || currentSeqIndex >= len(steps) {
 			currentSeqIndex = 0
@@ -509,7 +555,7 @@ func buildLinearProgressionState(
 	}
 	lowerTarget, upperTarget := parseRepRange(repsPrescribed)
 	isRepRange := upperTarget > lowerTarget
-	isAMRAP := strings.Contains(repsPrescribed, "+")
+	isAMRAP := strings.Contains(repsPrescribed, "+") || strings.Contains(baseRepsStr, "+")
 
 	increment := parseNumberValue(block.Data["increment"])
 	if increment == 0 {
@@ -550,7 +596,16 @@ func buildLinearProgressionState(
 	case missedFloor || !allSetsCompleted || isLinearTooHard(hasRPE, avgRPE, hasRIR, avgRIR):
 		outcome = OutcomeReduce
 		sessionCount = 0 // reset consecutive sessions on failure
-		if len(steps) > 0 {
+		if maxLoad > 0 && isAlreadyCapped {
+			suggestedLoad = formatLoad(maxLoad, loadUnit)
+			suggestedSeqIndex = currentSeqIndex
+			outcome = OutcomeMaintain
+			if onMaxLoad == "expand_reps" && cappedReps > 0 {
+				summary = fmt.Sprintf("Fell short of %d reps with max equipment load (%s). Maintained load; aim for %d reps across all sets next session.", cappedReps, suggestedLoad, cappedReps)
+			} else {
+				summary = fmt.Sprintf("Failed rep target at max equipment load (%s). Maintained load; try again next session.", suggestedLoad)
+			}
+		} else if len(steps) > 0 {
 			if currentSeqIndex < len(steps)-1 {
 				suggestedSeqIndex = currentSeqIndex + 1
 				suggestedLoad = currentLoad // Keep the same load when changing schemes in GZCLP
@@ -627,15 +682,49 @@ func buildLinearProgressionState(
 			}
 			summary = fmt.Sprintf("Deload milestone reached (%d sessions). Reducing load by %d%% to %s next session for recovery.", sessionCount, int((1.0-deloadPercent)*100), suggestedLoad)
 		} else {
+			rawIncrease := currentLoadValue
 			if hasCurrentLoad && increment > 0 {
-				rawIncrease := currentLoadValue + increment
+				rawIncrease = currentLoadValue + increment
 				if precision > 0 {
 					rawIncrease = roundToPrecision(rawIncrease, precision)
 				}
 				suggestedLoad = formatLoad(rawIncrease, loadUnit)
 			}
 
-			if bounceToBase && currentSeqIndex > 0 && len(steps) > 0 {
+			// Check if equipment limit is reached
+			if maxLoad > 0 && (rawIncrease > maxLoad || (hasCurrentLoad && currentLoadValue >= maxLoad) || isAlreadyCapped) {
+				suggestedLoad = formatLoad(maxLoad, loadUnit)
+				isAlreadyCapped = true
+
+				if onMaxLoad == "maintain" {
+					summary = fmt.Sprintf("Equipment load limit reached (%s). Maintained load for future sessions.", suggestedLoad)
+				} else {
+					// onMaxLoad == "expand_reps"
+					baseReps := int(lowerTarget)
+					if baseReps <= 0 {
+						baseReps = 3
+					}
+
+					if currentLoadValue < maxLoad {
+						// Arrived at maxLoad for the first time!
+						cappedReps = baseReps
+						summary = fmt.Sprintf("Equipment load limit reached (%s). Load capped at %s for next session (%s).", suggestedLoad, suggestedLoad, repsPrescribed)
+					} else if cappedReps <= 0 || cappedReps == baseReps {
+						// Completed base reps at maxLoad!
+						cappedReps = baseReps + 1
+						summary = fmt.Sprintf("Completed all sets at max equipment load (%s). Advancing to rep progression: target increased to %d reps!", suggestedLoad, cappedReps)
+					} else {
+						// Already in capped rep progression.
+						if allSetsCompleted && !anyRepTargetMiss(logs, float64(cappedReps)) {
+							cappedReps++
+							summary = fmt.Sprintf("Completed all sets at %d reps with max equipment load (%s). Advancing target to %d reps!", cappedReps-1, suggestedLoad, cappedReps)
+						} else {
+							outcome = OutcomeMaintain
+							summary = fmt.Sprintf("Maintained max equipment load (%s). Keep working towards %d reps across all sets.", suggestedLoad, cappedReps)
+						}
+					}
+				}
+			} else if bounceToBase && currentSeqIndex > 0 && len(steps) > 0 {
 				suggestedSeqIndex = 0
 				baseStep := steps[0]
 				summary = fmt.Sprintf("Succeeded on rescue scheme (%dx%s with %s)! Adding load next session (%s) and returning to base scheme (%dx%s).",
@@ -669,7 +758,19 @@ func buildLinearProgressionState(
 	var nextRepsPlanned string
 	var nextLowerTarget float64
 	var nextUpperTarget float64
-	if len(steps) > 0 {
+	if maxLoad > 0 && isAlreadyCapped && cappedReps > 0 && onMaxLoad == "expand_reps" {
+		if len(steps) > 0 && suggestedSeqIndex >= 0 && suggestedSeqIndex < len(steps) {
+			nextSetsPlanned = steps[suggestedSeqIndex].Sets
+		} else {
+			nextSetsPlanned = setsPlanned
+		}
+		nextRepsPlanned = fmt.Sprintf("%d", cappedReps)
+		if isAMRAP || strings.Contains(baseRepsStr, "+") {
+			nextRepsPlanned = fmt.Sprintf("%d+", cappedReps)
+		}
+		nextLowerTarget = float64(cappedReps)
+		nextUpperTarget = float64(cappedReps)
+	} else if len(steps) > 0 {
 		if suggestedSeqIndex >= 0 && suggestedSeqIndex < len(steps) {
 			nextSetsPlanned = steps[suggestedSeqIndex].Sets
 			nextRepsPlanned = steps[suggestedSeqIndex].Reps
@@ -718,6 +819,10 @@ func buildLinearProgressionState(
 			"min_amrap_reps":         minAMRAPReps,
 			"min_total_reps":         minTotalReps,
 			"strict_total_reps":      strictTotalReps,
+			"max_load":               maxLoad,
+			"on_max_load":            onMaxLoad,
+			"capped":                 isAlreadyCapped,
+			"capped_reps":            cappedReps,
 		},
 	}
 }
@@ -1011,6 +1116,8 @@ func evalSingleExerciseProgression(
 	existingMetadata map[string]any,
 	logs []CompletedSetLog,
 	isDeload bool,
+	maxLoad float64,
+	onMaxLoad string,
 ) singleProgressionResult {
 	if loadUnit == "" {
 		loadUnit = "kg"
@@ -1023,6 +1130,20 @@ func evalSingleExerciseProgression(
 	}
 	if increment <= 0 {
 		increment = 2.5
+	}
+	if onMaxLoad == "" {
+		onMaxLoad = "expand_reps"
+	}
+
+	isAlreadyCapped := false
+	cappedReps := 0
+	if existingMetadata != nil {
+		if b, ok := existingMetadata["capped"].(bool); ok {
+			isAlreadyCapped = b
+		}
+		if cr, ok := existingMetadata["capped_reps"]; ok {
+			cappedReps = intOrDefault(cr, 0)
+		}
 	}
 
 	currentLoad := ""
@@ -1092,7 +1213,7 @@ func evalSingleExerciseProgression(
 	if currentRepTarget < minReps {
 		currentRepTarget = minReps
 	}
-	if currentRepTarget > maxReps {
+	if currentRepTarget > maxReps && (!isAlreadyCapped || onMaxLoad != "expand_reps") {
 		currentRepTarget = maxReps
 	}
 
@@ -1109,6 +1230,10 @@ func evalSingleExerciseProgression(
 				"max_reps":      maxReps,
 				"is_deload":     true,
 				"baseline_load": existingSuggestedLoad,
+				"max_load":      maxLoad,
+				"on_max_load":   onMaxLoad,
+				"capped":        isAlreadyCapped,
+				"capped_reps":   cappedReps,
 			},
 		}
 	}
@@ -1122,9 +1247,83 @@ func evalSingleExerciseProgression(
 		if allSetsCompleted && minActualReps >= maxReps {
 			outcome := OutcomeIncrease
 			suggestedLoad := currentLoad
+			rawIncrease := currentLoadVal
 			if hasCurrentLoad && increment > 0 {
-				suggestedLoad = formatLoad(currentLoadVal+increment, loadUnit)
+				rawIncrease = currentLoadVal + increment
+				suggestedLoad = formatLoad(rawIncrease, loadUnit)
 			}
+
+			if maxLoad > 0 && (rawIncrease > maxLoad || currentLoadVal >= maxLoad || isAlreadyCapped) {
+				suggestedLoad = formatLoad(maxLoad, loadUnit)
+				isAlreadyCapped = true
+				if onMaxLoad == "maintain" {
+					return singleProgressionResult{
+						CurrentLoad:   currentLoad,
+						SuggestedLoad: suggestedLoad,
+						TargetReps:    strconv.Itoa(maxReps),
+						Outcome:       OutcomeMaintain,
+						Summary:       fmt.Sprintf("Hit %d reps across all %d sets at max equipment load (%s). Maintained load and rep target.", maxReps, setsPlanned, suggestedLoad),
+						Metadata: map[string]any{
+							"target_reps":      maxReps,
+							"min_reps":         minReps,
+							"max_reps":         maxReps,
+							"increment":        increment,
+							"load_unit":        loadUnit,
+							"progression_type": "double",
+							"max_load":         maxLoad,
+							"on_max_load":      onMaxLoad,
+							"capped":           true,
+						},
+					}
+				}
+
+				// onMaxLoad == "expand_reps"
+				if currentLoadVal < maxLoad {
+					// Arrived at maxLoad for the first time
+					return singleProgressionResult{
+						CurrentLoad:   currentLoad,
+						SuggestedLoad: suggestedLoad,
+						TargetReps:    strconv.Itoa(minReps),
+						Outcome:       outcome,
+						Summary:       fmt.Sprintf("Hit %d reps across all %d sets! Reached max equipment load (%s); reset target to %d reps next session.", maxReps, setsPlanned, suggestedLoad, minReps),
+						Metadata: map[string]any{
+							"target_reps":      minReps,
+							"min_reps":         minReps,
+							"max_reps":         maxReps,
+							"increment":        increment,
+							"load_unit":        loadUnit,
+							"progression_type": "double",
+							"max_load":         maxLoad,
+							"on_max_load":      onMaxLoad,
+							"capped":           true,
+							"capped_reps":      minReps,
+						},
+					}
+				}
+
+				// Already at maxLoad: advance reps past maxReps
+				nextTarget := minActualReps + 1
+				return singleProgressionResult{
+					CurrentLoad:   currentLoad,
+					SuggestedLoad: suggestedLoad,
+					TargetReps:    strconv.Itoa(nextTarget),
+					Outcome:       OutcomeIncrease,
+					Summary:       fmt.Sprintf("Completed all sets at %d reps with max equipment load (%s). Advancing target to %d reps!", minActualReps, suggestedLoad, nextTarget),
+					Metadata: map[string]any{
+						"target_reps":      nextTarget,
+						"min_reps":         minReps,
+						"max_reps":         maxReps,
+						"increment":        increment,
+						"load_unit":        loadUnit,
+						"progression_type": "double",
+						"max_load":         maxLoad,
+						"on_max_load":      onMaxLoad,
+						"capped":           true,
+						"capped_reps":      nextTarget,
+					},
+				}
+			}
+
 			return singleProgressionResult{
 				CurrentLoad:   currentLoad,
 				SuggestedLoad: suggestedLoad,
@@ -1138,14 +1337,19 @@ func evalSingleExerciseProgression(
 					"increment":        increment,
 					"load_unit":        loadUnit,
 					"progression_type": "double",
+					"max_load":         maxLoad,
+					"on_max_load":      onMaxLoad,
+					"capped":           false,
 				},
 			}
 		}
 
 		if allSetsCompleted && minActualReps >= currentRepTarget {
 			nextTarget := minActualReps + 1
-			if nextTarget > maxReps {
-				nextTarget = maxReps
+			if maxLoad <= 0 || !isAlreadyCapped || onMaxLoad != "expand_reps" {
+				if nextTarget > maxReps {
+					nextTarget = maxReps
+				}
 			}
 			return singleProgressionResult{
 				CurrentLoad:   currentLoad,
@@ -1160,6 +1364,10 @@ func evalSingleExerciseProgression(
 					"increment":        increment,
 					"load_unit":        loadUnit,
 					"progression_type": "double",
+					"max_load":         maxLoad,
+					"on_max_load":      onMaxLoad,
+					"capped":           isAlreadyCapped,
+					"capped_reps":      nextTarget,
 				},
 			}
 		}
@@ -1177,6 +1385,10 @@ func evalSingleExerciseProgression(
 				"increment":        increment,
 				"load_unit":        loadUnit,
 				"progression_type": "double",
+				"max_load":         maxLoad,
+				"on_max_load":      onMaxLoad,
+				"capped":           isAlreadyCapped,
+				"capped_reps":      cappedReps,
 			},
 		}
 
@@ -1184,8 +1396,14 @@ func evalSingleExerciseProgression(
 		lowerTarget := float64(minReps)
 		if allSetsCompleted && float64(minActualReps) >= lowerTarget {
 			suggestedLoad := currentLoad
+			rawIncrease := currentLoadVal
 			if hasCurrentLoad && increment > 0 {
-				suggestedLoad = formatLoad(currentLoadVal+increment, loadUnit)
+				rawIncrease = currentLoadVal + increment
+				suggestedLoad = formatLoad(rawIncrease, loadUnit)
+			}
+			if maxLoad > 0 && (rawIncrease > maxLoad || currentLoadVal >= maxLoad || isAlreadyCapped) {
+				suggestedLoad = formatLoad(maxLoad, loadUnit)
+				isAlreadyCapped = true
 			}
 			return singleProgressionResult{
 				CurrentLoad:   currentLoad,
@@ -1198,6 +1416,9 @@ func evalSingleExerciseProgression(
 					"increment":        increment,
 					"load_unit":        loadUnit,
 					"progression_type": "linear",
+					"max_load":         maxLoad,
+					"on_max_load":      onMaxLoad,
+					"capped":           isAlreadyCapped,
 				},
 			}
 		}
@@ -1212,6 +1433,9 @@ func evalSingleExerciseProgression(
 				"increment":        increment,
 				"load_unit":        loadUnit,
 				"progression_type": "linear",
+				"max_load":         maxLoad,
+				"on_max_load":      onMaxLoad,
+				"capped":           isAlreadyCapped,
 			},
 		}
 
@@ -1226,6 +1450,9 @@ func evalSingleExerciseProgression(
 				"target_reps":      repsStr,
 				"load_unit":        loadUnit,
 				"progression_type": "none",
+				"max_load":         maxLoad,
+				"on_max_load":      onMaxLoad,
+				"capped":           isAlreadyCapped,
 			},
 		}
 	}
@@ -1273,9 +1500,26 @@ func buildDoubleProgressionState(
 		existingMeta = existing.Metadata
 	}
 
+	maxLoad := parseNumberValue(block.Data["max_load"])
+	if maxLoad <= 0 {
+		if prog, ok := block.Data["progression"].(map[string]any); ok {
+			maxLoad = parseNumberValue(prog["max_load"])
+		}
+	}
+	onMaxLoad := strings.ToLower(strings.TrimSpace(asString(block.Data["on_max_load"])))
+	if onMaxLoad == "" {
+		if prog, ok := block.Data["progression"].(map[string]any); ok {
+			onMaxLoad = strings.ToLower(strings.TrimSpace(asString(prog["on_max_load"])))
+		}
+	}
+	if onMaxLoad == "" {
+		onMaxLoad = "expand_reps"
+	}
+
 	res := evalSingleExerciseProgression(
 		exerciseName, "double", setsPlanned, repsStr, minReps, maxReps, increment, loadUnit,
 		configuredLoad, existingLoad, existingMeta, logs, session.IsDeload,
+		maxLoad, onMaxLoad,
 	)
 
 	_, avgRPELabel, _ := averageMetric(logs, func(log CompletedSetLog) string { return log.ActualRPE })
@@ -1442,13 +1686,39 @@ func buildSupersetProgressionState(
 		}
 	}
 
+	maxLoadA := parseNumberValue(block.Data["max_load_a"])
+	if maxLoadA <= 0 {
+		maxLoadA = parseNumberValue(block.Data["max_load"])
+	}
+	onMaxLoadA := strings.ToLower(strings.TrimSpace(asString(block.Data["on_max_load_a"])))
+	if onMaxLoadA == "" {
+		onMaxLoadA = strings.ToLower(strings.TrimSpace(asString(block.Data["on_max_load"])))
+	}
+	if onMaxLoadA == "" {
+		onMaxLoadA = "expand_reps"
+	}
+
+	maxLoadB := parseNumberValue(block.Data["max_load_b"])
+	if maxLoadB <= 0 {
+		maxLoadB = parseNumberValue(block.Data["max_load"])
+	}
+	onMaxLoadB := strings.ToLower(strings.TrimSpace(asString(block.Data["on_max_load_b"])))
+	if onMaxLoadB == "" {
+		onMaxLoadB = strings.ToLower(strings.TrimSpace(asString(block.Data["on_max_load"])))
+	}
+	if onMaxLoadB == "" {
+		onMaxLoadB = "expand_reps"
+	}
+
 	resA := evalSingleExerciseProgression(
 		exA, progTypeA, setsPlanned, repsAStr, minA, maxA, incA, unitA,
 		startLoadA, existingLoadA, existingMetaA, logsA, session.IsDeload,
+		maxLoadA, onMaxLoadA,
 	)
 	resB := evalSingleExerciseProgression(
 		exB, progTypeB, setsPlanned, repsBStr, minB, maxB, incB, unitB,
 		startLoadB, existingLoadB, existingMetaB, logsB, session.IsDeload,
+		maxLoadB, onMaxLoadB,
 	)
 
 	overallOutcome := OutcomeMaintain
@@ -1504,8 +1774,31 @@ func (s *Service) syncProgressionStateWithBlock(state *ProgressionState, block r
 		state.Metadata["sets_planned"] = sets
 		return
 	}
-	if state.Metadata == nil {
-		state.Metadata = make(map[string]any)
+
+	maxLoad := parseNumberValue(block.Data["max_load"])
+	if maxLoad <= 0 {
+		if prog, ok := block.Data["progression"].(map[string]any); ok {
+			maxLoad = parseNumberValue(prog["max_load"])
+		}
+	}
+	onMaxLoad := strings.ToLower(strings.TrimSpace(asString(block.Data["on_max_load"])))
+	if onMaxLoad == "" {
+		if prog, ok := block.Data["progression"].(map[string]any); ok {
+			onMaxLoad = strings.ToLower(strings.TrimSpace(asString(prog["on_max_load"])))
+		}
+	}
+	if onMaxLoad == "" {
+		onMaxLoad = "expand_reps"
+	}
+	state.Metadata["max_load"] = maxLoad
+	state.Metadata["on_max_load"] = onMaxLoad
+
+	isCapped, _ := state.Metadata["capped"].(bool)
+	suggLoadVal, _ := parseNumberString(state.SuggestedLoad)
+	if isCapped && maxLoad > 0 && suggLoadVal < maxLoad {
+		isCapped = false
+		state.Metadata["capped"] = false
+		delete(state.Metadata, "capped_reps")
 	}
 
 	blockFailSeq := asString(block.Data["fail_sequence"])
@@ -1523,18 +1816,22 @@ func (s *Service) syncProgressionStateWithBlock(state *ProgressionState, block r
 			if len(steps) > 0 {
 				state.Metadata["current_sequence_index"] = 0
 				state.Metadata["sets_planned"] = steps[0].Sets
-				state.Metadata["reps_planned"] = steps[0].Reps
-				lower, _ := parseRepRange(steps[0].Reps)
-				state.Metadata["target_reps_lower"] = lower
+				if !isCapped {
+					state.Metadata["reps_planned"] = steps[0].Reps
+					lower, _ := parseRepRange(steps[0].Reps)
+					state.Metadata["target_reps_lower"] = lower
+				}
 			}
 		} else {
 			state.Metadata["current_sequence_index"] = 0
 			sets := intOrDefault(block.Data["sets"], 3)
-			reps := asString(block.Data["reps"])
 			state.Metadata["sets_planned"] = sets
-			state.Metadata["reps_planned"] = reps
-			lower, _ := parseRepRange(reps)
-			state.Metadata["target_reps_lower"] = lower
+			if !isCapped {
+				reps := asString(block.Data["reps"])
+				state.Metadata["reps_planned"] = reps
+				lower, _ := parseRepRange(reps)
+				state.Metadata["target_reps_lower"] = lower
+			}
 		}
 	} else if blockFailSeq == "" {
 		blockSets := intOrDefault(block.Data["sets"], 3)
@@ -1543,8 +1840,10 @@ func (s *Service) syncProgressionStateWithBlock(state *ProgressionState, block r
 		stateSets := intOrDefault(state.Metadata["sets_planned"], 3)
 		stateReps := asString(state.Metadata["reps_planned"])
 
-		if blockSets != stateSets || blockReps != stateReps {
+		if blockSets != stateSets {
 			state.Metadata["sets_planned"] = blockSets
+		}
+		if !isCapped && blockReps != stateReps {
 			state.Metadata["reps_planned"] = blockReps
 			lower, _ := parseRepRange(blockReps)
 			state.Metadata["target_reps_lower"] = lower
@@ -1561,8 +1860,10 @@ func (s *Service) syncProgressionStateWithBlock(state *ProgressionState, block r
 			expectedReps := steps[currIdx].Reps
 			actualSets := intOrDefault(state.Metadata["sets_planned"], 0)
 			actualReps := asString(state.Metadata["reps_planned"])
-			if actualSets != expectedSets || actualReps != expectedReps {
+			if actualSets != expectedSets {
 				state.Metadata["sets_planned"] = expectedSets
+			}
+			if !isCapped && actualReps != expectedReps {
 				state.Metadata["reps_planned"] = expectedReps
 				lower, _ := parseRepRange(expectedReps)
 				state.Metadata["target_reps_lower"] = lower
