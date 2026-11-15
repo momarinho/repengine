@@ -1,6 +1,13 @@
 import { fail, redirect } from '@sveltejs/kit';
-import type { Actions } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 import { apiFetch, safeJson } from '$lib/server/api';
+import { isDemoMode } from '$lib/server/demo/config';
+
+export const load = (async () => {
+	return {
+		isDemo: isDemoMode()
+	};
+}) satisfies PageServerLoad;
 
 export const actions = {
 	login: async ({ request, cookies, fetch }) => {

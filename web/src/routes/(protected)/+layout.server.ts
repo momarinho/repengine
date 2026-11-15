@@ -1,6 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
 import { apiFetch } from '$lib/server/api';
+import { isDemoMode } from '$lib/server/demo/config';
 
 function decodeUserIDFromToken(token: string): number | null {
 	const parts = token.split('.');
@@ -16,6 +17,14 @@ function decodeUserIDFromToken(token: string): number | null {
 }
 
 export const load = (async ({ cookies, fetch }) => {
+	const demo = isDemoMode();
+	if (demo) {
+		return {
+			sessionUserID: 1,
+			isDemo: true
+		};
+	}
+
 	const token = cookies.get('token');
 
 	if (!token) {
@@ -29,6 +38,7 @@ export const load = (async ({ cookies, fetch }) => {
 	}
 
 	return {
-		sessionUserID: decodeUserIDFromToken(token)
+		sessionUserID: decodeUserIDFromToken(token),
+		isDemo: false
 	};
 }) satisfies LayoutServerLoad;

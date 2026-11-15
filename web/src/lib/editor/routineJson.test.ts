@@ -382,7 +382,7 @@ test('parseAndValidateRoutineJson and exportWorkflowToCanonicalJson preserve max
 	assert.equal(deadlift.data.on_max_load, 'expand_reps');
 
 	const canonical = exportWorkflowToCanonicalJson(
-		{ id: 1, name: 'Home Gym GZCLP', description: '', is_public: false, blocks: [] },
+		{ name: 'Home Gym GZCLP', description: '', is_public: false },
 		result.draftBlocks
 	);
 	const blockJson = canonical.sections[0].blocks[0];

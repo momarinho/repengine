@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import type { PageData } from './$types';
 
-	let { form } = $props();
+	let { data, form }: { data: PageData; form: { message?: string } | null } = $props();
 </script>
 
 <svelte:head>
@@ -42,6 +43,25 @@
 				<h2 class="text-lg font-bold text-on-surface">Welcome back</h2>
 				<p class="text-xs text-on-surface-variant mt-0.5">Enter your credentials to access your routines and athlete logs.</p>
 			</div>
+
+			{#if data.isDemo}
+				<div class="mb-6 rounded-xl border border-primary/30 bg-primary/10 p-4 space-y-3">
+					<div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary">
+						<span class="material-symbols-outlined text-base">bolt</span>
+						Showcase Demo Mode
+					</div>
+					<p class="text-xs text-on-surface-variant leading-relaxed">
+						Explore the full Routine Studio, GZCLP &amp; Wave progression engine, Home Gym plate cap mode, and Workout HUD without creating an account.
+					</p>
+					<a
+						href="/dashboard"
+						class="btn-primary-gradient w-full font-headline font-bold text-sm py-2.5 px-4 rounded-xl shadow-lg shadow-primary/20 hover:brightness-110 transition-all flex justify-center items-center gap-2"
+					>
+						<span class="material-symbols-outlined text-[18px]">play_arrow</span>
+						Enter Live Demo
+					</a>
+				</div>
+			{/if}
 
 			<!-- Login Form -->
 			<form method="POST" action="?/login" class="space-y-4" use:enhance>

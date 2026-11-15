@@ -1,6 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
 import { apiFetch } from '$lib/server/api';
+import { isDemoMode } from '$lib/server/demo/config';
 
 export const actions = {
 	logout: async ({ cookies, fetch }) => {
@@ -16,6 +17,6 @@ export const actions = {
 
 		cookies.delete('token', { path: '/' });
 
-		throw redirect(303, '/login');
+		throw redirect(303, isDemoMode() ? '/' : '/login');
 	}
 } satisfies Actions;

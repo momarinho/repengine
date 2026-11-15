@@ -1,3 +1,6 @@
+import { isDemoMode } from './demo/config';
+import { handleDemoAnalyticsFetch, handleDemoApiFetch } from './demo/handler';
+
 const API_URL = process.env.API_URL || 'http://localhost:8080';
 const ANALYTICS_URL = process.env.ANALYTICS_URL || 'http://localhost:8081';
 
@@ -14,6 +17,9 @@ export async function analyticsFetch(
 	path: string,
 	init: RequestInit = {}
 ): Promise<Response> {
+	if (isDemoMode()) {
+		return handleDemoAnalyticsFetch(path, init);
+	}
 	return fetchFn(analyticsUrl(path), init);
 }
 
@@ -23,6 +29,9 @@ export async function bffFetch(
 	token: string | undefined,
 	init: RequestInit = {}
 ): Promise<Response> {
+	if (isDemoMode()) {
+		return handleDemoAnalyticsFetch(path, init);
+	}
 	const headers = new Headers(init.headers);
 
 	if (token) {
@@ -41,6 +50,9 @@ export async function apiFetch(
 	token: string | undefined,
 	init: RequestInit = {}
 ): Promise<Response> {
+	if (isDemoMode()) {
+		return handleDemoApiFetch(path, init);
+	}
 	const headers = new Headers(init.headers);
 
 	if (token) {
